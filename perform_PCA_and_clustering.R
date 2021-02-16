@@ -127,10 +127,16 @@ if (cfg$include_coverage){
   } else {
     mydata <- complete_data
   }
-  if (dim(table(mydata["g_cov_z_bool"])) == 1) {
-      #cat("\nexcluded due to a variance of 0 (no genes with conspicuos coverage profile):\n", file=paste(c(cfg$output_path, "PCA_and_clustering/variables_excluded_from_PCA_and_clustering.txt"), collapse=""), append=TRUE)
-      #write.table(colnames(subsetted_data[, (names(subsetted_data) %in% contig_columns)]), file=paste(c(cfg$output_path, "PCA_and_clustering/variables_excluded_from_PCA_and_clustering.txt"), collapse=""), col.names=FALSE, row.names=FALSE, quote=FALSE, append=TRUE)
-      mydata <- subset(mydata, select = -g_cov_z_bool)
+  # if only one value in "g_cov_z_bool", drop the column
+  if("g_cov_z_bool" %in% colnames(mydata)){
+    if (dim(table(mydata["g_cov_z_bool"])) == 1) {
+        #cat("\nexcluded due to a variance of 0 (no genes with conspicuos coverage profile):\n", file=paste(c(cfg$output_path, "PCA_and_clustering/variables_excluded_from_PCA_and_clustering.txt"), collapse=""), append=TRUE)
+        #write.table(colnames(subsetted_data[, (names(subsetted_data) %in% contig_columns)]), file=paste(c(cfg$output_path, "PCA_and_clustering/variables_excluded_from_PCA_and_clustering.txt"), collapse=""), col.names=FALSE, row.names=FALSE, quote=FALSE, append=TRUE)
+        mydata <- subset(mydata, select = -g_cov_z_bool)
+    }
+  }
+}else{
+  mydata <- complete_data
 }
 
 

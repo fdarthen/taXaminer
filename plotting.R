@@ -230,7 +230,8 @@ genes_coords_taxon$label[is.na(genes_coords_taxon$label)] <- "Unassigned"
 # csv output of genes with orphan + taxon info and PCA coordinates
 num_cov_cols <- length(cfg$pbc_paths)*10 # number of coverage related columns in genes_coords_taxon; information needed for indexing
 # indexes of columns to be subsetted and reordered for output
-cols <- c(3:(30+num_cov_cols),32+num_cov_cols,34+num_cov_cols,33+num_cov_cols,2,(35+num_cov_cols),(36+num_cov_cols),(38+num_cov_cols)) #,(40+num_cov_cols),(41+num_cov_cols))
+print(colnames(genes_coords_taxon))
+cols <- c(3:(30+num_cov_cols),32+num_cov_cols,34+num_cov_cols,33+num_cov_cols,2,(35+num_cov_cols),(36+num_cov_cols),(41+num_cov_cols)) #,(40+num_cov_cols),(41+num_cov_cols))
 raw_gene_table_orphan_info <- data.frame(genes_coords_taxon)[,cols]
 names(raw_gene_table_orphan_info)[names(raw_gene_table_orphan_info) == "rank"] <- cfg$plot_grouping_rank
 write.csv(raw_gene_table_orphan_info, file=paste(c(cfg$output_path, "taxonomic_assignment/raw_gene_table_taxon.csv"), collapse=""), row.names=FALSE, quote=FALSE)
