@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # reads FASTA, GFF3 and per_base_coverage.txt file and produces gene_info directory
 # author: Simonida Zehr
 # date: 18 June 2019
@@ -15,10 +17,10 @@ from Bio.Seq import Seq as BioPython_Seq # to count oligonucleotides (also overl
 import yaml
 config_obj=yaml.safe_load(open('./config.yml','r'))
 gff_path=config_obj['gff_path'] # GFF file path
-fasta_path='tmp.MILTS.fasta' # path to tmp FASTA file
 pbc_paths=config_obj['pbc_paths'] # per base coverage (PBC) file path(s)
 contig_tag=config_obj['contig_tag'] # contig label (e.g. "region", "contig", ...)
 output_path=config_obj['output_path'] # complete output path (ENDING ON A SLASH!)
+fasta_path=output_path+'tmp.MILTS.fasta' # path to tmp FASTA file
 include_pseudogenes = config_obj['include_pseudogenes'] # boolean signifying whether pseudogenes should be included in the analysis
 include_coverage = config_obj['include_coverage']
 
@@ -37,8 +39,10 @@ print("include pseudogenes = " + str(include_pseudogenes))
 
 if include_coverage.lower()[0] == 't': # if this 1st letter is 't'
     include_coverage = True # set boolean in this script to True
+    num_pbc = len(pbc_paths) # number of pbc paths
 elif include_coverage.lower()[0] == 'f': # if this first letter is 'f'
     include_coverage = False # set the boolean in this script to False
+    num_pbc = 1 # number of pbc paths is set to 1 as placeholder (mock coverage is generated)
 else: # if the user input is invalid,
     include_coverage = False # set the boolean to false by default
 print("include coverage = " + str(include_coverage))
@@ -64,7 +68,7 @@ class Contig:
         self.set_centre_corrector()
 
 
-        self.per_base_coverages = [[] for pbc in pbc_paths] # array that holds the coverage per base in this contig
+        self.per_base_coverages = [[] for pbc in range(num_pbc)] # array that holds the coverage per base in this contig
                                 # note that the element at index i is the coverage at base i+1
                                 # (indexing in python is 0-based but sequences are 1-based)
         self.coverage = []
@@ -283,8 +287,8 @@ class Contig:
             # missing base coverages are substituted with NaNs
             # get array WITHOUT NaNs
             gene_pbc_without_nans = []
-            for counter, pbc_path in enumerate(pbc_paths):
-                gene_pbc_without_nans.append([cov for cov in self.per_base_coverages[counter][cov_start:cov_end]
+            for pbc in range(num_pbc):
+                gene_pbc_without_nans.append([cov for cov in self.per_base_coverages[pbc][cov_start:cov_end]
                                                 if not np.isnan(cov)])
 
             gene_coverage = [np.mean(coverages) for coverages in gene_pbc_without_nans]
@@ -455,7 +459,7 @@ class Gene:
         self.percentage_of_contig_length = self.compute_percentage_of_contig_length()
         self.length_of_covered_bases = []
 
-        self.coverage = [np.nan for pbc in pbc_paths]
+        self.coverage = [np.nan for pbc in range(num_pbc)]
         self.coverage_sd = []
 
 
@@ -622,23 +626,23 @@ class Gene:
         # if this is the only gene on the contig
         if self.single_gene == 1:
             # no comparisons possible
-            return [np.nan for pbc in pbc_paths]
+            return [np.nan for pbc in range(num_pbc)]
 
         covdevs = []
-        for counter in range(len(pbc_paths)):
-            gene_cov_sd_contig = all_contigs[self.contig].get_gene_coverage_sd()[counter]
+        for pbc_index in range(num_pbc):
+            gene_cov_sd_contig = all_contigs[self.contig].get_gene_coverage_sd()[pbc_index]
             if gene_cov_sd_contig == 0:
                 # no deviation from contig
                 covdevs.append(np.nan)
                 continue
-            gene_cov_mean_contig = all_contigs[self.contig].get_gene_coverage_mean()[counter]
+            gene_cov_mean_contig = all_contigs[self.contig].get_gene_coverage_mean()[pbc_index]
 
 
             # deviation in units of 1 SD (contig)
-            dev_in_sd = abs(gene_cov_mean_contig - self.coverage[counter]) / gene_cov_sd_contig
+            dev_in_sd = abs(gene_cov_mean_contig - self.coverage[pbc_index]) / gene_cov_sd_contig
 
             # if own cov is smaller than gene cov mean on contig
-            if self.coverage[counter] < gene_cov_mean_contig:
+            if self.coverage[pbc_index] < gene_cov_mean_contig:
                 # return negative deviation
                 covdevs.append(-dev_in_sd)
             else:
@@ -646,7 +650,7 @@ class Gene:
         return covdevs
 
 
-    def covdev_from_overall(self, mean_ref, sd_ref, counter):
+    def covdev_from_overall(self, mean_ref, sd_ref, pbc_index):
         '''Indicates how much the gene cov deviates from overall mean gene cov,
         in units of gene cov SD (overall).'''
 
@@ -655,10 +659,10 @@ class Gene:
         if sd_ref == 0:
             return np.nan
         # deviation in units of 1 SD (overall)
-        dev_in_sd = abs(mean_ref - self.coverage[counter]) / sd_ref
+        dev_in_sd = abs(mean_ref - self.coverage[pbc_index]) / sd_ref
 
         # if own cov is smaller than gene cov mean
-        if self.coverage[counter] < mean_ref:
+        if self.coverage[pbc_index] < mean_ref:
             # return negative deviation
             return -dev_in_sd
         else:
@@ -809,25 +813,25 @@ def impute_array(data_array):
     # we're going to loop over all genes and store all of the
     # variables to be imputed
     # --> initialise these arrays
-    c_genecovsds = [[] for pbc in pbc_paths]
+    c_genecovsds = [[] for pbc in range(num_pbc)]
     c_genelensds = []
 
-    g_covdev_cs = [[] for pbc in pbc_paths]
+    g_covdev_cs = [[] for pbc in range(num_pbc)]
     g_lendev_cs = []
     g_gcdev_cs = []
 
     # for each gene array in the given matrix:
     for gene_array in data_array:
-        for counter in range(len(pbc_paths)):
+        for pbc_index in range(num_pbc):
 
             # get all gene coverage SDs which are not NaNs
-            if not np.isnan(gene_array[index_of["c_genecovsd"]][counter]):          # (expl.: index_of["c_genecovsd"] returns 11
+            if not np.isnan(gene_array[index_of["c_genecovsd"]][pbc_index]):          # (expl.: index_of["c_genecovsd"] returns 11
                 # and add them to the respective array                              # gene_array[11] will give the c_genecovsd value
-                c_genecovsds[counter].append(gene_array[index_of["c_genecovsd"]][counter]) # for the current gene)
+                c_genecovsds[pbc_index].append(gene_array[index_of["c_genecovsd"]][pbc_index]) # for the current gene)
 
             # get all gene deviations from contig mean cov
-            if not np.isnan(gene_array[index_of["g_covdev_c"]][counter]):
-                g_covdev_cs[counter].append(gene_array[index_of["g_covdev_c"]][counter])
+            if not np.isnan(gene_array[index_of["g_covdev_c"]][pbc_index]):
+                g_covdev_cs[pbc_index].append(gene_array[index_of["g_covdev_c"]][pbc_index])
 
         # get all gene length SDs
         if not np.isnan(gene_array[index_of["c_genelensd"]]):
@@ -872,12 +876,12 @@ def impute_array(data_array):
     for gene_array in data_array:
 
         if include_coverage:
-            for counter in range(len(pbc_paths)):
-                gene_array[index_of["c_genecovsd"]][counter] = rescale(gene_array[index_of["c_genecovsd"]][counter], \
-                                min_c_genecovsds[counter], max_c_genecovsds[counter], 0, 1, my_mean1[counter]) #1.0, 10.0
+            for pbc_index in range(num_pbc):
+                gene_array[index_of["c_genecovsd"]][pbc_index] = rescale(gene_array[index_of["c_genecovsd"]][pbc_index], \
+                                min_c_genecovsds[pbc_index], max_c_genecovsds[pbc_index], 0, 1, my_mean1[pbc_index]) #1.0, 10.0
 
-                gene_array[index_of["g_covdev_c"]][counter] = rescale(gene_array[index_of["g_covdev_c"]][counter], \
-                                min_g_covdev_cs[counter], max_g_covdev_cs[counter], 0, 1, my_mean3[counter]) #1.0, 10.0
+                gene_array[index_of["g_covdev_c"]][pbc_index] = rescale(gene_array[index_of["g_covdev_c"]][pbc_index], \
+                                min_g_covdev_cs[pbc_index], max_g_covdev_cs[pbc_index], 0, 1, my_mean3[pbc_index]) #1.0, 10.0
 
         gene_array[index_of["c_genelensd"]] = \
         rescale(gene_array[index_of["c_genelensd"]], min_c_genelensds, max_c_genelensds, 0, 1, my_mean2) #1.0, 10.0
@@ -1023,7 +1027,7 @@ def compute_coverage_and_positional_info():
         # if contig is geneless
         # set its gene coverage mean & SD to np.nan
         if contig.geneless_info() == 1:
-            contig.set_gene_coverage_mean_and_sd([np.nan for coverages in pbc_paths], [np.nan for coverages in pbc_paths])
+            contig.set_gene_coverage_mean_and_sd([np.nan for coverages in range(num_pbc)], [np.nan for coverages in range(num_pbc)])
             contig.set_gene_lengths_mean_and_sd(np.nan, np.nan)
 
         else:
@@ -1063,10 +1067,10 @@ def compute_coverage_and_positional_info():
 
             # compute length corrected gene coverage mean and SD for this contig
             contig_weighted_gene_cov_mean, contig_weighted_gene_cov_sd = [], []
-            for counter in range (len(pbc_paths)): #for each coverage file
+            for pbc_index in range(num_pbc): #for each coverage file
                 cov_mean, cov_sd = get_lgth_corr_stats( \
-                [coverages[counter] for coverages in contig_gene_covs], \
-                [coverages[counter] for coverages in contig_gene_covered_base_lengths])
+                [coverages[pbc_index] for coverages in contig_gene_covs], \
+                [coverages[pbc_index] for coverages in contig_gene_covered_base_lengths])
                 contig_weighted_gene_cov_mean.append(cov_mean)
                 contig_weighted_gene_cov_sd.append(cov_sd)
 
@@ -1083,7 +1087,7 @@ def compute_coverage_and_positional_info():
                 contig.set_gene_lengths_mean_and_sd(np.mean(contig_gene_lengths),
                                                 np.nan) # set standard deviation to NaN
                 contig.set_gene_coverage_mean_and_sd(contig_weighted_gene_cov_mean,
-                                                 [np.nan for pbc in pbc_paths]) # set standard deviation to NaN
+                                                 [np.nan for pbc in range(num_pbc)]) # set standard deviation to NaN
                 contig.set_gene_gc_mean_and_sd(contig_weighted_gene_gc_mean,
                                               np.nan)
 
@@ -1406,10 +1410,10 @@ def compute_stats(contig_list, lgth_corr_function):
     contig_max_cov = [max([cov[i] for cov in contig_coverages]) for i in range(len(contig_coverages[0]))]
     # WEIGHTING
     all_contigs_mean_cov, all_contigs_cov_sd = [], []
-    for counter in range(len(pbc_paths)):
+    for pbc_index in range(num_pbc):
         mean_cov, cov_sd = lgth_corr_function( \
-                            [cov[counter] for cov in contig_coverages], \
-                            [cov[counter] for cov in contig_covered_bases_lengths])
+                            [cov[pbc_index] for cov in contig_coverages], \
+                            [cov[pbc_index] for cov in contig_covered_bases_lengths])
         all_contigs_mean_cov.append(mean_cov)
         all_contigs_cov_sd.append(cov_sd)
 
@@ -1437,17 +1441,17 @@ def compute_stats(contig_list, lgth_corr_function):
     gene_max_cov = [max([cov[i] for cov in gene_coverages]) for i in range(len(gene_coverages[0]))]
     # WEIGHTING
     all_genes_mean_cov, all_genes_cov_sd = [], []
-    for counter in range(len(pbc_paths)):
+    for pbc_index in range(num_pbc):
         mean_cov, cov_sd = lgth_corr_function( \
-                            [cov[counter] for cov in gene_coverages], \
-                            [cov[counter] for cov in gene_covered_bases_lengths])
+                            [cov[pbc_index] for cov in gene_coverages], \
+                            [cov[pbc_index] for cov in gene_covered_bases_lengths])
         all_genes_mean_cov.append(mean_cov)
         all_genes_cov_sd.append(cov_sd)
     # UNWEIGHTED COV MEAN AND SD
     all_genes_mean_cov_unweighted, all_genes_cov_sd_unweighted = [], []
-    for counter in range(len(pbc_paths)):
-        mean_cov = np.mean([cov[counter] for cov in gene_coverages])
-        cov_sd = np.std([cov[counter] for cov in gene_coverages])
+    for pbc_index in range(num_pbc):
+        mean_cov = np.mean([cov[pbc_index] for cov in gene_coverages])
+        cov_sd = np.std([cov[pbc_index] for cov in gene_coverages])
         all_genes_mean_cov_unweighted.append(mean_cov)
         all_genes_cov_sd_unweighted.append(cov_sd)
 
@@ -1620,7 +1624,7 @@ def get_raw_array(contig_name_list, stats_ref):
 
             c_cov = contig.get_coverage()
             c_covsd = contig.get_coverage_sd()
-            c_covdev = [contig.covdev_from_overall(stats_ref["contig cov mean"][i], stats_ref["contig cov sd"][i], i) for i in range(len(pbc_paths))]
+            c_covdev = [contig.covdev_from_overall(stats_ref["contig cov mean"][pbc_index], stats_ref["contig cov sd"][pbc_index], pbc_index) for pbc_index in range(num_pbc)]
             c_genecovm = contig.get_gene_coverage_mean()
             c_genecovsd = contig.get_gene_coverage_sd()
             c_genelenm = contig.get_gene_lengths_mean()
@@ -1649,15 +1653,15 @@ def get_raw_array(contig_name_list, stats_ref):
                 # ------------------
 
 
-                
+
                 g_cov_z_score_vector = []
-                for counter in range(len(pbc_paths)):
-                    if (gene.get_coverage()[counter] - stats_ref["gene cov mean unweighted"][counter]) == 0 \
-                    or stats_ref["gene cov sd unweighted"][counter] == 0 \
-                    or (gene.get_coverage()[counter] == np.nan or stats_ref["gene cov mean unweighted"][counter] == np.nan or stats_ref["gene cov sd unweighted"][counter] == np.nan):
+                for pbc_index in range(num_pbc):
+                    if (gene.get_coverage()[pbc_index] - stats_ref["gene cov mean unweighted"][pbc_index]) == 0 \
+                    or stats_ref["gene cov sd unweighted"][pbc_index] == 0 \
+                    or (gene.get_coverage()[pbc_index] == np.nan or stats_ref["gene cov mean unweighted"][pbc_index] == np.nan or stats_ref["gene cov sd unweighted"][pbc_index] == np.nan):
                         g_cov_z_score_vector.append(0)
                     else:
-                        g_cov_z_score = (gene.get_coverage()[counter] - stats_ref["gene cov mean unweighted"][counter]) / stats_ref["gene cov sd unweighted"][counter]
+                        g_cov_z_score = (gene.get_coverage()[pbc_index] - stats_ref["gene cov mean unweighted"][pbc_index]) / stats_ref["gene cov sd unweighted"][pbc_index]
                         g_cov_z_score_vector.append(g_cov_z_score)
 
                 above_2 = 0
@@ -1671,11 +1675,11 @@ def get_raw_array(contig_name_list, stats_ref):
                     else: # coverage of gene is within 2SDs of mean
                         within_2 += 1
 
-                if above_2 == len(pbc_paths):
+                if above_2 == num_pbc:
                     g_cov_z_score_bool = 1 # gene coverage is higher than average in all coverage profiles
-                elif below_m2 == len(pbc_paths):
+                elif below_m2 == num_pbc:
                     g_cov_z_score_bool = 1 # gene coverage is lower than average in all coverage profiles
-                elif within_2 == len(pbc_paths):
+                elif within_2 == num_pbc:
                     g_cov_z_score_bool = 1 # gene coverage is within 2SDs of mean in all coverage profiles
                 else:
                     g_cov_z_score_bool = 0 # gene has differential coverage profile
@@ -1720,8 +1724,8 @@ def get_raw_array(contig_name_list, stats_ref):
                     gene.get_coverage(), # index 22
                     gene.get_coverage_sd(), # index 23
                     gene.covdev_from_contig(), # index 24
-                    [gene.covdev_from_overall(stats_ref["gene cov mean"][i], stats_ref["gene cov sd"][i], i) \
-                        for i in range(len(pbc_paths))], # index 25
+                    [gene.covdev_from_overall(stats_ref["gene cov mean"][pbc_index], stats_ref["gene cov sd"][pbc_index], pbc_index) \
+                        for pbc_index in range(num_pbc)], # index 25
 
                     g_cov_z_score_vector, # index 33
                     g_cov_z_score_bool, # index 34
@@ -1768,11 +1772,11 @@ def output_table(raw_array, filename):
     c_cov_header = []
     g_cov_header = []
     for elem in ["c_cov", "c_covsd", "c_covdev", "c_genecovm", "c_genecovsd"]:
-        for i in range(len(pbc_paths)):
-            c_cov_header.append(elem+"_"+str(i))
+        for pbc_index in range(num_pbc):
+            c_cov_header.append(elem+"_"+str(pbc_index))
     for elem in (["g_cov", "g_covsd", "g_covdev_c", "g_covdev_o", "g_cov_zscore"]):
-        for i in range(len(pbc_paths)):
-                g_cov_header.append(elem+"_"+str(i))
+        for pbc_index in range(num_pbc):
+                g_cov_header.append(elem+"_"+str(pbc_index))
 
 
     header = [
@@ -1861,19 +1865,19 @@ def output_summary_file(stats_ref, filename):
     summaryfile = open(path_summaryfile, "w")
 
     contig_cov_summary = ""
-    for counter in range(len(pbc_paths)):
-        contig_cov_summary += "contig cov mean\t" + str(round(stats_ref["contig cov mean"][counter], 2)) + "\n" + \
-         "contig cov sd\t" + str(round(stats_ref["contig cov sd"][counter], 2)) + "\n" + \
-         "contig cov min\t" + str(round(stats_ref["contig cov min"][counter], 2)) + "\n" + \
-         "contig cov max\t" + str(round(stats_ref["contig cov max"][counter], 2)) + "\n"
+    for pbc_index in range(num_pbc):
+        contig_cov_summary += "contig cov mean\t" + str(round(stats_ref["contig cov mean"][pbc_index], 2)) + "\n" + \
+         "contig cov sd\t" + str(round(stats_ref["contig cov sd"][pbc_index], 2)) + "\n" + \
+         "contig cov min\t" + str(round(stats_ref["contig cov min"][pbc_index], 2)) + "\n" + \
+         "contig cov max\t" + str(round(stats_ref["contig cov max"][pbc_index], 2)) + "\n"
     contig_cov_summary += "\n"
 
     gene_cov_summary = ""
-    for counter in range(len(pbc_paths)):
-        gene_cov_summary += "gene cov mean\t" + str(round(stats_ref["gene cov mean"][counter], 2))  + "\n" + \
-          "gene cov sd\t" + str(round(stats_ref["gene cov sd"][counter], 2)) + "\n" + \
-          "gene cov min\t" + str(round(stats_ref["gene cov min"][counter], 2))  + "\n" + \
-          "gene cov max\t" + str(round(stats_ref["gene cov max"][counter], 2)) + "\n"
+    for pbc_index in range(num_pbc):
+        gene_cov_summary += "gene cov mean\t" + str(round(stats_ref["gene cov mean"][pbc_index], 2))  + "\n" + \
+          "gene cov sd\t" + str(round(stats_ref["gene cov sd"][pbc_index], 2)) + "\n" + \
+          "gene cov min\t" + str(round(stats_ref["gene cov min"][pbc_index], 2))  + "\n" + \
+          "gene cov max\t" + str(round(stats_ref["gene cov max"][pbc_index], 2)) + "\n"
     gene_cov_summary += "\n"
 
 
@@ -2160,8 +2164,9 @@ total_z_score_vector = calculate_z_score_vector(total_tetranuc_freqs, total_trin
 current_contig = None # contig (object) to which coverages are currently added
 current_contig_name = "dummy" # name of contig to which coverages are currently added
 
+
 if include_coverage:
-    for counter, pbc_path in enumerate(pbc_paths):
+    for pbc_index, pbc_path in enumerate(pbc_paths):
         with open(pbc_path, 'r') as pbc: # open PBC file
             for line in pbc:
 
@@ -2178,14 +2183,14 @@ if include_coverage:
                 if current_contig is not None: # only add to contigs which exist in GFF file
                     base = int(pbc_info_array[1])
                     coverage = int(float(pbc_info_array[2]))
-                    current_contig.add_base_coverage(counter, base, coverage)
+                    current_contig.add_base_coverage(pbc_index, base, coverage)
 else: # if user does not want to include coverage information or it is not available
     mock_coverage = 1 # coverage that is set for all bases
-    for counter, pbc_path in enumerate(pbc_paths):
-        for contig_name, contig in all_contigs.items():
-            if contig.geneless_info() == 0: # only store "info" if contig has genes
-                for base in range(1, contig.get_length()+1): # set coverage for every base to mock coverage
-                    contig.add_base_coverage(counter, base, mock_coverage)
+    for contig_name, contig in all_contigs.items():
+        if contig.geneless_info() == 0: # only store "info" if contig has genes
+            for base in range(1, contig.get_length()+1): # set coverage for every base to mock coverage
+                for pbc_index in range(num_pbc):
+                    contig.add_base_coverage(pbc_index, base, mock_coverage)
 
 
 
@@ -2208,6 +2213,7 @@ compute_coverage_and_positional_info()
 
 
 # ----------------------- GET STATS -> values for reference ----------------------
+
 
 # get stats taking ALL contigs and genes into account (except those without coverage)
 stats_for_all_contigs = compute_stats(all_contigs.keys(), get_lgth_corr_stats)

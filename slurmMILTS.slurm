@@ -8,6 +8,8 @@
 #SBATCH --error=./array_%A_%a.e.out      # and error log
 
 
+PATH=$PWD/tools:$PWD/tools/samtools-1.11:$PWD/tools/gffread-0.12.1:$PATH
+
 start=`date +%s`
 
 # read necessary variables from config file
@@ -101,7 +103,7 @@ then
 
 
   # 1.a) remove newlines from fasta
-  awk '/^>/{if(NR==1){print}else{printf("\n%s\n",$0)}next} {printf("%s",$0)} END{printf("\n")}' $fasta_path >> tmp.MILTS.fasta
+  awk '/^>/{if(NR==1){print}else{printf("\n%s\n",$0)}next} {printf("%s",$0)} END{printf("\n")}' $fasta_path >> ${output_path}tmp.MILTS.fasta
 
   # 2) start python script --> produces descriptive gene statistics
   echo -e "\nproduce gene info start:"
@@ -143,7 +145,7 @@ then
     echo "taxonomic assignment start:"
     time4_1=`date +%s`
     diamond blastp -q "${proteins_path}" -o "${taxon_hits_lca_path}" -d "${nr_db_path}" -f 102 -b2.0 --tmpdir /dev/shm --sensitive --taxon-exclude "$tax_id" --top 10 -c1
-    diamond blastp -q "${proteins_path}" -o "${best_taxon_hit_path}" -d "${nr_db_path}"  -f 6 qseqid sseqid evalue bitscore score pident staxids sscinames -b2.0 --tmpdir /dev/shm --sensitive --taxon-exclude "$tax_id" -c1 -k 1
+    diamond blastp -q "${proteins_path}" -o "${best_taxon_hit_path}" -d "${nr_db_path}" -f 6 qseqid sseqid evalue bitscore score pident staxids sscinames -b2.0 --tmpdir /dev/shm --sensitive --taxon-exclude "$tax_id" -c1 -k 1
     time4_2=`date +%s`
     echo "taxonomic assignment end (time elapsed:" $(($time4_2-$time4_1)) "s)"
   fi
@@ -154,14 +156,14 @@ fi
 echo "plot taxonomic assignment start:"
 time5_1=`date +%s`
 # grepping the GFF to only relevant lines accelerates gffread on large files immensely
-zgrep -E "CDS|gene" ${gff_path} | gffread - -o ${output_path}"tmp.prot_gene_matching.txt" --table "@id,@geneid"
+zgrep -P "\tCDS\t|\tgene\t|\tmRNA\t" ${gff_path} | gffread - -o ${output_path}"tmp.prot_gene_matching.txt" --table "@id,@geneid"
 Rscript plotting.R --verbose >> $output_path"R_log.out"
 time5_2=`date +%s`
 echo "plot taxonomic assignment end (time elapsed:" $(($time5_2-$time5_1)) "s)"
 
 # 1.b) remove the temporarily created newline-free FASTA
 [[ -e ${output_path}"tmp.prot_gene_matching.txt" ]] && rm ${output_path}"tmp.prot_gene_matching.txt"
-[[ -e tmp.MILTS.fasta ]] && rm tmp.MILTS.fasta
+[[ -e ${output_path}tmp.MILTS.fasta ]] && rm ${output_path}tmp.MILTS.fasta
 
 
 end=`date +%s`
