@@ -50,5 +50,5 @@ custom_minPts: "10"
 
 ## Plotting options ##
 taxon_hit_threshold: "min"
-plot_grouping_rank: "phylum"
-lca_replacement_rank: "genus"
+plot_grouping_rank: "genus"
+lca_replacement_rank: "family"

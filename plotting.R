@@ -1,18 +1,10 @@
 #!/usr/bin/env Rscript
 
-library.path <- .libPaths()
 library(ggplot2) # for plotting
 library(viridis) # for colours
-library(gridExtra) # saving multiple plots into one file
-if ("PhyloProfile" %in% rownames(installed.packages()) == FALSE) {
-    if (!requireNamespace("BiocManager", quietly = TRUE))
-        install.packages("BiocManager")
-    BiocManager::install("PhyloProfile")
-}
 library(PhyloProfile)
 library(data.table)
-library(taxonomizr)
-library(seqinr)
+
 
 library(yaml) # for reading config file
 cfg <- yaml.load_file("config.yml")
@@ -151,6 +143,7 @@ lca_names <- id_to_name(genes_lca_hits$lcaID)
 colnames(lca_names) <- c("lcaID", "lca_hit")
 
 
+
 # merge data
 transl_taxon_hits_part <- merge(genes_lca_hits, lca_names, by = "lcaID", all.x = TRUE)
 transl_taxon_hits <- merge(transl_taxon_hits_part, genes_best_hit, by = c("geneID", "protID"), all = TRUE)
@@ -164,6 +157,7 @@ genes_coords_taxon <- transform(genes_coords_taxon, best_hitID = as.numeric(best
 
 genes_coords_taxon$labelID <- as.numeric(genes_coords_taxon$lcaID)
 genes_coords_taxon$labelID[is.na(genes_coords_taxon$labelID)] <- 0
+
 
 ncbiFilein <- paste0(find.package("PhyloProfile"),"/PhyloProfile/data/preProcessedTaxonomy.txt")
 if (file.exists(ncbiFilein)) {
@@ -191,11 +185,10 @@ query_plot_rank <- query_taxonomy[rank == cfg$plot_grouping_rank]$ncbiID
 query_label <- query_plot_rank #paste0("Query ", cfg$plot_grouping_rank) # label for this group in the plots
 query_replace_rank <- query_taxonomy[rank == cfg$lca_replacement_rank]$ncbiID
 
-
 # retrieve <lca_replacement_rank> of best hits to determine if the best hit should replace LCA
 best_hits_taxonomy <- PhyloProfile::getTaxonomyInfo(unique(genes_best_hit$best_hitID),preProcessedTaxonomy)
 best_hit_replace_rank <- lapply(best_hits_taxonomy, function(x) x$ncbiID[x$rank == cfg$lca_replacement_rank])
-best_hit_replace_rank <- lapply(best_hit_replace_rank, function(x) if(identical(x, integer(0))) "higherrank" else x)
+best_hit_replace_rank <- lapply(best_hit_replace_rank, function(x) if(identical(x, numeric(0))) "higherrank" else x)
 best_hit_replace_rank_name <- lapply(best_hits_taxonomy, function(x) x$fullName[x$rank == cfg$lca_replacement_rank])
 best_hit_replace_rank_name <- lapply(best_hit_replace_rank_name, function(x) if(identical(x, character(0))) "higherrank" else x)
 best_hit_id <- lapply(best_hits_taxonomy, function(x) x$ncbiID[1])
@@ -204,17 +197,17 @@ genes_coords_taxon <- merge(genes_coords_taxon, best_hit_replace_matching, by="b
 genes_coords_taxon$lca_replacement_rank[is.na(genes_coords_taxon$lca_replacement_rank)] <- 0
 genes_coords_taxon$labelID <- ifelse(genes_coords_taxon$lca_replacement_rank == query_replace_rank, genes_coords_taxon$best_hitID, genes_coords_taxon$labelID)
 
+
 # retrieve <plot_grouping_rank> of current label to determine if it's in same <plot_grouping_rank> as query (and thus be merged into one group/label)
 lca_hits_taxonomy <- PhyloProfile::getTaxonomyInfo(unique(genes_coords_taxon$labelID[genes_coords_taxon$labelID != "0"]),preProcessedTaxonomy)
 lca_hit_plot_rank <- lapply(lca_hits_taxonomy, function(x) x$ncbiID[x$rank == cfg$plot_grouping_rank])
-lca_hit_plot_rank <- lapply(lca_hit_plot_rank, function(x) if(identical(x, integer(0))) "higherrank" else x)
+lca_hit_plot_rank <- lapply(lca_hit_plot_rank, function(x) if(identical(x, numeric(0))) "higherrank" else x)
 lca_hit_plot_rank_name <- lapply(lca_hits_taxonomy, function(x) x$fullName[x$rank == cfg$plot_grouping_rank])
 lca_hit_plot_rank_name <- lapply(lca_hit_plot_rank_name, function(x) if(identical(x, character(0))) "higherrank" else x)
 lca_hit_id <- lapply(lca_hits_taxonomy, function(x) x$ncbiID[1])
 lca_hit_group_matching <- do.call(rbind, Map(data.frame, "labelID"=lca_hit_id, "plot_grouping_rank"=lca_hit_plot_rank, "plot_grouping_rank_name"=lca_hit_plot_rank_name))
 genes_coords_taxon <- merge(genes_coords_taxon, lca_hit_group_matching, by="labelID", all.x = TRUE)
 genes_coords_taxon$labelID <- ifelse(genes_coords_taxon$plot_grouping_rank == query_plot_rank, query_plot_rank, genes_coords_taxon$labelID)
-
 # get full name of ncbiID of labels
 label_names <- id_to_name(genes_coords_taxon$labelID)
 colnames(label_names) <- c("labelID", "label")
@@ -251,7 +244,7 @@ if (cfg$taxon_hit_threshold == "min") {
     cfg$taxon_hit_threshold <- 1
   }
 }
-print(cfg$taxon_hit_threshold)
+#print(cfg$taxon_hit_threshold)
 # genes with taxonomic assignemnt of low abundance get label "Otherwise assigned"
 genes_coords_taxon$label[genes_coords_taxon$label %in% names(taxon_count_table[taxon_count_table < cfg$taxon_hit_threshold])] <- "Otherwise assigned"
 
@@ -328,6 +321,7 @@ protID <- names(prot_fasta)
 query_seq <- paste(prot_fasta)
 prot_sequences <- data.frame(protID, query_seq)
 prot_sequences$query_seq <- gsub("(.{70}?)", "\\1</br>", prot_sequences$query_seq)
+genes_coords_taxon <- merge(genes_coords_taxon, prot_sequences, by="protID", all.x=TRUE)
 genes_coords_taxon$g_terminal[genes_coords_taxon$g_terminal == "0"] <- "no"
 genes_coords_taxon$g_terminal[genes_coords_taxon$g_terminal == "1"] <- "yes"
 
@@ -335,7 +329,6 @@ g_cov_vars <- as.factor(grep("g_cov_[0-9]",colnames(genes_coords_taxon), value=T
 genes_coords_taxon$g_coverages <- apply(subset(genes_coords_taxon, select=g_cov_vars),1,paste,collapse="; ")
 g_covdev_vars <- as.factor(grep("g_covdev_c_[0-9]",colnames(genes_coords_taxon), value=TRUE))
 genes_coords_taxon$g_covdeviations <- apply(subset(genes_coords_taxon, select=g_covdev_vars),1,paste,collapse="; ")
-
 
 
 fig <- plot_ly(genes_coords_taxon, type="scatter", mode="markers", x = ~Dim.1, y = ~Dim.2,
@@ -393,24 +386,43 @@ if (as.numeric(cfg$num_pcs) >= 3){
 
   plot_pdf_andor_png(plot_z, paste(c(cfg$output_path, "taxonomic_assignment/density_z"), collapse=""), TRUE)
 
+  genes_coords_taxon_query <- genes_coords_taxon[genes_coords_taxon$labelID == query_label,]
+  genes_coords_taxon_rest <- genes_coords_taxon[genes_coords_taxon$labelID != query_label | is.na(genes_coords_taxon$labelID),]
 
 
-    fig <- plot_ly(genes_coords_taxon, type="scatter3d", mode="markers", x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
+  fig <- plot_ly(type="scatter3d", mode="markers",
+        symbols=c('circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond'), # additional options: 'circle-open', 'square-open', 'diamond-open', 'x')
+        colors=viridis_pal(option="D")(3),
+        size=8)
+
+  fig <- fig %>% add_markers(fig, data=genes_coords_taxon_query, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
       hoverinfo = 'text',
       text = ~paste('</br>ID:',g_name,
                     '</br>Coverage:',g_coverages, '(SD from contig mean:',g_covdeviations,')',
                     '</br>Terminal:',g_terminal,
                     '</br>LCA:',lca_hit,
                     '</br>Best hit:',best_hit,'(e-value:',evalue,')',
-                    '</br>Seq:',prot_sequences$query_seq),
+                    '</br>Seq:',query_seq),
       #'</br>Coordinates: (',round(Dim.1,2),',',round(Dim.2,2),')',
+      opacity=0.5,
       symbol=~as.factor(label.y),
-      symbols=c('circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond', 'circle', 'square', 'diamond'), # additional options: 'circle-open', 'square-open', 'diamond-open', 'x'
       color=~as.factor(label.y),
-      colors=viridis_pal(option="D")(3),
-      size=8,
       textposition="bottom right"
     )
+    fig <- fig %>% add_markers(fig, data=genes_coords_taxon_rest, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
+        hoverinfo = 'text',
+        text = ~paste('</br>ID:',g_name,
+                      '</br>Coverage:',g_coverages, '(SD from contig mean:',g_covdeviations,')',
+                      '</br>Terminal:',g_terminal,
+                      '</br>LCA:',lca_hit,
+                      '</br>Best hit:',best_hit,'(e-value:',evalue,')',
+                      '</br>Seq:',query_seq),
+        #'</br>Coordinates: (',round(Dim.1,2),',',round(Dim.2,2),')',
+        symbol=~as.factor(label.y),
+        color=~as.factor(label.y),
+        textposition="bottom right"
+      )
+
   fig <- fig %>% layout(title = 'taxonomic assignment')
   saveWidgetFix(as_widget(fig),paste(c(cfg$output_path, "taxonomic_assignment/3D_plot.html"), collapse=""), selfcontained=FALSE)
 
