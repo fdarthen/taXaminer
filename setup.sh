@@ -21,7 +21,6 @@ Rscript -e 'BiocManager::install("PhyloProfile")'
 
 # make MILTS script executable
 chmod +x MILTS.sh
-chmod +x test.sh
 [[ ! -d tools ]] && mkdir -p tools
 cd tools
 
