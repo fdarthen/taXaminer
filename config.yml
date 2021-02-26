@@ -19,7 +19,7 @@ include_pseudogenes: "FALSE"
 ## Run options ##
 compute_pbc: "FALSE"
 extract_proteins: "FALSE"
-compute_tax_assignment: "FALSE"
+compute_tax_assignment: "TRUE"
 only_plotting: "FALSE"
 
 ## Taxonomic assignment options ##
