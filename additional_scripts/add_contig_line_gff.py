@@ -9,7 +9,8 @@ gff_path=sys.argv[1] # input GFF
 out_path=sys.argv[2] # output GFF
 if len(sys.argv) > 3:
     fasta_path=sys.argv[3] # input GFF
-
+else:
+    fasta_path=False
 
 
 

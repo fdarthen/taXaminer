@@ -11,11 +11,15 @@ import operator # for quick comparisons
 import scipy.stats as stats # for Pearson's R
 from itertools import product as itertools_product # to generate all possible oligonucleotides from base alphabet
 from Bio.Seq import Seq as BioPython_Seq # to count oligonucleotides (also overlapping ones! not implemented in normal count)
+import yaml # read config file
+import sys # parse command line arguments
+
+config_path = sys.argv[1]
 
 # read parameters from config file ./cfg.json
 # json version: config_obj=json.load(open('./cfg.json','r'))
-import yaml
-config_obj=yaml.safe_load(open('./config.yml','r'))
+
+config_obj=yaml.safe_load(open(config_path,'r'))
 gff_path=config_obj['gff_path'] # GFF file path
 pbc_paths=config_obj['pbc_paths'] # per base coverage (PBC) file path(s)
 contig_tag=config_obj['contig_tag'] # contig label (e.g. "region", "contig", ...)
@@ -53,11 +57,6 @@ print("include coverage = " + str(include_coverage))
 # ==============================================================
 
 
-#  ██████  ██████  ███    ██ ████████ ██  ██████
-# ██      ██    ██ ████   ██    ██    ██ ██
-# ██      ██    ██ ██ ██  ██    ██    ██ ██   ███
-# ██      ██    ██ ██  ██ ██    ██    ██ ██    ██
-#  ██████  ██████  ██   ████    ██    ██  ██████
 
 class Contig:
     def __init__(self, name, length):
@@ -436,11 +435,6 @@ class Contig:
         return self.z_score_vector
 
 
-#  ██████  ███████ ███    ██ ███████
-# ██       ██      ████   ██ ██
-# ██   ███ █████   ██ ██  ██ █████
-# ██    ██ ██      ██  ██ ██ ██
-#  ██████  ███████ ██   ████ ███████
 
 class Gene:
 
@@ -727,13 +721,6 @@ class Gene:
 
 
 
-
-# ███████ ██    ██ ███    ██  ██████ ████████ ██  ██████  ███    ██ ███████
-# ██      ██    ██ ████   ██ ██         ██    ██ ██    ██ ████   ██ ██
-# █████   ██    ██ ██ ██  ██ ██         ██    ██ ██    ██ ██ ██  ██ ███████
-# ██      ██    ██ ██  ██ ██ ██         ██    ██ ██    ██ ██  ██ ██      ██
-# ██       ██████  ██   ████  ██████    ██    ██  ██████  ██   ████ ███████
-
 # ==============================================================
 # ========================= FUNCTIONS ==========================
 # ==============================================================
@@ -786,12 +773,6 @@ def rescale(x, old_min, old_max, new_min, new_max, nansub):
         y = ((x - old_min)/(old_max - old_min))
     return y
 
-
-# ██ ███    ███ ██████  ██    ██ ████████ ███████      █████  ██████  ██████   █████  ██    ██
-# ██ ████  ████ ██   ██ ██    ██    ██    ██          ██   ██ ██   ██ ██   ██ ██   ██  ██  ██
-# ██ ██ ████ ██ ██████  ██    ██    ██    █████       ███████ ██████  ██████  ███████   ████
-# ██ ██  ██  ██ ██      ██    ██    ██    ██          ██   ██ ██   ██ ██   ██ ██   ██    ██
-# ██ ██      ██ ██       ██████     ██    ███████     ██   ██ ██   ██ ██   ██ ██   ██    ██
 
 def impute_array(data_array):
     '''This function takes a data_array, i.e. an array of arrays describing a
@@ -1000,12 +981,6 @@ def get_Nx(x, contig_lengths):
             return length
 
 
-
-#  ██████  ██████  ██    ██         █████  ███    ██ ██████          ██████   ██████  ███████         ██ ███    ██ ███████  ██████
-# ██      ██    ██ ██    ██        ██   ██ ████   ██ ██   ██         ██   ██ ██    ██ ██              ██ ████   ██ ██      ██    ██
-# ██      ██    ██ ██    ██        ███████ ██ ██  ██ ██   ██         ██████  ██    ██ ███████         ██ ██ ██  ██ █████   ██    ██
-# ██      ██    ██  ██  ██         ██   ██ ██  ██ ██ ██   ██         ██      ██    ██      ██         ██ ██  ██ ██ ██      ██    ██
-#  ██████  ██████    ████  ███████ ██   ██ ██   ████ ██████  ███████ ██       ██████  ███████ ███████ ██ ██   ████ ██       ██████
 
 def compute_coverage_and_positional_info():
     '''Uses per base coverage information to compute & set
@@ -1294,12 +1269,6 @@ def pearsonr_with_nans_omitted(vector1, vector2):
 # -------- END: FUNCTIONS FOR TETRANUCLEOTIDE Z-SCORE / CORRELATION COEFF -------
 
 
-#  ██████  ██████  ███    ███ ██████  ██    ██ ████████ ███████     ███████ ████████  █████  ████████ ███████
-# ██      ██    ██ ████  ████ ██   ██ ██    ██    ██    ██          ██         ██    ██   ██    ██    ██
-# ██      ██    ██ ██ ████ ██ ██████  ██    ██    ██    █████       ███████    ██    ███████    ██    ███████
-# ██      ██    ██ ██  ██  ██ ██      ██    ██    ██    ██               ██    ██    ██   ██    ██         ██
-#  ██████  ██████  ██      ██ ██       ██████     ██    ███████     ███████    ██    ██   ██    ██    ███████
-
 def compute_stats(contig_list, lgth_corr_function):
     '''Computes and returns basic positional, length, coverage and GC info.
     This function MUST be run in order to obtain cov, GC & length statistics!
@@ -1524,15 +1493,6 @@ def compute_stats(contig_list, lgth_corr_function):
 
 
 
-
-# ███████ ██ ██   ████████ ███████ ██████       ██████  ██████  ███    ██ ████████ ██     ██████  ███████ ███    ██ ███████ ███████
-# ██      ██ ██      ██    ██      ██   ██     ██      ██    ██ ████   ██    ██    ██    ██       ██      ████   ██ ██      ██
-# █████   ██ ██      ██    █████   ██████      ██      ██    ██ ██ ██  ██    ██ ████████ ██   ███ █████   ██ ██  ██ █████   ███████
-# ██      ██ ██      ██    ██      ██   ██     ██      ██    ██ ██  ██ ██    ██ ██  ██   ██    ██ ██      ██  ██ ██ ██           ██
-# ██      ██ ███████ ██    ███████ ██   ██      ██████  ██████  ██   ████    ██ ██████    ██████  ███████ ██   ████ ███████ ███████
-
-
-
 def filter_contigs_and_genes():
     '''Stores names of all contigs without genes in a list and returns it.
     Moves all contigs without coverage info to a new dict and returns it.
@@ -1574,13 +1534,6 @@ def filter_contigs_and_genes():
     return geneless_contigs, contigs_without_cov, genes_without_cov
 
 
-
-
-#  ██████  ███████ ████████     ██████   █████  ██     ██      █████  ██████  ██████   █████  ██    ██
-# ██       ██         ██        ██   ██ ██   ██ ██     ██     ██   ██ ██   ██ ██   ██ ██   ██  ██  ██
-# ██   ███ █████      ██        ██████  ███████ ██  █  ██     ███████ ██████  ██████  ███████   ████
-# ██    ██ ██         ██        ██   ██ ██   ██ ██ ███ ██     ██   ██ ██   ██ ██   ██ ██   ██    ██
-#  ██████  ███████    ██        ██   ██ ██   ██  ███ ███      ██   ██ ██   ██ ██   ██ ██   ██    ██
 
 def get_raw_array(contig_name_list, stats_ref):
     '''Loops over all  contigs requested in contig_name_list
@@ -1753,13 +1706,6 @@ def get_raw_array(contig_name_list, stats_ref):
 
 
 
-
-#  ██████  ██    ██ ████████ ██████  ██    ██ ████████     ████████  █████  ██████  ██      ███████
-# ██    ██ ██    ██    ██    ██   ██ ██    ██    ██           ██    ██   ██ ██   ██ ██      ██
-# ██    ██ ██    ██    ██    ██████  ██    ██    ██           ██    ███████ ██████  ██      █████
-# ██    ██ ██    ██    ██    ██      ██    ██    ██           ██    ██   ██ ██   ██ ██      ██
-#  ██████   ██████     ██    ██       ██████     ██           ██    ██   ██ ██████  ███████ ███████
-
 def output_table(raw_array, filename):
     '''Prints raw_array including header to a file.'''
 
@@ -1851,14 +1797,6 @@ def deviation_from_n50(c_len, n50):
 
 
 
-
-
-
-# ███████ ██    ██ ███    ███ ███    ███  █████  ██████  ██    ██     ███████ ██ ██      ███████
-# ██      ██    ██ ████  ████ ████  ████ ██   ██ ██   ██  ██  ██      ██      ██ ██      ██
-# ███████ ██    ██ ██ ████ ██ ██ ████ ██ ███████ ██████    ████       █████   ██ ██      █████
-#      ██ ██    ██ ██  ██  ██ ██  ██  ██ ██   ██ ██   ██    ██        ██      ██ ██      ██
-# ███████  ██████  ██      ██ ██      ██ ██   ██ ██   ██    ██        ██      ██ ███████ ███████
 
 def output_summary_file(stats_ref, filename):
     path_summaryfile = output_dir + "/" + filename
@@ -1954,35 +1892,52 @@ all_genes = {} # dict to hold all genes parsed; key=gene name, value=object gene
 all_contig_lengths = []
 
 
-#  ██████  ███████ ███████
-# ██       ██      ██
-# ██   ███ █████   █████
-# ██    ██ ██      ██
-#  ██████  ██      ██
-
 # ==============================================================
 # ======================= READ GFF FILE ========================
 # ==============================================================
+
+
 fasta_tag = False   # boolean flag used to control parsing
                     # will be set to true when ##FASTA block is reached
+contig_tags = ["region", "contig", "scaffold"]  # list of commonly used tags to indicate
+                                                # GFFs entry for scaffold/contig/etc.
 
 with open(gff_path, 'r') as gff: # open GFF file
     for line in gff:
         if not fasta_tag: # if FASTA block has not been reached yet
 
             if line.startswith('#'):
+                if "#sequence-region" in line: # use scaffold information from directives
+
+                    tmp_array = line.split()
+
+                    contig_name = tmp_array[1]
+                    if contig_name in all_contigs.keys():
+                        continue
+                    else:
+                        contig_length = int(tmp_array[3])
+                        # add this length to all_contig_lengths
+                        # to store the size of the initial (unfiltered) assembly
+                        all_contig_lengths.append(contig_length)
+
+                        # initialise contig
+                        contig = Contig(contig_name, contig_length)
+                        # add to dictionary of contigs
+                        all_contigs[contig_name] = contig
+
                 if "#FASTA" in line: # if FASTA block has been reached
                     fasta_tag = True           # set boolean flag to true
                     break                      # and stop parsing
-
 
             else: # if the line holds annotations
 
                 tmp_array = line.split()
 
-                if tmp_array[2] == contig_tag:
+                if (tmp_array[2] == contig_tag) or (tmp_array[2] in contig_tags):
                     # if tmp_array[2] == "contig":
                     contig_name = tmp_array[0]
+                    if contig_name in all_contigs.keys():
+                        continue
                     contig_length = int(tmp_array[4])
                     # add this length to all_contig_lengths
                     # to store the size of the initial (unfiltered) assembly
@@ -2022,11 +1977,6 @@ with open(gff_path, 'r') as gff: # open GFF file
                     pass
 
 
-# ███████  █████  ███████ ████████  █████
-# ██      ██   ██ ██         ██    ██   ██
-# █████   ███████ ███████    ██    ███████
-# ██      ██   ██      ██    ██    ██   ██
-# ██      ██   ██ ███████    ██    ██   ██
 
 # ==============================================================
 # ===================== READ FASTA FILE =====================
@@ -2035,8 +1985,6 @@ with open(gff_path, 'r') as gff: # open GFF file
 
 # global variable needed to keep track of currently parsed contig
 current_contig = None
-
-
 
 
 # ---- start: global variables needed for oligonucleotide frequencies ------
@@ -2152,11 +2100,6 @@ with open(fasta_path, 'r') as fasta: # open FASTA file
 
 total_z_score_vector = calculate_z_score_vector(total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs)
 
-# ██████  ██████   ██████
-# ██   ██ ██   ██ ██
-# ██████  ██████  ██
-# ██      ██   ██ ██
-# ██      ██████   ██████
 
 # ==============================================================
 # ===================== READ COVERAGE FILE =====================

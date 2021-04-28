@@ -1,14 +1,12 @@
 #!/bin/bash
 #SBATCH --partition=all
-#SBATCH --account=user
-#SBATCH --cpus-per-task=16
-#SBATCH --mem-per-cpu=32gb
+#SBATCH --account=freya
+#SBATCH --cpus-per-task=8
+#SBATCH --mem-per-cpu=16gb
 #SBATCH --job-name="milts"
 #SBATCH --output=./array_%A_%a.o.out     # Standard output
 #SBATCH --error=./array_%A_%a.e.out      # and error log
 
-
-PATH=$PWD/tools:$PWD/tools/samtools-1.11:$PWD/tools/gffread-0.12.1:$PATH
 
 start=`date +%s`
 
@@ -21,9 +19,6 @@ tax_id=$(cat ./config.yml | python -c "import sys, yaml; print(yaml.safe_load(sy
 taxon_hits_lca_path=$(cat ./config.yml | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['taxon_hits_lca_path'])")
 best_taxon_hit_path=$(cat ./config.yml | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['best_taxon_hit_path'])")
 nr_db_path=$(cat ./config.yml | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['nr_db_path'])")
-pbc_paths_list=$(cat ./config.yml | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['pbc_paths'])")
-pbc_paths=${pbc_paths_list//[[\]]}
-pbc_path=${pbc_paths%%,*}
 # BOOLS
 only_plotting=$(cat ./config.yml | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['only_plotting'])")
 extract_proteins=$(cat ./config.yml | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['extract_proteins'])")
@@ -103,7 +98,7 @@ then
 
 
   # 1.a) remove newlines from fasta
-  awk '/^>/{if(NR==1){print}else{printf("\n%s\n",$0)}next} {printf("%s",$0)} END{printf("\n")}' $fasta_path >> ${output_path}tmp.MILTS.fasta
+  awk '/^>/{if(NR==1){print}else{printf("\n%s\n",$0)}next} {printf("%s",$0)} END{printf("\n")}' $fasta_path >> tmp.MILTS.fasta
 
   # 2) start python script --> produces descriptive gene statistics
   echo -e "\nproduce gene info start:"
@@ -156,14 +151,14 @@ fi
 echo "plot taxonomic assignment start:"
 time5_1=`date +%s`
 # grepping the GFF to only relevant lines accelerates gffread on large files immensely
-zgrep -P "\tCDS\t|\tgene\t|\tmRNA\t" ${gff_path} | gffread - -o ${output_path}"tmp.prot_gene_matching.txt" --table "@id,@geneid"
+zgrep -E "CDS|gene" ${gff_path} | gffread - -o ${output_path}"tmp.prot_gene_matching.txt" --table "@id,@geneid"
 Rscript plotting.R --verbose >> $output_path"R_log.out"
 time5_2=`date +%s`
 echo "plot taxonomic assignment end (time elapsed:" $(($time5_2-$time5_1)) "s)"
 
 # 1.b) remove the temporarily created newline-free FASTA
 [[ -e ${output_path}"tmp.prot_gene_matching.txt" ]] && rm ${output_path}"tmp.prot_gene_matching.txt"
-[[ -e ${output_path}tmp.MILTS.fasta ]] && rm ${output_path}tmp.MILTS.fasta
+[[ -e tmp.MILTS.fasta ]] && rm tmp.MILTS.fasta
 
 
 end=`date +%s`

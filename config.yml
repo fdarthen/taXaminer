@@ -2,14 +2,13 @@
 ## Input and output options ##
 gff_path: "./example/test.gff"
 fasta_path: "./example/test.fasta"
-pbc_paths: ["./example/test.pbc.txt","./example/test.pbc_2.txt"]
+pbc_paths: ["./example/test.pbc.txt"] #,"./example/test.pbc_2.txt"]
 proteins_path: "./example/test_proteins.fasta"
 output_path: "./MILTS_report/"
-reads_1: "path/to/readset_1.fa"
-reads_2: "path/to/readset_2.fa"
-reads_un: "path/to/readset_unpaired.fa"
 output_pdf: "TRUE"
 output_png: "FALSE"
+reads_1: "path/to/readset_1.fa"
+reads_2: "path/to/readset_2.fa"
 
 ## Gene info options ##
 contig_tag: "region"
@@ -22,14 +21,16 @@ extract_proteins: "FALSE"
 compute_tax_assignment: "FALSE"
 only_plotting: "FALSE"
 
+
 ## Taxonomic assignment options ##
 taxon_hits_lca_path: "./example/test_lca_hits.txt"
 best_taxon_hit_path: "./example/test_best_hits.txt"
-nr_db_path: "path/to/nr_taxonomy.dmnd"
+nr_db_path: "/share/project/freya/NCBI/nrTaxonomy.dmnd"
+taxon_exclude: "TRUE"
 tax_id: "107806"
 
 ## PCA options ##
-all_input_variables: "c_name,c_num_of_genes,c_len,c_genelenm,c_genelensd,g_len,g_lendev_c,g_abspos,g_terminal,c_cov,c_covsd,g_cov,g_covsd,g_covdev_c,c_pearson_r,g_pearson_r_o,g_pearson_r_c"
+all_input_variables: "c_name,c_num_of_genes,c_len,c_genelenm,c_genelensd,g_len,g_lendev_c,g_abspos,g_terminal,c_cov,c_covsd,g_cov,g_covsd,g_covdev_c,g_cov_z_bool,c_pearson_r,g_pearson_r_o,g_pearson_r_c"
 input_variables: "c_name,c_num_of_genes,c_len,c_genelenm,c_genelensd,g_len,g_lendev_c,g_abspos,g_terminal,c_cov,c_covsd,g_cov,g_covsd,g_covdev_c,c_pearson_r,g_pearson_r_o,g_pearson_r_c"
 
 perform_parallel_analysis: "FALSE"
@@ -51,4 +52,3 @@ custom_minPts: "10"
 ## Plotting options ##
 taxon_hit_threshold: "min"
 plot_grouping_rank: "genus"
-lca_replacement_rank: "family"
