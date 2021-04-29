@@ -1,5 +1,7 @@
 #!/bin/bash
 
+PATH=$PWD/tools:$PWD/tools/samtools-1.11:$PWD/tools/gffread-0.12.1:$PATH
+
 start=`date +%s`
 
 config_path=$1
@@ -14,8 +16,8 @@ taxon_hits_lca_path=$(cat "$config_path" | python -c "import sys, yaml; print(ya
 best_taxon_hit_path=$(cat "$config_path" | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['best_taxon_hit_path'])")
 nr_db_path=$(cat "$config_path" | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['nr_db_path'])")
 pbc_paths_list=$(cat "$config_path" | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['pbc_paths'])")
-pbc_paths=${pbc_paths_list//[[\]]}
-pbc_path=${pbc_paths%%,*}
+pbc_path=$(echo $pbc_paths_list | cut -d ',' -f1 | awk -F '[' '{print $2}' | awk -F ']' '{print $1}' | awk -F "'" '{print $2}')
+
 # BOOLS
 only_plotting=$(cat "$config_path" | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['only_plotting'])")
 extract_proteins=$(cat "$config_path" | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['extract_proteins'])")
@@ -27,6 +29,7 @@ echo "Config: " $config_path
 echo "FASTA: " $fasta_path
 echo "GFF: " $gff_path
 echo "Proteins: " $proteins_path
+echo "PBC(s): " $pbc_paths_list
 echo "Output directory: " $output_path
 echo "Taxonomic assignment: "
 echo $taxon_hits_lca_path

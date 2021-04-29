@@ -300,9 +300,9 @@ if (as.numeric(cfg$num_pcs) >= 3){
         name=~plot_label_freq
     )
 
-    orca_static_3d(fig, paste0(cfg$output_path, "taxonomic_assignment/"), "3D_plot_1_2", 0, 0, 2.25)
-    orca_static_3d(fig, paste0(cfg$output_path, "taxonomic_assignment/"), "3D_plot_1_3", 0, 2.25, 0)
-    orca_static_3d(fig, paste0(cfg$output_path, "taxonomic_assignment/"), "3D_plot_2_3", 2.25, 0, 0)
+    orca_static_3d(fig, paste0(cfg$output_path, "taxonomic_assignment/"), "2D_plot_1_2", 0, 0, 2.25)
+    orca_static_3d(fig, paste0(cfg$output_path, "taxonomic_assignment/"), "2D_plot_1_3", 0, 2.25, 0)
+    orca_static_3d(fig, paste0(cfg$output_path, "taxonomic_assignment/"), "2D_plot_2_3", 2.25, 0, 0)
     orca_static_3d(fig, paste0(cfg$output_path, "taxonomic_assignment/"), "3D_plot", 1.55, 1.55, 1.55)
 
     fig <- fig %>% layout(title = 'taxonomic assignment', scene = list(aspectmode='cube'))

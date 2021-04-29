@@ -11,6 +11,8 @@
 # call:
 # ./compute_pbc.sh path/to/config.yml
 
+PATH=$PWD/tools:$PWD/tools/samtools-1.11:$PATH
+
 config_path=$1
 echo $config_path
 

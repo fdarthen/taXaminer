@@ -54,12 +54,12 @@ wget http://ccb.jhu.edu/software/stringtie/dl/gffread-0.12.6.Linux_x86_64.tar.gz
 tar xzf gffread-0.12.6.Linux_x86_64.tar.gz
   
 
-# Database    
-wget https://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz        
-wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz        
-wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/prot.accession2taxid.gz
+# # Database    
+# wget https://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz        
+# wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz        
+# wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/prot.accession2taxid.gz
 
-tar -zxf 'taxdump.tar.gz' nodes.dmp names.dmp
-diamond makedb --in "nr.gz" -d "nr_taxonomy.dmnd" -p 8 --taxonmap "prot.accession2taxid.gz" --taxonnodes "nodes.dmp" --taxonnames "names.dmp"
-rm -rf nr.gz prot.accession2taxid.gz nodes.dmp names.dmp
+# tar -zxf 'taxdump.tar.gz' nodes.dmp names.dmp
+# diamond makedb --in "nr.gz" -d "nr_taxonomy.dmnd" -p 8 --taxonmap "prot.accession2taxid.gz" --taxonnodes "nodes.dmp" --taxonnames "names.dmp"
+# rm -rf nr.gz prot.accession2taxid.gz nodes.dmp names.dmp
       

@@ -8,6 +8,7 @@
 #SBATCH --error=./array_%A_%a.e.out      # and error log
 #SBATCH --array=1                                                    # Array range. The %X specifies that max. X jobs run in parallel
 
+PATH=$PWD/tools:$PATH
 
 echo TaskID $SLURM_ARRAY_TASK_ID
 config_path=$1
