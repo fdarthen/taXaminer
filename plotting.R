@@ -1,12 +1,15 @@
+#!/usr/bin/env Rscript
+
 library(ggplot2) # for plotting
 library(viridis) # for colours
-library(PhyloProfile)
 library(data.table)
+library(plotly)
+library(htmlwidgets)
+library(yaml) # for reading config file
 
 args <- commandArgs(trailingOnly = TRUE)
 config_path <- args[1]
 
-library(yaml) # for reading config file
 cfg <- yaml.load_file(config_path)
 
 plot_pdf_andor_png <- function(plot, plot_path, spec) {
@@ -212,8 +215,6 @@ plot_2 <- ggplot(data=genes_coords_taxon_query, aes(x=Dim.1,y=Dim.2)) +
 plot_pdf_andor_png(plot_2, paste(c(cfg$output_path, "taxonomic_assignment/density_2d"), collapse=""), TRUE)
 
 
-library(plotly)
-library(htmlwidgets)
 
 # add sequence information
 prot_fasta <- Biostrings::readAAStringSet(cfg$proteins_path)

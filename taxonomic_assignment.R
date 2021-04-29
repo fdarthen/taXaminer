@@ -1,15 +1,12 @@
 #!/usr/bin/env Rscript
 
-library(ggplot2) # for plotting
-library(viridis) # for colours
 library(PhyloProfile)
 library(data.table)
-
+library(yaml) # for reading config file
 
 args <- commandArgs(trailingOnly = TRUE)
 config_path <- args[1]
 
-library(yaml) # for reading config file
 cfg <- yaml.load_file(config_path)
 
 

@@ -2,7 +2,7 @@
 ## Input and output options ##
 gff_path: "./example/test.gff"
 fasta_path: "./example/test.fasta"
-pbc_paths: ["./example/test.pbc.txt"] #,"./example/test.pbc_2.txt"]
+pbc_paths: ["./example/test.pbc.txt","./example/test.pbc_2.txt"]
 proteins_path: "./example/test_proteins.fasta"
 output_path: "./MILTS_report/"
 output_pdf: "TRUE"
@@ -25,7 +25,7 @@ only_plotting: "FALSE"
 ## Taxonomic assignment options ##
 taxon_hits_lca_path: "./example/test_lca_hits.txt"
 best_taxon_hit_path: "./example/test_best_hits.txt"
-nr_db_path: "/share/project/freya/NCBI/nrTaxonomy.dmnd"
+nr_db_path: "path/to/nrTaxonomy.dmnd"
 taxon_exclude: "TRUE"
 tax_id: "107806"
 

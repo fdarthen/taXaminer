@@ -9,12 +9,12 @@ library(factoextra) # for pca
 library(ggplot2) # for plotting
 library(viridis) # for colours
 library(stats) # for hclust and kmeans clustering
+library(yaml) # for reading config file
 
 
 args <- commandArgs(trailingOnly = TRUE)
 config_path <- args[1]
 
-library(yaml) # for reading config file
 cfg <- yaml.load_file(config_path)
 
 plot_pdf_andor_png <- function(theplot, thepath, spec) {
