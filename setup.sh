@@ -14,6 +14,8 @@ cd samtools-1.11/
 ./configure --prefix=$PWD
 make
 
+cd ..
+
 # bedtools
 wget https://github.com/arq5x/bedtools2/releases/download/v2.30.0/bedtools.static.binary
 mv bedtools.static.binary bedtools
@@ -45,21 +47,19 @@ tar xzf diamond-linux64.tar.gz
 
 
 # gffread
-cd /some/build/dir
-git clone https://github.com/gpertea/gffread
-cd gffread
-make release
-# OR
-wget http://ccb.jhu.edu/software/stringtie/dl/gffread-0.12.6.Linux_x86_64.tar.gz
-tar xzf gffread-0.12.6.Linux_x86_64.tar.gz
-  
+wget http://ccb.jhu.edu/software/stringtie/dl/gffread-0.12.1.Linux_x86_64.tar.gz
+tar xzf gffread-0.12.1.Linux_x86_64.tar.gz
+mv gffread-0.12.1.Linux_x86_64/  gffread-0.12.1/
 
-# # Database    
-# wget https://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz        
-# wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz        
+rm -rf gffread-0.12.1.Linux_x86_64.tar.gz diamond-linux64.tar.gz samtools-1.11.tar.bz2
+
+
+
+# # Database
+# wget https://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz
+# wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
 # wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/prot.accession2taxid.gz
 
 # tar -zxf 'taxdump.tar.gz' nodes.dmp names.dmp
 # diamond makedb --in "nr.gz" -d "nr_taxonomy.dmnd" -p 8 --taxonmap "prot.accession2taxid.gz" --taxonnodes "nodes.dmp" --taxonnames "names.dmp"
 # rm -rf nr.gz prot.accession2taxid.gz nodes.dmp names.dmp
-      

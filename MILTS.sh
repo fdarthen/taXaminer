@@ -24,6 +24,9 @@ extract_proteins=$(cat "$config_path" | python -c "import sys, yaml; print(yaml.
 compute_tax_assignment=$(cat "$config_path" | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['compute_tax_assignment'])")
 taxon_exclude=$(cat "$config_path" | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['taxon_exclude'])")
 compute_pbc=$(cat "$config_path" | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['compute_pbc'])")
+output_pdf=$(cat "$config_path" | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['output_pdf'])")
+output_png=$(cat "$config_path" | python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['output_png'])")
+
 
 echo "Config: " $config_path
 echo "FASTA: " $fasta_path
@@ -40,23 +43,24 @@ echo -e "\n"
 if [ "${only_plotting}" = "FALSE" ]; then
 
     [[ ! -d "${output_path}" ]] && mkdir -p "${output_path}"
+    [[ ! -d "${output_path}tmp/" ]] && mkdir -p "${output_path}tmp/"
 
     # 1.a) remove newlines from fasta
-    awk '/^>/{if(NR==1){print}else{printf("\n%s\n",$0)}next} {printf("%s",$0)} END{printf("\n")}' $fasta_path >> ${output_path}tmp.MILTS.fasta
+    awk '/^>/{if(NR==1){print}else{printf("\n%s\n",$0)}next} {printf("%s",$0)} END{printf("\n")}' $fasta_path >> "${output_path}tmp/tmp.MILTS.fasta"
     # 1.b) creating a tabular file for protein to gene ID matching and finding the protein with longest CDS for each gene
     # grepping the GFF to only relevant lines accelerates gffread on large files immensely
-    grep -P "\tCDS\t|\tgene\t|\tmRNA\t" ${gff_path} | gffread - -o ${output_path}"tmp.prot_gene_matching.txt" --table "@id,@geneid,@cdslen"
+    grep -P "\tCDS\t|\tgene\t|\tmRNA\t" ${gff_path} | gffread - -o "${output_path}tmp/tmp.prot_gene_matching.txt" --table "@id,@geneid,@cdslen,@numexons"
 
     # check if protein FASTA should be extracted but exists
     if [ "${extract_proteins}" = "TRUE" ]; then
         if [[ -f "${proteins_path}" ]]; then
             echo "Proteins FASTA file exists but it is set to be extracted. This process will overwrite it. Do you want to continue? (y/n)"
             read input
-            if [ "$input" = "n" ]; then
-                echo "Please change the option for 'extract_proteins' to 'FALSE'"
-                [[ "$BASH_SOURCE" == "$0" ]] && exit 1 || return 1
-            else
+            if [ "$input" = "y" ]; then
                 echo "Proteins FASTA file will be overwritten"
+            else
+                echo "Please reconsider your option for 'extract_proteins' or delete/move your proteins FASTA file before restarting"
+                [[ "$BASH_SOURCE" == "$0" ]] && exit 1 || return 1
             fi
         fi
     fi
@@ -66,21 +70,21 @@ if [ "${only_plotting}" = "FALSE" ]; then
         if [[ -f "${taxon_hits_lca_path}" ]]; then
             echo "LCA hit file exists but it is set to be computed. This process will overwrite it. Do you want to continue? (y/n)"
             read input
-            if [ "$input" = "n" ]; then
-                echo "Please change the option for 'compute_tax_assignment' to 'FALSE'"
-                [[ "$BASH_SOURCE" == "$0" ]] && exit 1 || return 1
+            if [ "$input" = "y" ]; then
+                echo "LCA hit file will be overwritten"
             else
-                echo "LCA hi  t file will be overwritten"
+                echo "Please reconsider your option for 'compute_tax_assignment' or delete/move your LCA hit file file before restarting"
+                [[ "$BASH_SOURCE" == "$0" ]] && exit 1 || return 1
             fi
         fi
         if [[ -f "${best_taxon_hit_path}" ]]; then
             echo "Best hits file exists but it is set to be computed. This process will overwrite it. Do you want to continue? (y/n)"
             read input
-            if [ "$input" = "n" ]; then
-                echo "Please change the option for 'compute_tax_assignment' to 'FALSE'"
-                [[ "$BASH_SOURCE" == "$0" ]] && exit 1 || return 1
-            else
+            if [ "$input" = "y" ]; then
                 echo "Best hits file will be overwritten"
+            else
+                echo "Please reconsider your option for 'compute_tax_assignment' or delete/move your best hit file file before restarting"
+                [[ "$BASH_SOURCE" == "$0" ]] && exit 1 || return 1
             fi
         fi
     fi
@@ -90,11 +94,11 @@ if [ "${only_plotting}" = "FALSE" ]; then
         if [[ -f "${pbc_path}" ]]; then
             echo "PBC file exists but it is set to be computed. This process will overwrite it. Do you want to continue? (y/n)"
             read input
-            if [ "$input" = "n" ]; then
-                echo "Please change the option for 'compute_pbc' to 'FALSE'"
-                [[ "$BASH_SOURCE" == "$0" ]] && exit 1 || return 1
-            else
+            if [ "$input" = "y" ]; then
                 echo "PBC file will be overwritten"
+            else
+                echo "Please reconsider your option for 'compute_pbc' or delete/move your PBC file file before restarting"
+                [[ "$BASH_SOURCE" == "$0" ]] && exit 1 || return 1
             fi
         fi
         echo "compute per pase coverage start:"
@@ -104,8 +108,6 @@ if [ "${only_plotting}" = "FALSE" ]; then
         echo "compute per pase coverage end (time elapsed:" $(($time0_2-$time0_1)) "s)"
     fi
 
-
-    [[ ! -d "${output_path}" ]] && mkdir -p "${output_path}"
 
     # 2) start python script --> produces descriptive gene statistics
     echo -e "produce gene info start:"
@@ -118,7 +120,7 @@ if [ "${only_plotting}" = "FALSE" ]; then
     # 3) start R script for PCA and clustering
     echo "perform PCA and clustering start:"
     time2_1=`date +%s`
-    Rscript perform_PCA_and_clustering.R "$config_path" --verbose >> $output_path"R_log.out"
+    Rscript perform_PCA_and_clustering.R "$config_path" --verbose >> "${output_path}R_log.out"
     time2_2=`date +%s`
     echo "perform PCA and clustering end (time elapsed:" $(($time2_2-$time2_1)) "s)"
 
@@ -137,22 +139,20 @@ if [ "${only_plotting}" = "FALSE" ]; then
         time3_2=`date +%s`
         echo "retrieving peptide sequenes end (time elapsed:" $(($time3_2-$time3_1)) "s)"
         # 4.b) or identify the protein with longest CDS for each gene when protein FASTA is provided
-    else
+    else #TODO: if tax ass true
         python ./additional_scripts/longest_cds.py reg "$config_path"
     fi
-    date
-
 
     # 4.c) run sequence alignment with Diamond
     if [ "${compute_tax_assignment}" = "TRUE" ]; then
         echo "assess LCA and best hit start:"
         time4_1=`date +%s`
         if [ "${taxon_exclude}" = "TRUE" ]; then
-            diamond blastp -q "${output_path}tmp.longest_cds.protein.fasta" -o "${taxon_hits_lca_path}" -d "${nr_db_path}" -f 102 -b2.0 --tmpdir /dev/shm --sensitive --top 10 -c1 --taxon-exclude "$tax_id"
-            diamond blastp -q "${output_path}tmp.longest_cds.protein.fasta" -o "${best_taxon_hit_path}" -d "${nr_db_path}" -f 6 qseqid sseqid evalue bitscore score pident staxids sscinames -b2.0 --tmpdir /dev/shm --sensitive -c1 -k 1 --taxon-exclude "$tax_id"
+            diamond blastp -q "${output_path}tmp/tmp.longest_cds.protein.fasta" -o "${taxon_hits_lca_path}" -d "${nr_db_path}" -f 102 -b2.0 --tmpdir /dev/shm --sensitive --top 10 -c1 --taxon-exclude "$tax_id"
+            diamond blastp -q "${output_path}tmp/tmp.longest_cds.protein.fasta" -o "${best_taxon_hit_path}" -d "${nr_db_path}" -f 6 qseqid sseqid evalue bitscore score pident staxids sscinames -b2.0 --tmpdir /dev/shm --sensitive -c1 -k 1 --taxon-exclude "$tax_id"
         else
-            diamond blastp -q "${output_path}tmp.longest_cds.protein.fasta" -o "${taxon_hits_lca_path}" -d "${nr_db_path}" -f 102 -b2.0 --tmpdir /dev/shm --sensitive --top 10 -c1
-            diamond blastp -q "${output_path}tmp.longest_cds.protein.fasta" -o "${best_taxon_hit_path}" -d "${nr_db_path}" -f 6 qseqid sseqid evalue bitscore score pident staxids sscinames -b2.0 --tmpdir /dev/shm --sensitive -c1 -k 1
+            diamond blastp -q "${output_path}tmp/tmp.longest_cds.protein.fasta" -o "${taxon_hits_lca_path}" -d "${nr_db_path}" -f 102 -b2.0 --tmpdir /dev/shm --sensitive --top 10 -c1
+            diamond blastp -q "${output_path}tmp/tmp.longest_cds.protein.fasta" -o "${best_taxon_hit_path}" -d "${nr_db_path}" -f 6 qseqid sseqid evalue bitscore score pident staxids sscinames -b2.0 --tmpdir /dev/shm --sensitive -c1 -k 1
         fi
         time4_2=`date +%s`
         echo "assess LCA and best hit end (time elapsed:" $(($time4_2-$time4_1)) "s)"
@@ -161,7 +161,7 @@ if [ "${only_plotting}" = "FALSE" ]; then
     # 5.a) deduce taxonomic assignment based on LCA and best hit
     echo "compute taxonomic assignment start:"
     time5_1=`date +%s`
-    Rscript taxonomic_assignment.R "$config_path" --verbose >> $output_path"R_log.out"
+    Rscript taxonomic_assignment.R "$config_path" --verbose #>> $output_path"R_log.out"
     time5_2=`date +%s`
     echo "compute taxonomic assignment end (time elapsed:" $(($time5_2-$time5_1)) "s)"
 
@@ -171,15 +171,18 @@ fi
 # 5.b) plot genes with PCA coordinates and taxonomic assignment
 echo "plot taxonomic assignment start:"
 time6_1=`date +%s`
-Rscript plotting.R "$config_path" --verbose >> $output_path"R_log.out"
+Rscript plotting.R "$config_path" --verbose #>> $output_path"R_log.out"
 time6_2=`date +%s`
 echo "plot taxonomic assignment end (time elapsed:" $(($time6_2-$time6_1)) "s)"
 
+# 5.c) create static plots from json files
+# ${output_path}tmp/*.json not in "" so that filenames are preserved
+[[ "${output_pdf}" = "TRUE" ]] && orca graph ${output_path}tmp/*.json -f "pdf" -d "${output_path}taxonomic_assignment/"
+[[ "${output_png}" = "TRUE" ]] && orca graph ${output_path}tmp/*.json -f "png" -d "${output_path}taxonomic_assignment/"
+
+
 # 6) remove the temporarily created files
-[[ -e ${output_path}"tmp.prot_gene_matching.txt" ]] && rm ${output_path}"tmp.prot_gene_matching.txt"
-[[ -e ${output_path}"tmp.longest_cds.protein.fasta" ]] && rm ${output_path}"tmp.longest_cds.protein.fasta"
-[[ -e ${output_path}"tmp.MILTS.fasta" ]] && rm ${output_path}"tmp.MILTS.fasta"
-[[ -e ${output_path}"tmp.3d.json" ]] && rm ${output_path}"tmp.3d.json"
+[[ -e "${output_path}tmp/" ]] && rm -rf "${output_path}tmp/"
 
 
 end=`date +%s`
@@ -187,4 +190,4 @@ runtime=$(($end-$start))
 hours=$((runtime / 3600))
 minutes=$(( (runtime % 3600) / 60 ))
 seconds=$(( (runtime % 3600) % 60 ))
-echo "Runtime: $hours:$minutes:$seconds (hh:mm:ss)"
+echo "Total runtime: $hours:$minutes:$seconds (hh:mm:ss)"

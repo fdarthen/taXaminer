@@ -6,9 +6,12 @@
 #SBATCH --job-name="pbc"
 #SBATCH --output=./array_%A_%a.o.out     # Standard output
 #SBATCH --error=./array_%A_%a.e.out      # and error log
-#SBATCH --array=1-3%3
+#SBATCH --array=1 # -3%3 # <- set array of tasks
 
-config_file=$(awk -v arrayID=$SLURM_ARRAY_TASK_ID 'FNR==arrayID{print $0}' seedfile.txt)
+if [ -z "$1" ]; then
+    config_file=$(awk -v arrayID=$SLURM_ARRAY_TASK_ID 'FNR==arrayID{print $0}' seedfile.txt)
+else
+    config_file=$1
 echo $SLURM_ARRAY_TASK_ID $config_file
 
 . ./compute_pbc.sh "$config_file"

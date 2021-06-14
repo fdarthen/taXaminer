@@ -19,7 +19,7 @@ def gffread_prot_fasta(proteins_path,output_path):
     so it contains in its header the length of the cds
     This information is used to retrieve the longest transcript """
 
-    path_out = output_path+"tmp.longest_cds.protein.fasta"
+    path_out = output_path+"tmp/tmp.longest_cds.protein.fasta"
 
     with open(proteins_path, 'r') as file_prot:
         gene_dict = {} #key=geneID, value=sequence
@@ -56,8 +56,8 @@ def regular_prot_fasta(proteins_path,output_path):
     the gene-protein ID matching table, generated with gffread is used for this table
     (it contains the length of the CDS as well) """
 
-    matching_table_path = output_path+"tmp.prot_gene_matching.txt"
-    path_out = output_path+"tmp.longest_cds.protein.fasta"
+    matching_table_path = output_path+"tmp/tmp.prot_gene_matching.txt"
+    path_out = output_path+"tmp/tmp.longest_cds.protein.fasta"
 
     with open(matching_table_path, 'r') as file_match:
         gene_dict = {} #key=geneID, value=(len,transcriptID)

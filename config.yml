@@ -9,9 +9,10 @@ output_pdf: "TRUE"
 output_png: "FALSE"
 reads_1: "path/to/readset_1.fa"
 reads_2: "path/to/readset_2.fa"
+reads_un: "path/to/readset_unpaired.fa"
+bam: "path/to/mapping.bam"
 
 ## Gene info options ##
-contig_tag: "region"
 include_coverage: "TRUE"
 include_pseudogenes: "FALSE"
 
@@ -50,5 +51,5 @@ custom_eps: "0.3"
 custom_minPts: "10"
 
 ## Plotting options ##
-taxon_hit_threshold: "min"
-plot_grouping_rank: "genus"
+num_groups_plot: "all"
+plot_grouping_rank: "phylum"
