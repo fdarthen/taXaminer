@@ -208,7 +208,6 @@ myColors <- unique(genes_coords_taxon$label_color)
 names(myColors) <- unique(genes_coords_taxon$plot_label_freq)
 colScale <- scale_colour_manual(name = "species", labels=label, values = myColors)
 
-
 if (nrow(genes_taxon_1dim) > 0) {
     # label for density plots
     label_1d <- c(sort(unique(genes_taxon_1dim$plot_label_freq)))
@@ -237,23 +236,20 @@ if (nrow(genes_taxon_1dim) > 0) {
 
 
 plot_2 <- ggplot(genes_coords_taxon,aes(colour = plot_label_freq)) +
-    #scale_color_viridis(name="species", labels=dens2_label, discrete=TRUE, begin=0.1, end=0.9) +
     scale_shape_manual(name="species", labels=label, values=c(1,2,15,16,17,3,7,8,9,23,18,4,10,11,12,13,14,0)) +
-    #scale_color_manual(name="species", labels=label, values=c(1,2,15,16,17,3,7,8,9,23,18,4,10,11,12,13,14,0))
-    #scale_colour_manual(name = "species", labels=label, values = myColors)
     colScale
 if (nrow(genes_coords_taxon_query) > 0) {
     plot_2 <- plot_2 +
-        geom_point(data=genes_coords_taxon_query, aes(x=Dim.1, y=Dim.2, shape=taxon_query_factor)) +
+        geom_point(data=genes_coords_taxon_query, aes(x=Dim.1, y=Dim.2)) + #, shape=taxon_query_factor
         stat_density_2d(data=genes_coords_taxon_query,aes(x=Dim.1, y=Dim.2), geom="polygon", alpha=0.05)
 }
 if (nrow(genes_coords_taxon_unassigned) > 0) {
     plot_2 <- plot_2 +
-        geom_point(data=genes_coords_taxon_unassigned, aes(x=Dim.1, y=Dim.2, shape=taxon_unassigned_factor))
+        geom_point(data=genes_coords_taxon_unassigned, aes(x=Dim.1, y=Dim.2)) #, shape=taxon_unassigned_factor
 }
 if (nrow(genes_coords_taxon_rest) > 0) {
     plot_2 <- plot_2 +
-        geom_point(data=genes_coords_taxon_rest, aes(x=Dim.1, y=Dim.2, shape=taxon_rest_factor))
+        geom_point(data=genes_coords_taxon_rest, aes(x=Dim.1, y=Dim.2)) #, shape=taxon_rest_factor
 }
 plot_2 <- plot_2 +
       theme_bw() +

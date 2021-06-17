@@ -14,7 +14,7 @@ from Bio.Seq import Seq as BioPython_Seq # to count oligonucleotides (also overl
 import yaml # read config file
 import sys # parse command line arguments
 
-from classes import Assembly, Contig, Gene, Transcript
+from classes import Assembly, Contig, Gene #, Transcript
 
 
 # ====================== CONSTANTS ======================
@@ -345,17 +345,10 @@ def compute_coverage_and_positional_info(a):
                 contig_gene_gcs.append(gene.get_gc_content())
                 contig_gene_covs.append(gene.get_coverage())
 
-                gene.set_single_exon() # perform computations on wether gene has multiple exons or not
-                # print(gene.name)
-                # print(gene.transcripts)
-                #TODO
+                # gene.set_single_exon() # perform computations on wether gene has multiple exons or not #TODO
 
-
-            # if contig_gene_lengths == []:
-            #     print("contig_gene_lengths empty list")
 
             # lengths do not have to be length corrected
-
 
             # compute length corrected gene coverage mean and SD for this contig
             contig_weighted_gene_cov_mean, contig_weighted_gene_cov_sd = [], []
@@ -981,7 +974,7 @@ def get_raw_array(a, stats_ref):
                     gene.gcdev_from_overall(stats_ref["gene gc mean"],
                                             stats_ref["gene gc sd"]), # index 32
 
-                    gene.get_single_exon() # index 33
+                    # gene.get_single_exon() # index 33
 
 
 
@@ -1020,7 +1013,7 @@ def output_table(a, raw_array, filename):
         "g_len", "g_lendev_c", "g_lendev_o", "g_abspos", "g_terminal", "g_single"] + \
         g_cov_header + \
         ["g_cov_z_bool", "g_pearson_r_o", "g_pearson_p_o", "g_pearson_r_c", "g_pearson_p_c",
-        "g_gc_cont", "g_gcdev_c", "g_gcdev_o", "g_single_exon"
+        "g_gc_cont", "g_gcdev_c", "g_gcdev_o" # , "g_single_exon"
     ]
 
 
@@ -1192,7 +1185,7 @@ def read_faidx(a):
             if contig_name in a.get_contigs().keys():
                 continue
             else:
-                contig_length = line_array[1]
+                contig_length = int(line_array[1])
                 init_contig(a, contig_name, contig_length)
 
 
@@ -1234,57 +1227,6 @@ def read_gff(a, include_pseudogenes):
 
                     # add to list of genes in associated contig
                     a.get_contig(associated_contig).add_gene(gene_name)
-                elif (tmp_array[2] == "mRNA"):
-                    attributes = tmp_array[8].split(';')
-                    for attribute in attributes:
-                        key, value = attribute.split("=")
-                        if key == "ID":
-                            transcript_id = value
-                        elif key == "Parent":
-                            gene_name = value
-                            gene = a.get_gene(gene_name)
-                    # initialise transcript
-                    transcript = Transcript(transcript_id, gene_name)
-                    # add to dictionary of transcripts
-                    a.add_transcript(transcript_id, transcript)
-                    # add to list of transcripts in associated gene
-                    gene.add_transcript(transcript_id)
-
-                elif (tmp_array[2] == "exon"):
-                    attributes = tmp_array[8].split(';')
-                    for attribute in attributes:
-                        key, value = attribute.split("=")
-                        if key == "ID":
-                            exon_id = value
-                        elif key == "Parent": # parent should be in conformational GFF the mRNA
-                            if value in a.get_transcripts().keys(): # if parent ID not a transcript, its probably the gene
-                                transcript_id = value
-                                parent = a.get_transcript(transcript_id)
-                                parent.add_cds(exon_id)
-                            elif value in a.get_genes().keys(): # if parent ID a gene
-                                gene_id = value
-                                parent = a.get_gene(gene_id)
-                                # if there is no mRNA associated with the gene,
-                                # add exon to list of transcripts in associated gene
-                                parent.add_transcript(exon_id)
-
-                elif (tmp_array[2] == "CDS"):
-                    attributes = tmp_array[8].split(';')
-                    for attribute in attributes:
-                        key, value = attribute.split("=")
-                        if key == "ID":
-                            cds_id = value
-                        elif key == "Parent":
-                            if value in a.get_transcripts().keys(): # if parent ID not a transcript, it should be a gene
-                                transcript_id = value
-                                parent = a.get_transcript(transcript_id)
-                                parent.add_cds(cds_id)
-                            elif value in a.get_genes().keys(): # if parent ID a gene
-                                gene_id = value
-                                parent = a.get_gene(gene_id)
-                                # if there is no mRNA associated with the gene,
-                                # add CDS to list of transcripts in associated gene
-                                parent.add_transcript(cds_id)
                 else:
                     pass
 

@@ -7,7 +7,6 @@ chmod +x MILTS.sh
 cd tools
 
 #samtools
-
 wget https://github.com/samtools/samtools/releases/download/1.11/samtools-1.11.tar.bz2
 tar xjf samtools-1.11.tar.bz2
 cd samtools-1.11/
@@ -15,6 +14,8 @@ cd samtools-1.11/
 make
 
 cd ..
+ln -s samtools-1.11/samtools samtools
+
 
 # bedtools
 wget https://github.com/arq5x/bedtools2/releases/download/v2.30.0/bedtools.static.binary
@@ -25,9 +26,9 @@ chmod a+x bedtools
 #Python packages
 #standard library includes: itertools + sys
 
-pip install biopython # numpy + Bio.Seq
-pip install scipy
-pip install pyyaml
+python3 -m pip install biopython # numpy + Bio.Seq
+python3 -m pip install scipy
+python3 -m pip install pyyaml
 
 
 #R packages
@@ -49,17 +50,14 @@ tar xzf diamond-linux64.tar.gz
 # gffread
 wget http://ccb.jhu.edu/software/stringtie/dl/gffread-0.12.1.Linux_x86_64.tar.gz
 tar xzf gffread-0.12.1.Linux_x86_64.tar.gz
-mv gffread-0.12.1.Linux_x86_64/  gffread-0.12.1/
+ln -s gffread-0.12.1.Linux_x86_64/gffread gffread
+
+# orca
+wget https://github.com/plotly/orca/releases/download/v1.3.1/orca-1.3.1.AppImage
+chmod +x orca-1.3.1.AppImage
+ln -s orca-1.3.1.AppImage orca
+
 
 rm -rf gffread-0.12.1.Linux_x86_64.tar.gz diamond-linux64.tar.gz samtools-1.11.tar.bz2
 
-
-
-# # Database
-# wget https://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz
-# wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
-# wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/prot.accession2taxid.gz
-
-# tar -zxf 'taxdump.tar.gz' nodes.dmp names.dmp
-# diamond makedb --in "nr.gz" -d "nr_taxonomy.dmnd" -p 8 --taxonmap "prot.accession2taxid.gz" --taxonnodes "nodes.dmp" --taxonnames "names.dmp"
-# rm -rf nr.gz prot.accession2taxid.gz nodes.dmp names.dmp
+cd ..

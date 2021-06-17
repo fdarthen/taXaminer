@@ -8,10 +8,14 @@
 #SBATCH --error=./array_%A_%a.e.out      # and error log
 #SBATCH --array=1 # -3%3 # <- set array of tasks
 
-if [ -z "$1" ]; then
-    config_file=$(awk -v arrayID=$SLURM_ARRAY_TASK_ID 'FNR==arrayID{print $0}' seedfile.txt)
-else
-    config_file=$1
-echo $SLURM_ARRAY_TASK_ID $config_file
+PATH=$PWD/../tools:$PATH
 
-. ./compute_pbc.sh "$config_file"
+if [ -z "$1" ]; then
+    config_path=$(awk -v arrayID=$SLURM_ARRAY_TASK_ID 'FNR==arrayID{print $0}' seedfile.txt)
+else
+    config_path=$1
+fi
+
+echo $SLURM_ARRAY_TASK_ID $config_path
+
+. ./compute_pbc.sh "$config_path"

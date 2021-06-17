@@ -120,6 +120,8 @@ genes_coords_taxon$lcaID[genes_coords_taxon$lcaID == "0"] <- NA
 
 
 
+
+
 # ____________PERFORM RANK REPLACEMENTS FOR LCA AND QUERY GROUP___________________
 
 ncbiFilein <- paste0(find.package("PhyloProfile"),"/PhyloProfile/data/preProcessedTaxonomy.txt")
@@ -132,9 +134,8 @@ query_taxonomy <- PhyloProfile::getTaxonomyInfo(cfg$tax_id,preProcessedTaxonomy)
 # rank at which labels are merged in the plots
 # if cfg$plot_grouping_rank is numeric, it is already the ncbiID of the rank at which should be grouped
 # else it is the rank (like phylum/class/etc.) at which should be grouped and the ID must be retained from the taxonomy first
-query_plot_rank <- ifelse(grepl("\\d", cfg$plot_grouping_rank),as.numeric(cfg$plot_grouping_rank),query_taxonomy[rank == cfg$plot_grouping_rank]$ncbiID)
-query_label <- query_plot_rank
-query_label_name <- query_taxonomy$fullName[query_taxonomy$ncbiID == query_plot_rank]
+merging_rank <- ifelse(grepl("\\d", cfg$plot_grouping_rank),as.numeric(cfg$plot_grouping_rank),query_taxonomy[rank == cfg$plot_grouping_rank]$ncbiID)
+merging_rank_name <- query_taxonomy$fullName[query_taxonomy$ncbiID == merging_rank]
 # retrieve lineage information for query
 query_lineage <- c(query_taxonomy$ncbiID,"1") # 1 equals the root node, which is per default not included in the taxonomy
 
@@ -145,6 +146,11 @@ genes_coords_taxon$LCA_replace <- (genes_coords_taxon$lcaID %in% query_lineage)
 if (length(genes_coords_taxon$best_hitID[!is.na(genes_coords_taxon$best_hitID) & genes_coords_taxon$LCA_replace == TRUE]) > 0) {
     # compute (corrected) LCA of best hit and query species for genes where LCA_replace is TRUE,
     # i.e. LCA is within query species lineage
+
+    # for (best_hitID in unique(genes_coords_taxon$best_hitID[!is.na(genes_coords_taxon$best_hitID) & genes_coords_taxon$LCA_replace == TRUE])) {
+    #     print(best_hitID)
+    #     best_hits_taxonomy <- PhyloProfile::getTaxonomyInfo(best_hitID,preProcessedTaxonomy)
+    # }
 
     best_hits_taxonomy <- PhyloProfile::getTaxonomyInfo(unique(genes_coords_taxon$best_hitID[!is.na(genes_coords_taxon$best_hitID) & genes_coords_taxon$LCA_replace == TRUE]),preProcessedTaxonomy)
     best_hit_lineage <- lapply(best_hits_taxonomy, function(x) x$ncbiID) # all ncbiIDs in the lineage of the best hit
@@ -181,15 +187,16 @@ if (length(genes_coords_taxon$best_hitID[!is.na(genes_coords_taxon$best_hitID) &
 # also, the least abundant taxonomic assignments are merged, so that there are in total 18 groups left
 
 
+
 if (length(genes_coords_taxon$taxon_assignmentID[!is.na(genes_coords_taxon$taxon_assignmentID)]) > 0) {
-    # retrieve <query_plot_rank> of current taxon_assignment to determine if it's in same <query_plot_rank> as query (and thus be merged into one group/taxon_assignment)
+    # retrieve <merging_rank> of current taxon_assignment to determine if it's in same <merging_rank> as query (and thus be merged into one group/taxon_assignment)
     labels_taxonomy <- PhyloProfile::getTaxonomyInfo(unique(genes_coords_taxon$taxon_assignmentID[!is.na(genes_coords_taxon$taxon_assignmentID)]),preProcessedTaxonomy)
-    label_grouping <- lapply(labels_taxonomy, function(x) ifelse(query_plot_rank %in% x$ncbiID, TRUE, FALSE))
+    label_grouping <- lapply(labels_taxonomy, function(x) ifelse(merging_rank %in% x$ncbiID, TRUE, FALSE))
     label_id <- lapply(labels_taxonomy, function(x) x$ncbiID[1])
     label_group_matching <- do.call(rbind, Map(data.frame, "taxon_assignmentID"=as.numeric(label_id), "label_grouping"=label_grouping))
 
     genes_coords_taxon <- merge(genes_coords_taxon, label_group_matching, by="taxon_assignmentID", all.x = TRUE)
-    genes_coords_taxon$plot_label <- ifelse(genes_coords_taxon$label_grouping == TRUE, query_label_name, genes_coords_taxon$taxon_assignment)
+    genes_coords_taxon$plot_label <- ifelse(genes_coords_taxon$label_grouping == TRUE, merging_rank_name, genes_coords_taxon$taxon_assignment)
 }else{
     genes_coords_taxon$label_grouping <- NA
     genes_coords_taxon$plot_label <- genes_coords_taxon$taxon_assignment

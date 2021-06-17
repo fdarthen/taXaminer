@@ -5,8 +5,7 @@ import yaml
 
 
 
-fun=sys.argv[1]
-config_path = sys.argv[2]
+config_path = sys.argv[1]
 
 
 config_obj=yaml.safe_load(open(config_path,'r'))
@@ -14,47 +13,10 @@ proteins_path=config_obj['proteins_path'] # GFF file path
 output_path=config_obj['output_path'] # GFF file path
 
 
-def gffread_prot_fasta(proteins_path,output_path):
-    """ the protein FASTA file was created within MILTS with gffread,
-    so it contains in its header the length of the cds
-    This information is used to retrieve the longest transcript """
-
-    path_out = output_path+"tmp/tmp.longest_cds.protein.fasta"
-
-    with open(proteins_path, 'r') as file_prot:
-        gene_dict = {} #key=geneID, value=sequence
-        seq = ''
-        add = False
-        for line in file_prot:
-            if line.startswith('>'):
-                if add:
-                    gene_dict[gene] = seq
-                    seq = '' # reset the sequence
-                    add = False
-                transcript,gene,length = line.split('\t')
-                if gene in gene_dict.keys():
-                    # if length of the new transcript is larger, set add bool to True
-                    if ((len(gene_dict.get(gene))*3)+3) < int(length): #seq is in peptides (len*3) and gffread does not write final stop peptide (len*3+3)
-                        add = True
-                    else:
-                        add = False
-                else: # if no entry for gene is in dict, always add the transcript
-                    add = True
-            else:
-                if add:
-                    seq = seq + line.strip()
-
-    # overwrites the input file
-    with open(path_out, 'w') as file_out:
-        for gene, seq in gene_dict.items():
-            file_out.write('>'+gene+'\n')
-            file_out.write(seq+'\n')
-
-def regular_prot_fasta(proteins_path,output_path):
-    """ the protein FASTA file was provided from outside,
-    so it does not contain in its header the length of the cds
-    the gene-protein ID matching table, generated with gffread is used for this table
-    (it contains the length of the CDS as well) """
+def longest_cds_from_prot_fasta(proteins_path,output_path):
+    """ the gene-protein ID matching table, generated with gffread is used for this table
+    (it contains the length of the CDS ) to infer the transcript with the longest cds for each gene
+    this transcript is the written to a tmp fasta file"""
 
     matching_table_path = output_path+"tmp/tmp.prot_gene_matching.txt"
     path_out = output_path+"tmp/tmp.longest_cds.protein.fasta"
@@ -100,7 +62,5 @@ def regular_prot_fasta(proteins_path,output_path):
 
 
 
-if fun == "gffread":
-    gffread_prot_fasta(proteins_path)
-else:
-    regular_prot_fasta(proteins_path,output_path)
+
+longest_cds_from_prot_fasta(proteins_path,output_path)

@@ -19,4 +19,7 @@ conda install -c hcc r-paran -y
 echo "additional software"
 conda install samtools bedtools bowtie2 diamond gffread=0.12.1 -y
 
+# setting MILTS.sh as an executable
+chmod +x MILTS.sh
+
 echo "Done installing dependencies for MILTS"

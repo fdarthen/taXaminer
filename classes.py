@@ -82,19 +82,6 @@ class Assembly:
         return self.genes.get(gene)
 
 
-    def add_transcript(self, transcript_name, transcript):
-        self.transcripts[transcript_name] = transcript
-
-    def remove_transcript(self, transcript):
-        del self.transcripts[transcript]
-
-    def get_transcripts(self):
-        return self.transcripts
-
-    def get_transcript(self, transcript):
-        return self.transcripts[transcript]
-
-
     def add_geneless_contig(self, contig):
         self.geneless_contigs.append(contig)
 
@@ -545,9 +532,6 @@ class Gene:
 
         self.z_score_vector = None
 
-        self.transcripts = []
-        self.single_exon = 0                  # bool; "false" by default
-
 
     def get_name(self):     # the name equals the ID in the attributes field
         return self.name    # (the ID is required to be unique within the scope of the GFF)
@@ -795,48 +779,3 @@ class Gene:
 
     def get_z_score_vector(self):
         return self.z_score_vector
-
-    def get_transcript(self):
-        return self.transcripts
-
-    def add_transcript(self, transcript_id):
-        self.transcripts.append(transcript_id)
-
-    def get_single_exon(self):
-        return self.single_exon
-
-    def set_single_exon(self):
-        if len(self.transcripts) > 1:
-            self.single_exon = 0 # False; gene has multiple exons
-            #TODO: check is transcripts have gap between them
-            #TODO: multiple mRNA sufficient indicator?
-        else:
-            if # continue
-            self.single_exon = 1 # True; gene is single-exon gene
-
-
-############################ TRANSCRIPT #################################
-
-
-class Transcript:
-
-    def __init__(self, id, gene_name):
-        self.id = id
-        self.gene = gene_name
-
-        self.cds_list = []
-
-    def get_id(self):
-        return self.id
-
-    def get_gene_name(self):
-        return self.gene_name
-
-    def get_gene(self):
-        return self.gene
-
-    def add_cds(self, cds):
-        self.cds_list.append(cds)
-
-    def get_cds_list(self):
-        return self.cds_list
