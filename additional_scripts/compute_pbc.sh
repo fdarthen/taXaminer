@@ -50,7 +50,7 @@ else
     if [[ -f "${reads_1}" &&  -f "${reads_2}" ]]; then
         echo "mapping paired end data"
         ins_size=$(cat "$config_path" | python3 -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['ins_size'])")
-        echo "Insert size: " $((ins_size-200)) $((ins_size+200))
+        echo "Insert size: " $((ins_size-200)) "-" $((ins_size+200))
         bowtie2 --sensitive -I $((ins_size-200)) -X $((ins_size+200)) -a -p 16 -x ${cov_path}my_assembly -1 ${reads_1} -2 ${reads_2} -S ${cov_path}my_mapping.sam
     elif [[ -f "${reads_un}" ]]; then
         echo "mapping unpaired data"
