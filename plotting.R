@@ -12,16 +12,17 @@ config_path <- args[1]
 
 cfg <- yaml.load_file(config_path)
 
-plot_pdf_andor_png <- function(plot, plot_path, spec) {
+plot_pdf_andor_png <- function(plot, plot_path, spec, cols) {
     # spec: if dimensions and resolution should be specified
     if (spec) {
+      wid = 7 + (cols*2)
       if (cfg$output_png) {
-        png(paste0(plot_path,".png"), units="in", width=6, height=6, res=500)
+        png(paste0(plot_path,".png"), units="in", width=wid, height=7, res=500)
         print(plot)
         dev.off()
       }
       if (cfg$output_pdf) {
-        pdf(paste0(plot_path,".pdf"), width=6, height=6)
+        pdf(paste0(plot_path,".pdf"), width=wid, height=7)
         print(plot)
         dev.off()
       }
@@ -158,7 +159,8 @@ label_count_table <- data.frame(table(genes_coords_taxon$plot_label)) # how ofte
 label_count_table$plot_label_freq <- as.character(paste0(label_count_table$Var1," (",label_count_table$Freq,")"))
 genes_coords_taxon <- merge(genes_coords_taxon, label_count_table[,c("Var1","plot_label_freq")], by.x = "plot_label", by.y = "Var1", all.x = TRUE)
 label <- sort(unique(label_count_table$plot_label_freq))
-
+# allow 25 rows per column in legend; if number of labels exceeds this, create multiple columns
+label_ncols <- (length(label)%/%26)+1
 
 # add sequence information
 prot_fasta <- Biostrings::readAAStringSet(cfg$proteins_path)
@@ -211,6 +213,8 @@ colScale <- scale_colour_manual(name = "species", labels=label, values = myColor
 if (nrow(genes_taxon_1dim) > 0) {
     # label for density plots
     label_1d <- c(sort(unique(genes_taxon_1dim$plot_label_freq)))
+    # allow 25 rows per column in legend; if number of labels exceeds this, create multiple columns
+    label_1d_ncols <- (length(label_1d)%/%26)+1
 
     # manual colorscale for 1D plots
     myColors <- unique(genes_taxon_1dim$label_color)
@@ -221,17 +225,19 @@ if (nrow(genes_taxon_1dim) > 0) {
         colScale_1D +
         geom_density(data=genes_taxon_1dim, aes(x=Dim.1)) +
         theme_bw() +
-        ggtitle("density of Dim.1")
+        ggtitle("density of Dim.1") +
+        guides(col=guide_legend(ncol=label_1d_ncols))
 
-    plot_pdf_andor_png(plot_x, paste(c(cfg$output_path, "taxonomic_assignment/density_x"), collapse=""), TRUE)
+    plot_pdf_andor_png(plot_x, paste(c(cfg$output_path, "taxonomic_assignment/density_x"), collapse=""), TRUE, label_1d_ncols)
 
     plot_y <- ggplot(genes_taxon_1dim,aes(colour = plot_label_freq)) +
         colScale_1D +
         geom_density(data=genes_taxon_1dim, aes(x=Dim.2)) +
         theme_bw() +
-        ggtitle("density of Dim.2")
+        ggtitle("density of Dim.2") +
+        guides(col=guide_legend(ncol=label_1d_ncols))
 
-    plot_pdf_andor_png(plot_y, paste(c(cfg$output_path, "taxonomic_assignment/density_y"), collapse=""), TRUE)
+    plot_pdf_andor_png(plot_y, paste(c(cfg$output_path, "taxonomic_assignment/density_y"), collapse=""), TRUE, label_1d_ncols)
 }
 
 
@@ -253,8 +259,9 @@ if (nrow(genes_coords_taxon_rest) > 0) {
 }
 plot_2 <- plot_2 +
       theme_bw() +
-      ggtitle("2D density")
-plot_pdf_andor_png(plot_2, paste(c(cfg$output_path, "taxonomic_assignment/density_2d"), collapse=""), TRUE)
+      ggtitle("2D density") +
+      guides(col=guide_legend(ncol=label_ncols))
+plot_pdf_andor_png(plot_2, paste(c(cfg$output_path, "taxonomic_assignment/density_2d"), collapse=""), TRUE, label_ncols)
 
 if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
 
@@ -263,9 +270,10 @@ if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
             colScale_1D +
             geom_density(data=genes_taxon_1dim, aes(x=Dim.3)) +
             theme_bw() +
-            ggtitle("density of Dim.3")
+            ggtitle("density of Dim.3") +
+            guides(col=guide_legend(ncol=label_1d_ncols))
 
-        plot_pdf_andor_png(plot_z, paste(c(cfg$output_path, "taxonomic_assignment/density_z"), collapse=""), TRUE)
+        plot_pdf_andor_png(plot_z, paste(c(cfg$output_path, "taxonomic_assignment/density_z"), collapse=""), TRUE, label_1d_ncols)
     }
 
     fig <- plot_ly(type="scatter3d", mode="markers", symbols=c('circle'))
