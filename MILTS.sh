@@ -13,8 +13,8 @@ gff_path=$(cat "$config_path" | python3 -c "import sys, yaml; print(yaml.safe_lo
 output_path=$(cat "$config_path" | python3 -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['output_path'])")
 proteins_path=$(cat "$config_path" | python3 -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['proteins_path'])")
 tax_id=$(cat "$config_path" | python3 -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['tax_id'])")
-taxon_hits_lca_path=$(cat "$config_path" | python3 -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['taxon_hits_lca_path'])")
-best_taxon_hit_path=$(cat "$config_path" | python3 -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['best_taxon_hit_path'])")
+# taxon_hits_lca_path=$(cat "$config_path" | python3 -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['taxon_hits_lca_path'])")
+# best_taxon_hit_path=$(cat "$config_path" | python3 -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['best_taxon_hit_path'])")
 nr_db_path=$(cat "$config_path" | python3 -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['nr_db_path'])")
 pbc_paths_list=$(cat "$config_path" | python3 -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['pbc_paths'])")
 pbc_path=$(echo $pbc_paths_list | cut -d ',' -f1 | awk -F '[' '{print $2}' | awk -F ']' '{print $1}' | awk -F "'" '{print $2}')
@@ -28,6 +28,11 @@ compute_pbc=$(cat "$config_path" | python3 -c "import sys, yaml; print(yaml.safe
 output_pdf=$(cat "$config_path" | python3 -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['output_pdf'])")
 output_png=$(cat "$config_path" | python3 -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['output_png'])")
 
+# config=$(cat "$config_path" | python3 -c "import sys, yaml; print(yaml.safe_load(sys.stdin))")
+# echo $config # -> this is string of dictionary; parsing?
+
+source <(grep = test_config.ini | sed 's/ *= */=/g') # TODO: new config file?
+
 
 echo "Config: " $config_path
 echo "FASTA: " $fasta_path
@@ -35,9 +40,9 @@ echo "GFF: " $gff_path
 echo "Proteins: " $proteins_path
 echo "PBC(s): " $pbc_paths_list
 echo "Output directory: " $output_path
-echo "Taxonomic assignment: "
-echo $taxon_hits_lca_path
-echo $best_taxon_hit_path
+# echo "Taxonomic assignment: "
+# echo $taxon_hits_lca_path
+# echo $best_taxon_hit_path
 echo "NCBI Taxon ID: " $tax_id
 echo -e "\n"
 
@@ -47,11 +52,12 @@ echo -e "\n"
 if [ "${only_plotting}" = "FALSE" ]; then
 
     # 1.a) remove newlines from fasta
-    awk '/^>/{if(NR==1){print}else{printf("\n%s\n",$0)}next} {printf("%s",$0)} END{printf("\n")}' $fasta_path >> "${output_path}tmp/tmp.MILTS.fasta"
+    awk '/^>/{if(NR==1){print}else{printf("\n%s\n",$0)}next} {printf("%s",$0)} END{printf("\n")}' $fasta_path > "${output_path}tmp/tmp.MILTS.fasta"
     samtools faidx "${output_path}tmp/tmp.MILTS.fasta"
     # 1.b) creating a tabular file for protein to gene ID matching and finding the protein with longest CDS for each gene
     # grepping the GFF to only relevant lines accelerates gffread on large files immensely
-    grep -P "\tCDS\t|\tgene\t|\tmRNA\t" ${gff_path} | gffread - -o "${output_path}tmp/tmp.prot_gene_matching.txt" --table "@id,@geneid,@cdslen,@numexons"
+
+    # join -t $'\t'  -j 1  <(grep -P "\tCDS\t|\tgene\t|\tmRNA\t" /share/gluster/GeneSets/NCBI-Genomes/InvertebratesRefSeq/raw_dir/active/GCF_000001215.4/genomic.gff | sed 's/\tCDS\t/\tmRNA\t/g' | gffread - --table "@geneid,@id" | sort) <(grep -P "\tCDS\t|\tgene\t|\tmRNA\t" /share/gluster/GeneSets/NCBI-Genomes/InvertebratesRefSeq/raw_dir/active/GCF_000001215.4/genomic.gff | gffread - --table "@geneid,@cdslen" | sort) > "${output_path}tmp/tmp.prot_gene_matching.txt"
 
     # check if protein FASTA should be extracted but exists
     if [ "${extract_proteins}" = "TRUE" ]; then
@@ -114,7 +120,7 @@ if [ "${only_plotting}" = "FALSE" ]; then
     # 2) start python script --> produces descriptive gene statistics
     echo -e "produce gene info start:"
     time1_1=`date +%s`
-    python3 produce_gene_info.py "$config_path"
+    # python3 produce_gene_info.py "$config_path"
     time1_2=`date +%s`
     echo "produce gene info end (time elapsed:" $(($time1_2-$time1_1)) "s)"
 
@@ -141,39 +147,23 @@ if [ "${only_plotting}" = "FALSE" ]; then
         echo "retrieving peptide sequenes end (time elapsed:" $(($time3_2-$time3_1)) "s)"
 
     fi
-
-    # 4.b) or identify the protein with longest CDS for each gene when protein FASTA is provided
-    python3 ./additional_scripts/longest_cds.py "$config_path"
-
-    # 4.c) run sequence alignment with Diamond
-    if [ "${compute_tax_assignment}" = "TRUE" ]; then
-        echo "assess LCA and best hit start:"
-        time4_1=`date +%s`
-        if [ "${taxon_exclude}" = "TRUE" ]; then
-            diamond blastp -q "${output_path}tmp/tmp.longest_cds.protein.fasta" -o "${taxon_hits_lca_path}" -d "${nr_db_path}" -f 102 -b2.0 --tmpdir /dev/shm --sensitive --top 10 -c1 --taxon-exclude "$tax_id"
-            diamond blastp -q "${output_path}tmp/tmp.longest_cds.protein.fasta" -o "${best_taxon_hit_path}" -d "${nr_db_path}" -f 6 qseqid sseqid evalue bitscore score pident staxids sscinames -b2.0 --tmpdir /dev/shm --sensitive -c1 -k 1 --taxon-exclude "$tax_id"
-        else
-            diamond blastp -q "${output_path}tmp/tmp.longest_cds.protein.fasta" -o "${taxon_hits_lca_path}" -d "${nr_db_path}" -f 102 -b2.0 --tmpdir /dev/shm --sensitive --top 10 -c1
-            diamond blastp -q "${output_path}tmp/tmp.longest_cds.protein.fasta" -o "${best_taxon_hit_path}" -d "${nr_db_path}" -f 6 qseqid sseqid evalue bitscore score pident staxids sscinames -b2.0 --tmpdir /dev/shm --sensitive -c1 -k 1
-        fi
-        time4_2=`date +%s`
-        echo "assess LCA and best hit end (time elapsed:" $(($time4_2-$time4_1)) "s)"
-    fi
-
-    # 5.a) deduce taxonomic assignment based on LCA and best hit
-    echo "compute taxonomic assignment start:"
-    time5_1=`date +%s`
-    Rscript taxonomic_assignment.R "$config_path" --verbose >> $output_path"R_log.out"
-    time5_2=`date +%s`
-    echo "compute taxonomic assignment end (time elapsed:" $(($time5_2-$time5_1)) "s)"
-
 fi
 
+
+samtools faidx "${proteins_path}" -o "${output_path}tmp/tmp.proteins.fa.fai"
+
+
+# 5.a) deduce taxonomic assignment based on LCA and best hit
+echo "compute taxonomic assignment start:"
+time5_1=`date +%s`
+python3 taxonomic_assignment.py "$config_path"
+time5_2=`date +%s`
+echo "compute taxonomic assignment end (time elapsed:" $(($time5_2-$time5_1)) "s)"
 
 # 5.b) plot genes with PCA coordinates and taxonomic assignment
 echo "plot taxonomic assignment start:"
 time6_1=`date +%s`
-Rscript plotting.R "$config_path" --verbose >> $output_path"R_log.out"
+Rscript plotting.R "$config_path" --verbose #>> $output_path"R_log.out"
 time6_2=`date +%s`
 echo "plot taxonomic assignment end (time elapsed:" $(($time6_2-$time6_1)) "s)"
 

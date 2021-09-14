@@ -7,21 +7,25 @@ library(plotly)
 library(htmlwidgets)
 library(yaml) # for reading config file
 
+library(gridExtra)
+
+
 args <- commandArgs(trailingOnly = TRUE)
 config_path <- args[1]
 
 cfg <- yaml.load_file(config_path)
 
-plot_pdf_andor_png <- function(plot, plot_path, spec) {
+plot_pdf_andor_png <- function(plot, plot_path, spec, cols) {
     # spec: if dimensions and resolution should be specified
+    wid = 7 + (cols*2)
     if (spec) {
       if (cfg$output_png) {
-        png(paste0(plot_path,".png"), units="in", width=6, height=6, res=500)
+        png(paste0(plot_path,".png"), units="in", width=wid, height=7, res=500)
         print(plot)
         dev.off()
       }
       if (cfg$output_pdf) {
-        pdf(paste0(plot_path,".pdf"), width=6, height=6)
+        pdf(paste0(plot_path,".pdf"), width=wid, height=7)
         print(plot)
         dev.off()
       }
@@ -47,7 +51,7 @@ orca_static_3d <- function(plot, plot_filename, eye_x, eye_y, eye_z) {
     s <- list(camera = list(eye = list(x = eye_x, y = eye_y, z = eye_z)),
         xaxis=list(title="PC 1"),yaxis=list(title="PC 2"),zaxis=list(title="PC 3"),
         aspectmode='cube')
-    plot <- plot %>% layout(title = 'taxonomic assignment', scene = s, margin = m)
+    plot <- plot %>% layout(scene = s, margin = m) #title = 'taxonomic assignment',
 
     # save plots to json files to generate static plots exterenally with orca
     # orca function in R does not work and using system() does not work on cluster
@@ -145,7 +149,7 @@ getQualColForVector <- function(x = NULL) {
 #  _________________ READING DATA __________________ #
 
 genes_coords_taxon <- data.table::fread(paste0(cfg$output_path,'taxonomic_assignment/gene_table_taxon_assignment.csv'), sep=",", header=TRUE)
-query_label_name <- genes_coords_taxon$plot_label[genes_coords_taxon$plot_label != genes_coords_taxon$taxon_assignment & genes_coords_taxon$plot_label != "Unassigned" & genes_coords_taxon$plot_label != "Otherwise assigned"][1]
+query_label_name <- genes_coords_taxon$plot_label[genes_coords_taxon$plot_label != genes_coords_taxon$taxon_assignment & genes_coords_taxon$plot_label != "Unassigned" & genes_coords_taxon$plot_label != "Otherwise assigned"][1] #TODO: change in future (with new merging this hold not true anymore)
 print(query_label_name)
 if (is.null(query_label_name) | is.na(query_label_name)) {
     query_label_name <- "Undefined"
@@ -157,8 +161,9 @@ if (is.null(query_label_name) | is.na(query_label_name)) {
 label_count_table <- data.frame(table(genes_coords_taxon$plot_label)) # how often each label appears
 label_count_table$plot_label_freq <- as.character(paste0(label_count_table$Var1," (",label_count_table$Freq,")"))
 genes_coords_taxon <- merge(genes_coords_taxon, label_count_table[,c("Var1","plot_label_freq")], by.x = "plot_label", by.y = "Var1", all.x = TRUE)
-label <- sort(unique(label_count_table$plot_label_freq))
-
+label <- sort(unique(genes_coords_taxon$plot_label_freq))
+# allow 25 rows per column in legend; if number of labels exceeds this, create multiple columns
+label_ncols <- (length(label)%/%26)+1
 
 # add sequence information
 prot_fasta <- Biostrings::readAAStringSet(cfg$proteins_path)
@@ -206,55 +211,63 @@ taxons_1d <- as.factor(genes_taxon_1dim$plot_label)
 # manual colorscale for plots with all taxons
 myColors <- unique(genes_coords_taxon$label_color)
 names(myColors) <- unique(genes_coords_taxon$plot_label_freq)
-colScale <- scale_colour_manual(name = "species", labels=label, values = myColors)
+colScale <- scale_colour_manual(name = "taxonomic assignments", labels=label, values = myColors)
+
 
 if (nrow(genes_taxon_1dim) > 0) {
     # label for density plots
     label_1d <- c(sort(unique(genes_taxon_1dim$plot_label_freq)))
+    label_1d_ncols <- (length(label_1d)%/%26)+1
 
     # manual colorscale for 1D plots
-    myColors <- unique(genes_taxon_1dim$label_color)
-    names(myColors) <- unique(genes_taxon_1dim$plot_label_freq)
-    colScale_1D <- scale_colour_manual(name = "species", labels=label_1d, values = myColors)
+    myColors_1D <- unique(genes_taxon_1dim$label_color)
+    names(myColors_1D) <- unique(genes_taxon_1dim$plot_label_freq)
+    colScale_1D <- scale_colour_manual(name = "taxonomic assignments", labels=label_1d, values = myColors_1D)
 
     plot_x <- ggplot(genes_taxon_1dim,aes(colour = plot_label_freq)) +
         colScale_1D +
         geom_density(data=genes_taxon_1dim, aes(x=Dim.1)) +
         theme_bw() +
-        ggtitle("density of Dim.1")
+        ggtitle("density of Dim.1") +
+        guides(col=guide_legend(ncol=label_1d_ncols))
 
-    plot_pdf_andor_png(plot_x, paste(c(cfg$output_path, "taxonomic_assignment/density_x"), collapse=""), TRUE)
+    plot_pdf_andor_png(plot_x, paste(c(cfg$output_path, "taxonomic_assignment/density_x"), collapse=""), TRUE, label_1d_ncols)
 
     plot_y <- ggplot(genes_taxon_1dim,aes(colour = plot_label_freq)) +
         colScale_1D +
         geom_density(data=genes_taxon_1dim, aes(x=Dim.2)) +
         theme_bw() +
-        ggtitle("density of Dim.2")
+        ggtitle("density of Dim.2") +
+        guides(col=guide_legend(ncol=label_1d_ncols))
 
-    plot_pdf_andor_png(plot_y, paste(c(cfg$output_path, "taxonomic_assignment/density_y"), collapse=""), TRUE)
+
+    plot_pdf_andor_png(plot_y, paste(c(cfg$output_path, "taxonomic_assignment/density_y"), collapse=""), TRUE, label_1d_ncols)
 }
 
 
-plot_2 <- ggplot(genes_coords_taxon,aes(colour = plot_label_freq)) +
-    scale_shape_manual(name="species", labels=label, values=c(1,2,15,16,17,3,7,8,9,23,18,4,10,11,12,13,14,0)) +
+plot_2 <- ggplot(genes_coords_taxon,aes(x=Dim.1, y=Dim.2, colour = plot_label_freq)) +
+    scale_shape_manual(name="taxonomic assignments", labels=label, values=c(1,2,15,16,17,3,7,8,9,23,18,4,10,11,12,13,14,0)) +
     colScale
 if (nrow(genes_coords_taxon_query) > 0) {
     plot_2 <- plot_2 +
-        geom_point(data=genes_coords_taxon_query, aes(x=Dim.1, y=Dim.2)) + #, shape=taxon_query_factor
-        stat_density_2d(data=genes_coords_taxon_query,aes(x=Dim.1, y=Dim.2), geom="polygon", alpha=0.05)
+        geom_point(data=genes_coords_taxon_query, aes(x=Dim.1, y=Dim.2, colour=plot_label_freq), alpha=0.75) + #, shape=taxon_query_factor
+        #stat_density_2d(aes(x=Dim.1, y=Dim.2, color=plot_label_freq), data=genes_coords_taxon_query, geom="polygon", contour=TRUE, alpha=0.05)
+        geom_rug(data=genes_coords_taxon_query, mapping=aes(x=Dim.1), color="#404a4a")
 }
 if (nrow(genes_coords_taxon_unassigned) > 0) {
     plot_2 <- plot_2 +
-        geom_point(data=genes_coords_taxon_unassigned, aes(x=Dim.1, y=Dim.2)) #, shape=taxon_unassigned_factor
+        geom_point(data=genes_coords_taxon_unassigned, aes(x=Dim.1, y=Dim.2, colour = plot_label_freq), alpha=0.5) #, shape=taxon_unassigned_factor
 }
 if (nrow(genes_coords_taxon_rest) > 0) {
     plot_2 <- plot_2 +
-        geom_point(data=genes_coords_taxon_rest, aes(x=Dim.1, y=Dim.2)) #, shape=taxon_rest_factor
+        geom_point(data=genes_coords_taxon_rest, aes(x=Dim.1, y=Dim.2, colour = plot_label_freq)) #, shape=taxon_rest_factor
 }
 plot_2 <- plot_2 +
       theme_bw() +
-      ggtitle("2D density")
-plot_pdf_andor_png(plot_2, paste(c(cfg$output_path, "taxonomic_assignment/density_2d"), collapse=""), TRUE)
+      ggtitle("2D density") +
+      guides(col=guide_legend(ncol=label_ncols))
+plot_pdf_andor_png(plot_2, paste(c(cfg$output_path, "taxonomic_assignment/density_2d"), collapse=""), TRUE, label_ncols)
+
 
 if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
 
@@ -263,53 +276,57 @@ if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
             colScale_1D +
             geom_density(data=genes_taxon_1dim, aes(x=Dim.3)) +
             theme_bw() +
-            ggtitle("density of Dim.3")
+            ggtitle("density of Dim.3") +
+            guides(col=guide_legend(ncol=label_1d_ncols))
 
-        plot_pdf_andor_png(plot_z, paste(c(cfg$output_path, "taxonomic_assignment/density_z"), collapse=""), TRUE)
+        plot_pdf_andor_png(plot_z, paste(c(cfg$output_path, "taxonomic_assignment/density_z"), collapse=""), TRUE, label_1d_ncols)
     }
 
     fig <- plot_ly(type="scatter3d", mode="markers", symbols=c('circle'))
 
     fig <- fig %>% add_markers(fig, data=genes_coords_taxon_query, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
         hoverinfo="text",
-        text = ~paste('</br>ID:',g_name, '| Taxonomic assignment:',taxon_assignment,'| Label:',plot_label,
+        text = ~paste('</br>ID:',g_name, '| Scaffold:',c_name,
+            '</br>Taxonomic assignment:',taxon_assignment,'| Label:',plot_label,
             '</br>Coverage:',g_coverages, '(SD from contig mean:',g_covdeviations,')',
             '</br>Terminal:',g_terminal,'(Genes on contig:',c_num_of_genes,')',
-            '</br>LCA:',lca_hit,
-            '</br>Best hit:',best_hit,'(e-value:',evalue,')',
+            '</br>LCA:',lca,
+            '</br>Best hit:',best_hit,'(e-value:',bh_evalue,')',
             '</br>Seq:',query_seq),
         textposition="bottom left",
         opacity=0.75,
-        size=~I(25),
+        size=~I(50),
         color=~I(label_color),
         name=~plot_label_freq
     )
 
     fig <- fig %>% add_markers(fig, data=genes_coords_taxon_unassigned, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
         hoverinfo="text",
-        text = ~paste('</br>ID:',g_name, '| Taxonomic assignment:',taxon_assignment,'| Label:',plot_label,
+        text = ~paste('</br>ID:',g_name, '| Scaffold:',c_name,
+            '</br>Taxonomic assignment:',taxon_assignment,'| Label:',plot_label,
             '</br>Coverage:',g_coverages, '(SD from contig mean:',g_covdeviations,')',
             '</br>Terminal:',g_terminal,'(Genes on contig:',c_num_of_genes,')',
-            '</br>LCA:',lca_hit,
-            '</br>Best hit:',best_hit,'(e-value:',evalue,')',
+            '</br>LCA:',lca,
+            '</br>Best hit:',best_hit,'(e-value:',bh_evalue,')',
             '</br>Seq:',query_seq),
         textposition="bottom left",
         opacity=0.5,
-        size=~I(25),
+        size=~I(50),
         color=~I(label_color),
         name=~plot_label_freq
     )
 
     fig <- fig %>% add_markers(fig, data=genes_coords_taxon_rest, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
         hoverinfo="text",
-        text = ~paste('</br>ID:',g_name, '| Taxonomic assignment:',taxon_assignment,'| Label:',plot_label,
+        text = ~paste('</br>ID:',g_name, '| Scaffold:',c_name,
+            '</br>Taxonomic assignment:',taxon_assignment,'| Label:',plot_label,
             '</br>Coverage:',g_coverages, '(SD from contig mean:',g_covdeviations,')',
             '</br>Terminal:',g_terminal,'(Genes on contig:',c_num_of_genes,')',
-            '</br>LCA:',lca_hit,
-            '</br>Best hit:',best_hit,'(e-value:',evalue,')',
+            '</br>LCA:',lca,
+            '</br>Best hit:',best_hit,'(e-value:',bh_evalue,')',
             '</br>Seq:',query_seq),
         textposition="bottom left",
-        size=~I(25),
+        size=~I(50),
         color=~I(label_color),
         name=~plot_label_freq
     )

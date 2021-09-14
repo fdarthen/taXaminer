@@ -82,6 +82,18 @@ def rescale(x, old_min, old_max, new_min, new_max, nansub):
     return y
 
 
+def remove_prefix(text, prefix):
+    if text.startswith(prefix):
+        return text[len(prefix):]
+    return text
+
+def strip_ID(id):
+    """ remove GFFs prefixes from IDs """
+    for prefix in ['gene:','gene-','transcript:','transcript-','rna:','rna-','cds:','cds-']:
+        id = remove_prefix(id,prefix)
+    return id
+
+
 def impute_array(a, data_array, include_coverage):
     '''This function takes a data_array, i.e. an array of arrays describing a
     matrix where each row represents a gene and each column a variable.
@@ -1217,7 +1229,7 @@ def read_gff(a, include_pseudogenes):
                     strand = tmp_array[6]
                     attributes = tmp_array[8].split(';')
                     id_attribute = attributes[0].split('=') # something like ID=gene1
-                    gene_name = id_attribute[1] # get only the name after the equals sign
+                    gene_name = strip_ID(id_attribute[1]) # get only the name after the equals sign without "gene:" or "gene-" prefix
 
                     # initialise gene
                     gene = Gene(gene_name, start_pos, end_pos, associated_contig, source, score, strand, attributes, a)

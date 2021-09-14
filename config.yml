@@ -21,12 +21,14 @@ include_pseudogenes: "FALSE"
 compute_pbc: "FALSE"
 extract_proteins: "FALSE"
 compute_tax_assignment: "FALSE"
-only_plotting: "FALSE"
+only_plotting: "TRUE"
 
 ## Taxonomic assignment options ##
-taxon_hits_lca_path: "./example/test_lca_hits.txt"
-best_taxon_hit_path: "./example/test_best_hits.txt"
-nr_db_path: "path/to/nrTaxonomy.dmnd"
+assignment_mode: "quick"
+quick_mode_search_rank: "phylum"
+quick_mode_match_rank: "class"
+tax_assignment_path: "./example/top10_hits.txt"
+nr_db_path: "/share/gluster/Databases/NCBI/nr_taxonomy.dmnd" #"path/to/nrTaxonomy.dmnd"
 taxon_exclude: "TRUE"
 tax_id: "107806"
 
@@ -51,5 +53,6 @@ custom_eps: "0.3"
 custom_minPts: "10"
 
 ## Plotting options ##
-num_groups_plot: "all"
-plot_grouping_rank: "class"
+num_groups_plot: "25"
+abundancy_mode: "low"
+merging_labels: ["strain"]

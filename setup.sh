@@ -57,6 +57,15 @@ wget https://github.com/plotly/orca/releases/download/v1.3.1/orca-1.3.1.AppImage
 chmod +x orca-1.3.1.AppImage
 ln -s orca-1.3.1.AppImage orca
 
+# BASTA
+git clone https://github.com/timkahlke/BASTA.git
+cd BASTA
+python3 setup.py install
+cd ..
+# ln -s BASTA/basta.py basta
+
+
+
 
 rm -rf gffread-0.12.1.Linux_x86_64.tar.gz diamond-linux64.tar.gz samtools-1.11.tar.bz2
 
