@@ -19,6 +19,7 @@ plot_pdf_andor_png <- function(plot, plot_path, spec, cols) {
     # spec: if dimensions and resolution should be specified
     wid = 7 + (cols*2)
     if (spec) {
+      wid = 7 + (cols*2)
       if (cfg$output_png) {
         png(paste0(plot_path,".png"), units="in", width=wid, height=7, res=500)
         print(plot)
@@ -217,6 +218,7 @@ colScale <- scale_colour_manual(name = "taxonomic assignments", labels=label, va
 if (nrow(genes_taxon_1dim) > 0) {
     # label for density plots
     label_1d <- c(sort(unique(genes_taxon_1dim$plot_label_freq)))
+    # allow 25 rows per column in legend; if number of labels exceeds this, create multiple columns
     label_1d_ncols <- (length(label_1d)%/%26)+1
 
     # manual colorscale for 1D plots
@@ -239,7 +241,6 @@ if (nrow(genes_taxon_1dim) > 0) {
         theme_bw() +
         ggtitle("density of Dim.2") +
         guides(col=guide_legend(ncol=label_1d_ncols))
-
 
     plot_pdf_andor_png(plot_y, paste(c(cfg$output_path, "taxonomic_assignment/density_y"), collapse=""), TRUE, label_1d_ncols)
 }
@@ -267,7 +268,6 @@ plot_2 <- plot_2 +
       ggtitle("2D density") +
       guides(col=guide_legend(ncol=label_ncols))
 plot_pdf_andor_png(plot_2, paste(c(cfg$output_path, "taxonomic_assignment/density_2d"), collapse=""), TRUE, label_ncols)
-
 
 if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
 
