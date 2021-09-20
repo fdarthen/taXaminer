@@ -724,7 +724,7 @@ def main():
     output_path=config_obj['output_path'] # complete output path (ENDING ON A SLASH!)
     nr_db_path=config_obj['nr_db_path']
     proteins_path=config_obj['proteins_path'] # path to FASTA w/ protein seqs
-    fasta_path=output_path+'tmp/tmp.MILTS.fasta' # path to tmp FASTA file
+    fasta_path=config_obj['fasta_path'] # output_path+'tmp/tmp.MILTS.fasta' # path to tmp FASTA file
     gff_path=config_obj['gff_path'] # path to GFF
     taxon_exclude = config_obj['taxon_exclude'] # bool to exclude query taxon from sequence alignment
     compute_tax_assignment = config_obj['compute_tax_assignment']
