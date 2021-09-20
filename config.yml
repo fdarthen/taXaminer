@@ -28,7 +28,7 @@ assignment_mode: "quick"
 quick_mode_search_rank: "phylum"
 quick_mode_match_rank: "class"
 tax_assignment_path: "./example/top10_hits.txt"
-nr_db_path: "/share/gluster/Databases/NCBI/nr_taxonomy.dmnd" #"path/to/nrTaxonomy.dmnd"
+nr_db_path: "path/to/nrTaxonomy.dmnd"
 taxon_exclude: "TRUE"
 tax_id: "107806"
 

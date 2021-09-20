@@ -1,5 +1,4 @@
-
-
+# -*- coding: utf-8 -*-
 
 import yaml # read config file
 import taxopy
@@ -9,10 +8,9 @@ import numpy as np
 import csv
 import os
 
-# print(time.time())
 
-TAX_DB = taxopy.TaxDb(keep_files=True)
-# TAX_DB = taxopy.TaxDb(nodes_dmp="./nodes.dmp", names_dmp="./names.dmp", keep_files=True) #TODO: add to download
+#TAX_DB = taxopy.TaxDb(keep_files=True)
+TAX_DB = taxopy.TaxDb(nodes_dmp="./nodes.dmp", names_dmp="./names.dmp", keep_files=True) #TODO: add to download
 
 class Gene:
     def __init__(self, line_array, header_index):
@@ -59,11 +57,8 @@ class Gene:
 
         self.coords = tuple([line_array[index] for index in header_index.get('Dim.')])
 
-
-
         self.protID = None # ID of transcript with longest CDS
         self.lencds = 0 # lenght of self.protID
-
 
         self.tax_assignments = []
         self.best_hit = None
@@ -125,9 +120,6 @@ def get_gff_attribute(attr_list, attr):
     else:
         value = strip_ID(tmp)
     return value
-
-
-
 
 
 # ██████  ██       ██████  ████████     ██       █████  ██████  ███████ ██      ███████
@@ -206,11 +198,7 @@ def merge_assignments_at_id(genes, ids):
 def iterative_merging_top(genes, num_groups_plot):
     """ identify at which rank in query lineage to merge best """
 
-    #IDEA: if you want to manually define groups, do it beforehand, remove those genes/tax assignments before this iterative process
-    # and reduce the number of plots allowed by the number of predefined groups
-
     labelID_taxa = init_label_taxa_dict(genes) # taxa that have this label; label : set(taxa)
-
 
     update_dict = {'nonempty-dummy'}
     while update_dict:
@@ -347,8 +335,6 @@ def assess_best_of_multi_hits(taxIDs, queryID):
                 bestID = (taxon, lca_index)
 
     return bestID[0]
-
-
 
 def set_taxon_assignment(genes):
     # assess taxonomic assignment for each gene:
@@ -778,8 +764,8 @@ def main():
 
     pre = time.time()
     prots = prot_gene_matching(output_path, gff_path, genes)
-    print("Matching")
-    print(time.time()-pre)
+    # print("Matching")
+    # print(time.time()-pre)
 
     if compute_tax_assignment and not only_plotting:
         subset_prots_longest_cds(genes, proteins_path, tmp_prot_path)
@@ -831,8 +817,8 @@ def main():
 
         pre = time.time()
         taxonomic_assignment(tax_assignment_path, genes, prots, queryID)
-        print("Assignment")
-        print(time.time()-pre)
+        # print("Assignment")
+        # print(time.time()-pre)
 
     else:
         print('Assignment mode not one of quick or exhaustive')
