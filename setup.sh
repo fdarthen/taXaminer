@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# download taxdump files for taxopy package
+wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
+tar -zxf 'taxdump.tar.gz' nodes.dmp names.dmp
+rm -rf taxdump.tar.gz
 
 # make MILTS script executable
 chmod +x MILTS.sh
@@ -39,11 +43,10 @@ Rscript -e 'install.packages("paran", repos="https://cloud.r-project.org",quiet=
 Rscript -e 'install.packages("mclust", repos="https://cloud.r-project.org",quiet=TRUE)'
 Rscript -e 'install.packages("dbscan", repos="https://cloud.r-project.org",quiet=TRUE)'
 Rscript -e 'install.packages("BiocManager", repos="https://cloud.r-project.org",quiet=TRUE)'
-Rscript -e 'BiocManager::install("PhyloProfile")'
 
 
 # Diamond
-wget http://github.com/bbuchfink/diamond/releases/download/v2.0.7/diamond-linux64.tar.gz
+wget http://github.com/bbuchfink/diamond/releases/download/v2.0.11/diamond-linux64.tar.gz
 tar xzf diamond-linux64.tar.gz
 
 
@@ -56,16 +59,6 @@ ln -s gffread-0.12.1.Linux_x86_64/gffread gffread
 wget https://github.com/plotly/orca/releases/download/v1.3.1/orca-1.3.1.AppImage
 chmod +x orca-1.3.1.AppImage
 ln -s orca-1.3.1.AppImage orca
-
-# BASTA
-git clone https://github.com/timkahlke/BASTA.git
-cd BASTA
-python3 setup.py install
-cd ..
-# ln -s BASTA/basta.py basta
-
-
-
 
 rm -rf gffread-0.12.1.Linux_x86_64.tar.gz diamond-linux64.tar.gz samtools-1.11.tar.bz2
 
