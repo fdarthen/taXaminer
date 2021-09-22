@@ -9,8 +9,9 @@ import csv
 import os
 
 
-#TAX_DB = taxopy.TaxDb(keep_files=True)
-TAX_DB = taxopy.TaxDb(nodes_dmp="./nodes.dmp", names_dmp="./names.dmp", keep_files=True) #TODO: add to download
+TAX_DB = taxopy.TaxDb(nodes_dmp="./nodes.dmp", names_dmp="./names.dmp", keep_files=True)
+
+missing_taxids = set()
 
 class Gene:
     def __init__(self, line_array, header_index):
@@ -300,10 +301,35 @@ def merge_labels(genes, queryID, merging_labels):
         merge_assignments_at_id(genes, merger_ids)
 
 
-def set_unassigned_label(genes):
+def set_unassigned_labels(genes):
     for g_name, gene in genes.items():
-        if gene.plot_label == 'NA':
-            gene.plot_label = 'Unassigned'
+        if not gene.plot_label:
+            if gene.taxon_assignmentID == 'NA':
+                gene.plot_label = 'Unassigned'
+                gene.plot_labelID = 'NA'
+            else:
+                gene.plot_label = gene.taxon_assignment
+                gene.plot_labelID = gene.taxon_assignmentID
+
+
+def ident_query_label(genes, queryID):
+    """ identify which label represent the query species """
+
+    query_taxon = taxopy.Taxon(queryID, TAX_DB)
+    query_lineage = query_taxon.taxid_lineage
+
+    label_candidate = (None, len(query_lineage))
+
+    for g_name, gene in genes.items():
+        if gene.plot_labelID in query_lineage:
+            if query_lineage.index(gene.plot_labelID) < label_candidate[1]:
+                label_candidate = (gene.plot_label, query_lineage.index(gene.plot_labelID))
+
+
+    return label_candidate[0]
+
+
+
 
 
 
@@ -327,7 +353,8 @@ def assess_best_of_multi_hits(taxIDs, queryID):
             taxon = taxopy.Taxon(taxID, TAX_DB)
         except:
             taxon = None
-            print(f'Taxon ID {taxID} could not be found in taxopy database.')
+            missing_taxids.add(taxID)
+            # print(f'Taxon ID {taxID} could not be found in taxopy database.')
         if taxon:
             lca = taxopy.find_lca([query_taxon, taxon], TAX_DB)
             lca_index = query_lineage.index(lca.taxid)
@@ -825,10 +852,21 @@ def main():
 
 
     merge_labels(genes, queryID, merging_labels)
-    unlabeled_genes, num_labels = filter_labeled_genes(genes)
-    iterative_merging_top(unlabeled_genes, num_groups_plot-num_labels)
+    if num_groups_plot:
+        unlabeled_genes, num_labels = filter_labeled_genes(genes)
+        iterative_merging_top(unlabeled_genes, num_groups_plot-num_labels)
+    else:
+        set_unassigned_labels(genes)
 
-    #set_unassigned_label(genes)
+    query_label = ident_query_label(genes, queryID)
+    with open(output_path+'tmp/tmp.query_label', 'w') as tmp_file:
+        tmp_file.write(query_label+'\n')
+
+    print("The following Taxon ID(s) could not be found in the NCBI: ")
+    print(missing_taxids)
+    print("Taxonomic assignment might be affected by this.")
+
+
 
     write_output(output_path, genes, header)
 

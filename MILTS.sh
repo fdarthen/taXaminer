@@ -35,10 +35,9 @@ echo -e "\n"
 if [ "${only_plotting}" = "FALSE" ]; then
 
     # 1.a) remove newlines from fasta
-    # awk '/^>/{if(NR==1){print}else{printf("\n%s\n",$0)}next} {printf("%s",$0)} END{printf("\n")}' $fasta_path > "${output_path}tmp/tmp.MILTS.fasta"
-    # samtools faidx "${output_path}tmp/tmp.MILTS.fasta"
-    samtools faidx "${fasta_path}" -o "${output_path}tmp/tmp.MILTS.fasta.fai"
-
+    awk '/^>/{if(NR==1){print}else{printf("\n%s\n",$0)}next} {printf("%s",$0)} END{printf("\n")}' $fasta_path > "${output_path}tmp/tmp.MILTS.fasta"
+    samtools faidx "${output_path}tmp/tmp.MILTS.fasta"
+    
     # check if protein FASTA should be extracted but exists
     if [ "${extract_proteins}" = "TRUE" ]; then
         if [[ -f "${proteins_path}" ]]; then
