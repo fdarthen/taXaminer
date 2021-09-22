@@ -21,12 +21,12 @@ include_pseudogenes: "FALSE"
 compute_pbc: "FALSE"
 extract_proteins: "FALSE"
 compute_tax_assignment: "FALSE"
-only_plotting: "TRUE"
+only_plotting: "FALSE"
 
 ## Taxonomic assignment options ##
-assignment_mode: "quick"
-quick_mode_search_rank: "phylum"
-quick_mode_match_rank: "class"
+assignment_mode: "exhaustive"
+quick_mode_search_rank: "phylum" #quick mode only
+quick_mode_match_rank: "class" #quick mode only
 tax_assignment_path: "./example/top10_hits.txt"
 nr_db_path: "path/to/nrTaxonomy.dmnd"
 taxon_exclude: "TRUE"
@@ -54,5 +54,4 @@ custom_minPts: "10"
 
 ## Plotting options ##
 num_groups_plot: "25"
-abundancy_mode: "low"
-merging_labels: ["strain"]
+merging_labels: ["species"]
