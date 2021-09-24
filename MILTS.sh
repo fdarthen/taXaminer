@@ -26,7 +26,7 @@ else
     echo "Exhaustive taxonomic assignment mode"
 fi
 echo "Database: " $nr_db_path
-echo "NCBI Taxon ID: " $tax_id "(taxon exlcuded: $taxon_exclude)"
+echo "NCBI Taxon ID: " $tax_id "(taxon excluded: $taxon_exclude)"
 echo -e "\n"
 
 [[ ! -d "${output_path}" ]] && mkdir -p "${output_path}"
@@ -37,7 +37,7 @@ if [ "${only_plotting}" = "FALSE" ]; then
     # 1.a) remove newlines from fasta
     awk '/^>/{if(NR==1){print}else{printf("\n%s\n",$0)}next} {printf("%s",$0)} END{printf("\n")}' $fasta_path > "${output_path}tmp/tmp.MILTS.fasta"
     samtools faidx "${output_path}tmp/tmp.MILTS.fasta"
-    
+
     # check if protein FASTA should be extracted but exists
     if [ "${extract_proteins}" = "TRUE" ]; then
         if [[ -f "${proteins_path}" ]]; then

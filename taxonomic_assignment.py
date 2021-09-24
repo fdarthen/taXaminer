@@ -383,6 +383,7 @@ def calc_corrected_lca(genes, queryID):
 
     for g_name, gene in genes.items():
         if gene.lcaID in query_lineage and gene.best_hitID != 'NA':
+            print(gene.best_hitID)
             bh_taxon = taxopy.Taxon(gene.best_hitID, TAX_DB)
             corrected_lca = taxopy.find_lca([query_taxon, bh_taxon], TAX_DB)
             gene.corrected_lcaID = corrected_lca.taxid
@@ -490,7 +491,7 @@ def prot_gene_matching(output_path, gff_path, genes):
             if not line.startswith('#'):
                 spline = line.strip().split('\t')
                 if spline[2] == 'mRNA' or spline[2] == 'CDS':
-                    if "ID" in spline[8]:
+                    if spline[8].startswith('ID=') or ";ID=" in spline[8]:
                         # print(spline[8])
                         childID = get_gff_attribute(spline[8], 'ID') # strip_ID(spline[8].split('ID=')[1].split(';')[0])
                         parentID = get_gff_attribute(spline[8], 'Parent') # strip_ID(spline[8].split('Parent=')[1].split(';')[0])
@@ -743,13 +744,12 @@ def main():
     compute_tax_assignment = config_obj['compute_tax_assignment']
     only_plotting = config_obj['only_plotting']
     assignment_mode = config_obj['assignment_mode']
-    quick_mode_search_rank = config_obj['quick_mode_search_rank']
-    quick_mode_match_rank = config_obj['quick_mode_match_rank']
+    quick_mode_search_rank = config_obj['quick_mode_search_rank'] if 'quick_mode_search_rank' in config_obj.keys() else None
+    quick_mode_match_rank = config_obj['quick_mode_match_rank'] if 'quick_mode_match_rank' in config_obj.keys() else None
     tax_assignment_path = config_obj['tax_assignment_path']
     queryID = int(config_obj['tax_id'])
     merging_labels = config_obj['merging_labels']
     num_groups_plot = config_obj['num_groups_plot']
-    abundancy_mode = config_obj['abundancy_mode']
 
     tmp_prot_path = output_path+"tmp/tmp.subset.protein.fasta"
 
@@ -779,7 +779,7 @@ def main():
     if num_groups_plot.isdigit() or type(num_groups_plot) == int:
         num_groups_plot = int(num_groups_plot)
     elif num_groups_plot == 'all':
-        # no merging based on abundancy desired
+        # no merging of taxonomic assignments desired
         num_groups_plot = False
     else:
         print('No valid option for "num_groups_plot"')
