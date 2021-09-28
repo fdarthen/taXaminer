@@ -742,7 +742,6 @@ def main():
     output_path=config_obj['output_path'] # complete output path (ENDING ON A SLASH!)
     nr_db_path=config_obj['nr_db_path']
     proteins_path=config_obj['proteins_path'] # path to FASTA w/ protein seqs
-    fasta_path=output_path+'tmp/tmp.MILTS.fasta' # path to tmp FASTA file
     gff_path=config_obj['gff_path'] # path to GFF
     taxon_exclude = config_obj['taxon_exclude'] # bool to exclude query taxon from sequence alignment
     compute_tax_assignment = config_obj['compute_tax_assignment']
@@ -793,10 +792,7 @@ def main():
     # read file
     genes, header = read_genes_coords(output_path)
 
-    pre = time.time()
     prots = prot_gene_matching(output_path, gff_path, genes)
-    # print("Matching")
-    # print(time.time()-pre)
 
     if compute_tax_assignment and not only_plotting:
         subset_prots_longest_cds(genes, proteins_path, tmp_prot_path)
@@ -846,10 +842,8 @@ def main():
             print(diamond_cmd)
             os.system(diamond_cmd)
 
-        pre = time.time()
         taxonomic_assignment(tax_assignment_path, genes, prots, queryID)
-        # print("Assignment")
-        # print(time.time()-pre)
+
 
     else:
         print('Assignment mode not one of quick or exhaustive')
@@ -870,8 +864,6 @@ def main():
         print("The following Taxon ID(s) could not be found in the NCBI: ")
         print(missing_taxids)
         print("Skipped for taxonomic assignment.")
-
-
 
     write_output(output_path, genes, header)
 
