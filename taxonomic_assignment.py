@@ -329,10 +329,6 @@ def ident_query_label(genes, queryID):
     return label_candidate[0]
 
 
-
-
-
-
 # ████████  █████  ██   ██  ██████  ███    ██  ██████  ███    ███ ██  ██████      █████  ███████ ███████ ██  ██████  ███    ██ ███    ███ ███████ ███    ██ ████████
 #    ██    ██   ██  ██ ██  ██    ██ ████   ██ ██    ██ ████  ████ ██ ██          ██   ██ ██      ██      ██ ██       ████   ██ ████  ████ ██      ████   ██    ██
 #    ██    ███████   ███   ██    ██ ██ ██  ██ ██    ██ ██ ████ ██ ██ ██          ███████ ███████ ███████ ██ ██   ███ ██ ██  ██ ██ ████ ██ █████   ██ ██  ██    ██
@@ -347,19 +343,16 @@ def assess_best_of_multi_hits(taxIDs, queryID):
     query_lineage = query_taxon.taxid_lineage
 
     bestID = (None, len(query_lineage)+1) #(id, index in lineage)
-    taxon = None
     for taxID in taxIDs:
-        try:
+        if taxID in TAX_DB.taxid2name.keys(): # avoid crashes because of ncbiIDs not being represented in TAX_DB
             taxon = taxopy.Taxon(taxID, TAX_DB)
-        except:
-            taxon = None
-            missing_taxids.add(taxID)
-            # print(f'Taxon ID {taxID} could not be found in taxopy database.')
-        if taxon:
             lca = taxopy.find_lca([query_taxon, taxon], TAX_DB)
             lca_index = query_lineage.index(lca.taxid)
             if bestID[1] > lca_index: # check if new best hit is closer to query in lineage as current best hit
                 bestID = (taxon, lca_index)
+        else:
+            missing_taxids.add(taxID)
+
 
     return bestID[0]
 
@@ -383,11 +376,15 @@ def calc_corrected_lca(genes, queryID):
 
     for g_name, gene in genes.items():
         if gene.lcaID in query_lineage and gene.best_hitID != 'NA':
-            print(gene.best_hitID)
-            bh_taxon = taxopy.Taxon(gene.best_hitID, TAX_DB)
-            corrected_lca = taxopy.find_lca([query_taxon, bh_taxon], TAX_DB)
-            gene.corrected_lcaID = corrected_lca.taxid
-            gene.corrected_lca = corrected_lca.name
+            if gene.best_hitID in TAX_DB.taxid2name.keys(): # avoid crashes because of ncbiIDs not being represented in TAX_DB
+                bh_taxon = taxopy.Taxon(gene.best_hitID, TAX_DB)
+                corrected_lca = taxopy.find_lca([query_taxon, bh_taxon], TAX_DB)
+                gene.corrected_lcaID = corrected_lca.taxid
+                gene.corrected_lca = corrected_lca.name
+            else:
+                missing_taxids.add(gene.best_hitID)
+                gene.corrected_lcaID = 'NA'
+                gene.corrected_lca = 'NA'
         else:
             gene.corrected_lcaID = 'NA'
             gene.corrected_lca = 'NA'
@@ -403,7 +400,8 @@ def calc_lca(genes):
                 if tax_id in TAX_DB.taxid2name.keys(): # avoid crashes because of ncbiIDs not being represented in TAX_DB
                     taxon = taxopy.Taxon(tax_id, TAX_DB)
                     lca_query.append(taxon)
-
+                else:
+                    missing_taxids.add(tax_id)
         if len(lca_query) > 1:
             lca = taxopy.find_lca(lca_query, TAX_DB)
             gene.lca = lca.name
@@ -431,8 +429,12 @@ def read_tax_assignments(tax_assignment_path, prots, queryID):
                     if ';' in spline[-2]:
                         hit_ids = [int(id) for id in spline[-2].split(';')]
                         closest_hit = assess_best_of_multi_hits(hit_ids, queryID)
-                        gene.best_hit = closest_hit.name
-                        gene.best_hitID = closest_hit.taxid
+                        if closest_hit:
+                            gene.best_hit = closest_hit.name
+                            gene.best_hitID = closest_hit.taxid
+                        else:
+                            gene.best_hit = 'NA'
+                            gene.best_hitID = 'NA'
                     else:
                         gene.best_hit = spline[-1]
                         gene.best_hitID = int(spline[-2])
@@ -498,6 +500,8 @@ def prot_gene_matching(output_path, gff_path, genes):
                         # print(childID)
                         # print(parentID)
                         child_parent_dict[childID] = parentID
+            elif "#FASTA" in line: # if FASTA block has been reached
+                break
 
     prot_index_path = output_path + 'tmp/tmp.proteins.fa.fai'
 
@@ -862,9 +866,10 @@ def main():
     with open(output_path+'tmp/tmp.query_label', 'w') as tmp_file:
         tmp_file.write(query_label+'\n')
 
-    print("The following Taxon ID(s) could not be found in the NCBI: ")
-    print(missing_taxids)
-    print("Taxonomic assignment might be affected by this.")
+    if missing_taxids:
+        print("The following Taxon ID(s) could not be found in the NCBI: ")
+        print(missing_taxids)
+        print("Skipped for taxonomic assignment.")
 
 
 
