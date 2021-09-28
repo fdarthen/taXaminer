@@ -15,7 +15,6 @@ cfg <- yaml.load_file(config_path)
 
 plot_pdf_andor_png <- function(plot, plot_path, spec, cols) {
     # spec: if dimensions and resolution should be specified
-    wid = 7 + (cols*2)
     if (spec) {
       wid = 7 + (cols*2)
       if (cfg$output_png) {
@@ -151,23 +150,19 @@ genes_coords_taxon <- data.table::fread(paste0(cfg$output_path,'taxonomic_assign
 query_label_name <- read.table(paste0(cfg$output_path,'tmp/tmp.query_label'),header = F,nrows = 1)[1,1]
 print(query_label_name)
 
-
 # ________________ PLOT PREPARATION _______________ #
 
 # frequency information for labels in plots
 label_count_table <- data.frame(table(genes_coords_taxon$plot_label)) # how often each label appears
 label_count_table$plot_label_freq <- as.character(paste0(label_count_table$Var1," (",label_count_table$Freq,")"))
 genes_coords_taxon <- merge(genes_coords_taxon, label_count_table[,c("Var1","plot_label_freq")], by.x = "plot_label", by.y = "Var1", all.x = TRUE)
-label <- sort(unique(genes_coords_taxon$plot_label_freq))
-# allow 25 rows per column in legend; if number of labels exceeds this, create multiple columns
-label_ncols <- (length(label)%/%26)+1
 
 # add sequence information
 prot_fasta <- Biostrings::readAAStringSet(cfg$proteins_path)
 protID <- names(prot_fasta)
 query_seq <- paste(prot_fasta)
 prot_sequences <- data.frame(protID, query_seq)
-prot_sequences$protID <- gsub('\\ .*', '' , prot_sequences$protID)
+prot_sequences$protID <- gsub('\\s.*', '' , prot_sequences$protID)
 prot_sequences$query_seq <- gsub("(.{70}?)", "\\1</br>", prot_sequences$query_seq)
 genes_coords_taxon <- merge(genes_coords_taxon, prot_sequences, by="protID", all.x=TRUE)
 
@@ -180,35 +175,43 @@ genes_coords_taxon$g_coverages <- apply(subset(genes_coords_taxon, select=g_cov_
 g_covdev_vars <- as.factor(grep("g_covdev_c_[0-9]",colnames(genes_coords_taxon), value=TRUE))
 genes_coords_taxon$g_covdeviations <- apply(subset(genes_coords_taxon, select=g_covdev_vars),1,paste,collapse="; ")
 
-genes_coords_taxon$label_color[genes_coords_taxon$plot_label == query_label_name] <- "#404a4a"
-genes_coords_taxon$label_color[genes_coords_taxon$plot_label == "Unassigned"] <- "#778899"
-genes_coords_taxon$label_color[genes_coords_taxon$plot_label != query_label_name & genes_coords_taxon$plot_label != "Unassigned"] <- getQualColForVector(genes_coords_taxon$plot_label_freq[genes_coords_taxon$plot_label != query_label_name & genes_coords_taxon$plot_label != "Unassigned"])
 
+# prepare legend for plots and
+# sort data alphabetically by plot label/legend prior to color assignment
+label <- sort(unique(genes_coords_taxon$plot_label_freq))
+label_add <- c(grep(paste0(query_label_name),label, value=TRUE),grep(paste0("Unassigned"),label, value=TRUE))
+label <- grep(paste0("Unassigned|",query_label_name),label, value=TRUE, invert=TRUE)
+label <- c(label_add,label)
+genes_coords_taxon <- genes_coords_taxon[order(match(plot_label_freq,label))]
+# allow 25 rows per column in legend; if number of labels exceeds this, create multiple columns
+label_ncols <- (length(label)%/%26)+1
 
+# assign colors for each label/taxonomic assignment displayed in plot
+genes_coords_taxon$label_color[genes_coords_taxon$plot_label == query_label_name] <- "#404a4a" #dark grey
+genes_coords_taxon$label_color[genes_coords_taxon$plot_label == "Unassigned"] <- "#778899" # light grey
+genes_coords_taxon$label_color[genes_coords_taxon$plot_label != query_label_name & genes_coords_taxon$plot_label != "Unassigned"] <- getQualColForVector(genes_coords_taxon$plot_label_freq[genes_coords_taxon$plot_label != query_label_name & genes_coords_taxon$plot_label != "Unassigned"]) # color palette
+
+# subset data into three groups
+# this enables to stack the data point in the desired order in the plot
+# i.e. putting the less interesting (background) data points with query assignment in the background
 genes_coords_taxon_query <- genes_coords_taxon[genes_coords_taxon$plot_label == query_label_name,]
 genes_coords_taxon_unassigned <- genes_coords_taxon[genes_coords_taxon$plot_label == "Unassigned",]
 genes_coords_taxon_rest <- genes_coords_taxon[genes_coords_taxon$plot_label != query_label_name & genes_coords_taxon$plot_label != "Unassigned",]
 
-# 1D density of 1 element groups is not possible
+# 1D density of single data points is not possible
 # for 1D density only use taxons with abundancy of at least 2
-rownames(label_count_table) <- label_count_table$Var1
-genes_taxon_1dim <- genes_coords_taxon[genes_coords_taxon$plot_label %in% rownames(label_count_table[label_count_table$Freq > 1,]),]
+genes_taxon_1dim <- genes_coords_taxon[genes_coords_taxon$plot_label %in% label_count_table[label_count_table$Freq > 1,"Var1"],]
 
 
-# plot_label column as factor for marking in plots
-taxon_factor <- as.factor(genes_coords_taxon$plot_label)
-taxon_rest_factor <- as.factor(genes_coords_taxon_rest$plot_label)
-taxon_query_factor <- as.factor(genes_coords_taxon_query$plot_label)
-taxon_unassigned_factor <- as.factor(genes_coords_taxon_unassigned$plot_label)
-taxons_1d <- as.factor(genes_taxon_1dim$plot_label)
 
 
 # _______________PLOT GENERATION_____________________ #
 
-# manual colorscale for plots with all taxons
+
+# manual colorscale for plots with all taxa
 myColors <- unique(genes_coords_taxon$label_color)
 names(myColors) <- unique(genes_coords_taxon$plot_label_freq)
-colScale <- scale_colour_manual(name = "taxonomic assignments", labels=label, values = myColors)
+colScale <- scale_colour_manual(name = "taxonomic assignments", values = myColors)
 
 
 if (nrow(genes_taxon_1dim) > 0) {
@@ -220,20 +223,20 @@ if (nrow(genes_taxon_1dim) > 0) {
     # manual colorscale for 1D plots
     myColors_1D <- unique(genes_taxon_1dim$label_color)
     names(myColors_1D) <- unique(genes_taxon_1dim$plot_label_freq)
-    colScale_1D <- scale_colour_manual(name = "taxonomic assignments", labels=label_1d, values = myColors_1D)
+    colScale_1D <- scale_colour_manual(name = "taxonomic assignments", values = myColors_1D)
 
-    plot_x <- ggplot(genes_taxon_1dim,aes(colour = plot_label_freq)) +
+    plot_x <- ggplot(data=genes_taxon_1dim, aes(x=Dim.1, color=plot_label_freq)) +
+        geom_density() +
         colScale_1D +
-        geom_density(data=genes_taxon_1dim, aes(x=Dim.1)) +
         theme_bw() +
         ggtitle("density of Dim.1") +
         guides(col=guide_legend(ncol=label_1d_ncols))
 
     plot_pdf_andor_png(plot_x, paste(c(cfg$output_path, "taxonomic_assignment/density_x"), collapse=""), TRUE, label_1d_ncols)
 
-    plot_y <- ggplot(genes_taxon_1dim,aes(colour = plot_label_freq)) +
+    plot_y <- ggplot(data=genes_taxon_1dim, aes(x=Dim.2, colour=plot_label_freq)) +
+        geom_density() +
         colScale_1D +
-        geom_density(data=genes_taxon_1dim, aes(x=Dim.2)) +
         theme_bw() +
         ggtitle("density of Dim.2") +
         guides(col=guide_legend(ncol=label_1d_ncols))
@@ -242,22 +245,22 @@ if (nrow(genes_taxon_1dim) > 0) {
 }
 
 
-plot_2 <- ggplot(genes_coords_taxon,aes(x=Dim.1, y=Dim.2, colour = plot_label_freq)) +
+plot_2 <- ggplot(genes_coords_taxon) +
     scale_shape_manual(name="taxonomic assignments", labels=label, values=c(1,2,15,16,17,3,7,8,9,23,18,4,10,11,12,13,14,0)) +
     colScale
 if (nrow(genes_coords_taxon_query) > 0) {
     plot_2 <- plot_2 +
-        geom_point(data=genes_coords_taxon_query, aes(x=Dim.1, y=Dim.2, colour=plot_label_freq), alpha=0.75) + #, shape=taxon_query_factor
-        #stat_density_2d(aes(x=Dim.1, y=Dim.2, color=plot_label_freq), data=genes_coords_taxon_query, geom="polygon", contour=TRUE, alpha=0.05)
-        geom_rug(data=genes_coords_taxon_query, mapping=aes(x=Dim.1), color="#404a4a")
+        geom_point(data=genes_coords_taxon_query, aes(x=Dim.1, y=Dim.2, colour=plot_label_freq)) +
+        stat_density_2d(data=genes_coords_taxon_query, aes(x=Dim.1, y=Dim.2, color=plot_label_freq), geom="polygon", contour=TRUE, alpha=0.05)
+        #geom_rug(data=genes_coords_taxon_query, mapping=aes(x=Dim.1), color="#404a4a")
 }
 if (nrow(genes_coords_taxon_unassigned) > 0) {
     plot_2 <- plot_2 +
-        geom_point(data=genes_coords_taxon_unassigned, aes(x=Dim.1, y=Dim.2, colour = plot_label_freq), alpha=0.5) #, shape=taxon_unassigned_factor
+        geom_point(data=genes_coords_taxon_unassigned, aes(x=Dim.1, y=Dim.2, colour=plot_label_freq))
 }
 if (nrow(genes_coords_taxon_rest) > 0) {
     plot_2 <- plot_2 +
-        geom_point(data=genes_coords_taxon_rest, aes(x=Dim.1, y=Dim.2, colour = plot_label_freq)) #, shape=taxon_rest_factor
+        geom_point(data=genes_coords_taxon_rest, aes(x=Dim.1, y=Dim.2, colour=plot_label_freq))
 }
 plot_2 <- plot_2 +
       theme_bw() +
@@ -268,9 +271,9 @@ plot_pdf_andor_png(plot_2, paste(c(cfg$output_path, "taxonomic_assignment/densit
 if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
 
     if (nrow(genes_taxon_1dim) > 0) {
-        plot_z <- ggplot(genes_taxon_1dim,aes(colour = plot_label_freq)) +
+        plot_z <- ggplot(data=genes_taxon_1dim, aes(x=Dim.3, colour=plot_label_freq)) +
+            geom_density() +
             colScale_1D +
-            geom_density(data=genes_taxon_1dim, aes(x=Dim.3)) +
             theme_bw() +
             ggtitle("density of Dim.3") +
             guides(col=guide_legend(ncol=label_1d_ncols))
