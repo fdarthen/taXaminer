@@ -12,6 +12,8 @@ import os
 TAX_DB = taxopy.TaxDb(keep_files=True)
 # TAX_DB = taxopy.TaxDb(nodes_dmp="./nodes.dmp", names_dmp="./names.dmp", keep_files=True)
 
+missing_taxids = set()
+
 class Gene:
     def __init__(self, line_array, header_index):
         self.g_name = line_array[header_index.get('g_name')]
@@ -57,11 +59,8 @@ class Gene:
 
         self.coords = tuple([line_array[index] for index in header_index.get('Dim.')])
 
-
-
         self.protID = None # ID of transcript with longest CDS
         self.lencds = 0 # lenght of self.protID
-
 
         self.tax_assignments = []
         self.best_hit = None
@@ -123,9 +122,6 @@ def get_gff_attribute(attr_list, attr):
     else:
         value = strip_ID(tmp)
     return value
-
-
-
 
 
 # ██████  ██       ██████  ████████     ██       █████  ██████  ███████ ██      ███████
@@ -204,11 +200,7 @@ def merge_assignments_at_id(genes, ids):
 def iterative_merging_top(genes, num_groups_plot):
     """ identify at which rank in query lineage to merge best """
 
-    #IDEA: if you want to manually define groups, do it beforehand, remove those genes/tax assignments before this iterative process
-    # and reduce the number of plots allowed by the number of predefined groups
-
     labelID_taxa = init_label_taxa_dict(genes) # taxa that have this label; label : set(taxa)
-
 
     update_dict = {'nonempty-dummy'}
     while update_dict:
@@ -310,11 +302,32 @@ def merge_labels(genes, queryID, merging_labels):
         merge_assignments_at_id(genes, merger_ids)
 
 
-def set_unassigned_label(genes):
+def set_unassigned_labels(genes):
     for g_name, gene in genes.items():
-        if gene.plot_label == 'NA':
-            gene.plot_label = 'Unassigned'
+        if not gene.plot_label:
+            if gene.taxon_assignmentID == 'NA':
+                gene.plot_label = 'Unassigned'
+                gene.plot_labelID = 'NA'
+            else:
+                gene.plot_label = gene.taxon_assignment
+                gene.plot_labelID = gene.taxon_assignmentID
 
+
+def ident_query_label(genes, queryID):
+    """ identify which label represent the query species """
+
+    query_taxon = taxopy.Taxon(queryID, TAX_DB)
+    query_lineage = query_taxon.taxid_lineage
+
+    label_candidate = (None, len(query_lineage))
+
+    for g_name, gene in genes.items():
+        if gene.plot_labelID in query_lineage:
+            if query_lineage.index(gene.plot_labelID) < label_candidate[1]:
+                label_candidate = (gene.plot_label, query_lineage.index(gene.plot_labelID))
+
+
+    return label_candidate[0]
 
 
 # ████████  █████  ██   ██  ██████  ███    ██  ██████  ███    ███ ██  ██████      █████  ███████ ███████ ██  ██████  ███    ██ ███    ███ ███████ ███    ██ ████████
@@ -331,22 +344,18 @@ def assess_best_of_multi_hits(taxIDs, queryID):
     query_lineage = query_taxon.taxid_lineage
 
     bestID = (None, len(query_lineage)+1) #(id, index in lineage)
-    taxon = None
     for taxID in taxIDs:
-        try:
+        if taxID in TAX_DB.taxid2name.keys(): # avoid crashes because of ncbiIDs not being represented in TAX_DB
             taxon = taxopy.Taxon(taxID, TAX_DB)
-        except:
-            taxon = None
-            print(f'Taxon ID {taxID} could not be found in taxopy database.')
-        if taxon:
             lca = taxopy.find_lca([query_taxon, taxon], TAX_DB)
             lca_index = query_lineage.index(lca.taxid)
             if bestID[1] > lca_index: # check if new best hit is closer to query in lineage as current best hit
                 bestID = (taxon, lca_index)
+        else:
+            missing_taxids.add(taxID)
+
 
     return bestID[0]
-
-
 
 def set_taxon_assignment(genes):
     # assess taxonomic assignment for each gene:
@@ -368,10 +377,15 @@ def calc_corrected_lca(genes, queryID):
 
     for g_name, gene in genes.items():
         if gene.lcaID in query_lineage and gene.best_hitID != 'NA':
-            bh_taxon = taxopy.Taxon(gene.best_hitID, TAX_DB)
-            corrected_lca = taxopy.find_lca([query_taxon, bh_taxon], TAX_DB)
-            gene.corrected_lcaID = corrected_lca.taxid
-            gene.corrected_lca = corrected_lca.name
+            if gene.best_hitID in TAX_DB.taxid2name.keys(): # avoid crashes because of ncbiIDs not being represented in TAX_DB
+                bh_taxon = taxopy.Taxon(gene.best_hitID, TAX_DB)
+                corrected_lca = taxopy.find_lca([query_taxon, bh_taxon], TAX_DB)
+                gene.corrected_lcaID = corrected_lca.taxid
+                gene.corrected_lca = corrected_lca.name
+            else:
+                missing_taxids.add(gene.best_hitID)
+                gene.corrected_lcaID = 'NA'
+                gene.corrected_lca = 'NA'
         else:
             gene.corrected_lcaID = 'NA'
             gene.corrected_lca = 'NA'
@@ -387,7 +401,8 @@ def calc_lca(genes):
                 if tax_id in TAX_DB.taxid2name.keys(): # avoid crashes because of ncbiIDs not being represented in TAX_DB
                     taxon = taxopy.Taxon(tax_id, TAX_DB)
                     lca_query.append(taxon)
-
+                else:
+                    missing_taxids.add(tax_id)
         if len(lca_query) > 1:
             lca = taxopy.find_lca(lca_query, TAX_DB)
             gene.lca = lca.name
@@ -415,8 +430,12 @@ def read_tax_assignments(tax_assignment_path, prots, queryID):
                     if ';' in spline[-2]:
                         hit_ids = [int(id) for id in spline[-2].split(';')]
                         closest_hit = assess_best_of_multi_hits(hit_ids, queryID)
-                        gene.best_hit = closest_hit.name
-                        gene.best_hitID = closest_hit.taxid
+                        if closest_hit:
+                            gene.best_hit = closest_hit.name
+                            gene.best_hitID = closest_hit.taxid
+                        else:
+                            gene.best_hit = 'NA'
+                            gene.best_hitID = 'NA'
                     else:
                         gene.best_hit = spline[-1]
                         gene.best_hitID = int(spline[-2])
@@ -475,13 +494,15 @@ def prot_gene_matching(output_path, gff_path, genes):
             if not line.startswith('#'):
                 spline = line.strip().split('\t')
                 if spline[2] == 'mRNA' or spline[2] == 'CDS':
-                    if "ID" in spline[8]:
+                    if spline[8].startswith('ID=') or ";ID=" in spline[8]:
                         # print(spline[8])
                         childID = get_gff_attribute(spline[8], 'ID') # strip_ID(spline[8].split('ID=')[1].split(';')[0])
                         parentID = get_gff_attribute(spline[8], 'Parent') # strip_ID(spline[8].split('Parent=')[1].split(';')[0])
                         # print(childID)
                         # print(parentID)
                         child_parent_dict[childID] = parentID
+            elif "#FASTA" in line: # if FASTA block has been reached
+                break
 
     prot_index_path = output_path + 'tmp/tmp.proteins.fa.fai'
 
@@ -727,12 +748,13 @@ def main():
     compute_tax_assignment = config_obj['compute_tax_assignment']
     only_plotting = config_obj['only_plotting']
     assignment_mode = config_obj['assignment_mode']
-    quick_mode_search_rank = config_obj['quick_mode_search_rank']
-    quick_mode_match_rank = config_obj['quick_mode_match_rank']
+    quick_mode_search_rank = config_obj['quick_mode_search_rank'] if 'quick_mode_search_rank' in config_obj.keys() else None
+    quick_mode_match_rank = config_obj['quick_mode_match_rank'] if 'quick_mode_match_rank' in config_obj.keys() else None
     tax_assignment_path = config_obj['tax_assignment_path']
     queryID = int(config_obj['tax_id'])
     merging_labels = config_obj['merging_labels']
     num_groups_plot = config_obj['num_groups_plot']
+
     tmp_prot_path = output_path+"tmp/tmp.subset.protein.fasta"
 
     diamond_q = ' -q "' + tmp_prot_path + '"'
@@ -823,15 +845,26 @@ def main():
 
         taxonomic_assignment(tax_assignment_path, genes, prots, queryID)
 
+
     else:
         print('Assignment mode not one of quick or exhaustive')
 
 
     merge_labels(genes, queryID, merging_labels)
-    unlabeled_genes, num_labels = filter_labeled_genes(genes)
-    iterative_merging_top(unlabeled_genes, num_groups_plot-num_labels)
+    if num_groups_plot:
+        unlabeled_genes, num_labels = filter_labeled_genes(genes)
+        iterative_merging_top(unlabeled_genes, num_groups_plot-num_labels)
+    else:
+        set_unassigned_labels(genes)
 
-    #set_unassigned_label(genes)
+    query_label = ident_query_label(genes, queryID)
+    with open(output_path+'tmp/tmp.query_label', 'w') as tmp_file:
+        tmp_file.write(query_label+'\n')
+
+    if missing_taxids:
+        print("The following Taxon ID(s) could not be found in the NCBI: ")
+        print(missing_taxids)
+        print("Skipped for taxonomic assignment.")
 
     write_output(output_path, genes, header)
 
