@@ -1,5 +1,4 @@
-
-
+# -*- coding: utf-8 -*-
 
 import yaml # read config file
 import taxopy
@@ -9,10 +8,9 @@ import numpy as np
 import csv
 import os
 
-# print(time.time())
 
 TAX_DB = taxopy.TaxDb(keep_files=True)
-# TAX_DB = taxopy.TaxDb(nodes_dmp="./nodes.dmp", names_dmp="./names.dmp", keep_files=True) #TODO: add to download
+# TAX_DB = taxopy.TaxDb(nodes_dmp="./nodes.dmp", names_dmp="./names.dmp", keep_files=True)
 
 class Gene:
     def __init__(self, line_array, header_index):
@@ -724,7 +722,6 @@ def main():
     output_path=config_obj['output_path'] # complete output path (ENDING ON A SLASH!)
     nr_db_path=config_obj['nr_db_path']
     proteins_path=config_obj['proteins_path'] # path to FASTA w/ protein seqs
-    fasta_path=config_obj['fasta_path'] # output_path+'tmp/tmp.MILTS.fasta' # path to tmp FASTA file
     gff_path=config_obj['gff_path'] # path to GFF
     taxon_exclude = config_obj['taxon_exclude'] # bool to exclude query taxon from sequence alignment
     compute_tax_assignment = config_obj['compute_tax_assignment']
@@ -736,8 +733,6 @@ def main():
     queryID = int(config_obj['tax_id'])
     merging_labels = config_obj['merging_labels']
     num_groups_plot = config_obj['num_groups_plot']
-    abundancy_mode = config_obj['abundancy_mode']
-
     tmp_prot_path = output_path+"tmp/tmp.subset.protein.fasta"
 
     diamond_q = ' -q "' + tmp_prot_path + '"'
@@ -766,7 +761,7 @@ def main():
     if num_groups_plot.isdigit() or type(num_groups_plot) == int:
         num_groups_plot = int(num_groups_plot)
     elif num_groups_plot == 'all':
-        # no merging based on abundancy desired
+        # no merging of taxonomic assignments desired
         num_groups_plot = False
     else:
         print('No valid option for "num_groups_plot"')
@@ -776,10 +771,7 @@ def main():
     # read file
     genes, header = read_genes_coords(output_path)
 
-    pre = time.time()
     prots = prot_gene_matching(output_path, gff_path, genes)
-    print("Matching")
-    print(time.time()-pre)
 
     if compute_tax_assignment and not only_plotting:
         subset_prots_longest_cds(genes, proteins_path, tmp_prot_path)
@@ -829,10 +821,7 @@ def main():
             print(diamond_cmd)
             os.system(diamond_cmd)
 
-        pre = time.time()
         taxonomic_assignment(tax_assignment_path, genes, prots, queryID)
-        print("Assignment")
-        print(time.time()-pre)
 
     else:
         print('Assignment mode not one of quick or exhaustive')

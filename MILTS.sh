@@ -26,7 +26,7 @@ else
     echo "Exhaustive taxonomic assignment mode"
 fi
 echo "Database: " $nr_db_path
-echo "NCBI Taxon ID: " $tax_id "(taxon exlcuded: $taxon_exclude)"
+echo "NCBI Taxon ID: " $tax_id "(taxon excluded: $taxon_exclude)"
 echo -e "\n"
 
 [[ ! -d "${output_path}" ]] && mkdir -p "${output_path}"
@@ -34,9 +34,6 @@ echo -e "\n"
 
 if [ "${only_plotting}" = "FALSE" ]; then
 
-    # 1.a) remove newlines from fasta
-    # awk '/^>/{if(NR==1){print}else{printf("\n%s\n",$0)}next} {printf("%s",$0)} END{printf("\n")}' $fasta_path > "${output_path}tmp/tmp.MILTS.fasta"
-    # samtools faidx "${output_path}tmp/tmp.MILTS.fasta"
     samtools faidx "${fasta_path}" -o "${output_path}tmp/tmp.MILTS.fasta.fai"
 
     # check if protein FASTA should be extracted but exists
@@ -148,7 +145,7 @@ if [ "${only_plotting}" = "FALSE" ]; then
         time3_1=`date +%s`
         # extraction of peptide sequence for each CDS of each gene with gffread
         # length of cds is written into the header in the fasta
-        gffread -S --table "@id,@cdslen" -y ${proteins_path} -g ${fasta_path} ${gff_path}
+        gffread -S --table "@id" -y ${proteins_path} -g ${fasta_path} ${gff_path}
         time3_2=`date +%s`
         echo "retrieving peptide sequenes end (time elapsed:" $(($time3_2-$time3_1)) "s)"
 

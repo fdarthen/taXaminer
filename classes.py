@@ -20,7 +20,7 @@ class Assembly:
         self.genes = {}
         self.transcripts = {}
 
-        self.geneless_contigs = [] # list of names of contigs without genes
+        self.geneless_contigs = {} # dictionary of contigs without genes
         self.contigs_without_cov = {} # dictionary to which all contigs without cov info will be moved to
         self.genes_without_cov = {} # dictionary to which all genes without cov info will be moved to
 
@@ -82,8 +82,8 @@ class Assembly:
         return self.genes.get(gene)
 
 
-    def add_geneless_contig(self, contig):
-        self.geneless_contigs.append(contig)
+    def add_geneless_contig(self, contig_name, contig):
+        self.geneless_contigs[contig_name] = contig
 
     def remove_geneless_contig(self, contig):
         del self.geneless_contigs[contig]
@@ -91,8 +91,8 @@ class Assembly:
     def get_geneless_contigs(self):
         return self.geneless_contigs
 
-    # def get_geneless_contig(self, contig):
-    #     return self.geneless_contigs[contig]
+    def get_geneless_contig(self, contig):
+        return self.geneless_contigs[contig]
 
 
     def add_contig_without_cov(self, contig_name, contig):
