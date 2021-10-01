@@ -191,6 +191,7 @@ genes_coords_taxon$label_color[genes_coords_taxon$plot_label == query_label_name
 genes_coords_taxon$label_color[genes_coords_taxon$plot_label == "Unassigned"] <- "#778899" # light grey
 genes_coords_taxon$label_color[genes_coords_taxon$plot_label != query_label_name & genes_coords_taxon$plot_label != "Unassigned"] <- getQualColForVector(genes_coords_taxon$plot_label_freq[genes_coords_taxon$plot_label != query_label_name & genes_coords_taxon$plot_label != "Unassigned"]) # color palette
 
+
 # subset data into three groups
 # this enables to stack the data point in the desired order in the plot
 # i.e. putting the less interesting (background) data points with query assignment in the background

@@ -614,9 +614,10 @@ def compute_stats(a, lgth_corr_function):
     # gather how many bases are COVERED for each gene
     gene_covered_bases_lengths = []
 
-    for contig_name in a.get_contigs().keys():
+    for contig_name, contig in a.get_contigs().items():
 
-        contig = a.get_contig(contig_name)
+        if contig_name in a.get_geneless_contigs().keys():
+            continue
 
         #------ Gather Length, Coverage & GC Info Contig ----------------
         # get contig length + add it to list of all contig lengths
@@ -804,7 +805,7 @@ def filter_contigs_and_genes(a):
     for contig_name, contig in a.get_contigs().items():
         # store contig as geneless if true
         if contig.geneless_info() == 1:
-            a.add_geneless_contig(contig_name)
+            a.add_geneless_contig(contig_name, contig)
 
         # if no per base coverage info is available for this contig
         if contig.no_coverage_info():
@@ -836,9 +837,7 @@ def get_raw_array(a, stats_ref):
 
     output_array = []
 
-    for contig_name in a.get_contigs().keys():
-
-        contig = a.get_contig(contig_name)
+    for contig_name, contig in a.get_contigs().items():
 
         c_ngenes = contig.get_number_of_genes()
 
@@ -1088,25 +1087,26 @@ def deviation_from_n50(c_len, n50):
 
 
 
-def output_summary_file(a, stats_ref, filename):
+def output_summary_file(a, stats_ref, filename, include_coverage):
     path_summaryfile = a.get_output_dir() + "/" + filename
     summaryfile = open(path_summaryfile, "w")
 
     contig_cov_summary = ""
-    for pbc_index in range(a.get_num_pbc()):
-        contig_cov_summary += "contig cov mean\t" + str(round(stats_ref["contig cov mean"][pbc_index], 2)) + "\n" + \
-         "contig cov sd\t" + str(round(stats_ref["contig cov sd"][pbc_index], 2)) + "\n" + \
-         "contig cov min\t" + str(round(stats_ref["contig cov min"][pbc_index], 2)) + "\n" + \
-         "contig cov max\t" + str(round(stats_ref["contig cov max"][pbc_index], 2)) + "\n"
-    contig_cov_summary += "\n"
-
     gene_cov_summary = ""
-    for pbc_index in range(a.get_num_pbc()):
-        gene_cov_summary += "gene cov mean\t" + str(round(stats_ref["gene cov mean"][pbc_index], 2))  + "\n" + \
-          "gene cov sd\t" + str(round(stats_ref["gene cov sd"][pbc_index], 2)) + "\n" + \
-          "gene cov min\t" + str(round(stats_ref["gene cov min"][pbc_index], 2))  + "\n" + \
-          "gene cov max\t" + str(round(stats_ref["gene cov max"][pbc_index], 2)) + "\n"
-    gene_cov_summary += "\n"
+    if include_coverage:
+        for pbc_index in range(a.get_num_pbc()):
+            contig_cov_summary += "contig cov mean\t" + str(round(stats_ref["contig cov mean"][pbc_index], 2)) + "\n" + \
+             "contig cov sd\t" + str(round(stats_ref["contig cov sd"][pbc_index], 2)) + "\n" + \
+             "contig cov min\t" + str(round(stats_ref["contig cov min"][pbc_index], 2)) + "\n" + \
+             "contig cov max\t" + str(round(stats_ref["contig cov max"][pbc_index], 2)) + "\n"
+        contig_cov_summary += "\n"
+
+        for pbc_index in range(a.get_num_pbc()):
+            gene_cov_summary += "gene cov mean\t" + str(round(stats_ref["gene cov mean"][pbc_index], 2))  + "\n" + \
+              "gene cov sd\t" + str(round(stats_ref["gene cov sd"][pbc_index], 2)) + "\n" + \
+              "gene cov min\t" + str(round(stats_ref["gene cov min"][pbc_index], 2))  + "\n" + \
+              "gene cov max\t" + str(round(stats_ref["gene cov max"][pbc_index], 2)) + "\n"
+        gene_cov_summary += "\n"
 
 
     summaryfile.write("total # of contigs:\t" + str(len(a.get_contigs()) + len(a.get_contigs_without_cov())) + "\n" +
@@ -1188,9 +1188,9 @@ def init_contig(a, name, length):
 
 
 def read_faidx(a):
-    """ read FASTA index to initalize contigs with lenght information provided """
+    """ read FASTA index to initalize contigs with length information provided """
 
-    with open(a.get_fasta_path()+".fai", 'r') as faidx: # open FAIDX file
+    with open(a.get_output_path()+"tmp/tmp.MILTS.fasta.fai", 'r') as faidx: # open FAIDX file
         for line in faidx:
             line_array = line.split()
             contig_name = line_array[0]
@@ -1206,11 +1206,7 @@ def read_gff(a, include_pseudogenes):
 
     with open(a.get_gff_path(), 'r') as gff: # open GFF file
         for line in gff:
-            if line.startswith('#'):
-                if "#FASTA" in line: # if FASTA block has been reached
-                    break            # stop parsing
-
-            else: # if the line holds annotations
+            if not line.startswith('#'): # if the line holds annotations
 
                 tmp_array = line.split()
 
@@ -1241,6 +1237,8 @@ def read_gff(a, include_pseudogenes):
                     a.get_contig(associated_contig).add_gene(gene_name)
                 else:
                     pass
+            elif "#FASTA" in line: # if FASTA block has been reached
+                break            # stop parsing
 
 
 # ==============================================================
@@ -1274,92 +1272,97 @@ def read_fasta(a):
 
     total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs = init_tetranuc_freq()
 
-
-    # needs to be newline-free FASTA
     with open(a.get_fasta_path(), 'r') as fasta: # open FASTA file
         for line in fasta:
             line = line.strip()
 
             # if line contains fasta header
+            # store sequence of previous contig and save new name
             if line.startswith(">"):
+
+                if current_contig:
+                    # get a set holding the (1-based) positions of all Ns in this contig
+                    contig_N_pos = return_positions_of_Ns(raw_seq)
+                    # pass the set to the contig
+                    current_contig.set_positions_of_Ns(contig_N_pos)
+
+                    contig_seq = raw_seq.replace("N", "") # remove all ambiguous characters
+                    # CAUTION!! LENGTH OF CONTIGS / GENES IS *WITH* AMBIGUOUS CHARACTERS
+
+                    # -----> OLIGOTEST
+                    # count all tetra-/tri-/dinucleotides in the contig sequence and assign to contig
+                    contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs = \
+                    get_all_obsfreqs(contig_seq)
+                    current_contig.set_oligofreqs(contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs)
+
+                    # calculate and set the vector of the 256 oligonucleotide freq z-scores of this contig
+                    contig_z_score_vector =\
+                    calculate_z_score_vector(contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs)
+                    current_contig.set_z_score_vector(contig_z_score_vector)
+
+                    # add oligofrequencies in contig to total oligofrequencies observed so far
+                    total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs = \
+                    update_observed_oligofreqs(total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs,
+                                              contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs)
+                    # <----- OLIGOTEST
+
+                    # compute GC content of this contig
+                    contig_gc = (contig_seq.count('G')  / len(contig_seq)) \
+                    + (contig_seq.count('C')  / len(contig_seq))
+
+                    current_contig.set_gc_content(contig_gc)
+
+
+                    # for each gene on this contig
+                    for gene_name in current_contig.get_genes():
+                        current_gene = a.get_gene(gene_name)
+
+                        # ---- get start and end position ------------
+                        # because bp are 1-based but python lists are 0-based:
+                        gene_seq_start = current_gene.get_start_pos() - 1
+
+                        # because list slicing ([cov_start:cov_end]) stops BEFORE the given index:
+                        gene_seq_end = current_gene.get_end_pos()
+                        # (one would want to have gene_end+1, but since the array is 0-based
+                        # it's already "shifted" +1 to the right
+                        # --------------------------------------------
+
+                        # regard only gene region on contig
+                        gene_seq = raw_seq[gene_seq_start:gene_seq_end].replace("N", "")
+
+                        # count all tetra-/tri-/dinucleotides in the gene sequence and assign to gene
+                        gene_tetranuc_freqs, gene_trinuc_freqs, gene_dinuc_freqs = \
+                        get_all_obsfreqs(gene_seq)
+                        current_gene.set_oligofreqs(gene_tetranuc_freqs, gene_trinuc_freqs, gene_dinuc_freqs)
+
+                        # calculate and set the vector of the 256 oligonucleotide freq z-scores of this gene
+                        gene_z_score_vector =\
+                        calculate_z_score_vector(gene_tetranuc_freqs, gene_trinuc_freqs, gene_dinuc_freqs)
+                        current_gene.set_z_score_vector(gene_z_score_vector)
+
+                        # compute GC content of current gene
+                        gene_gc = (gene_seq.count('G') / len(gene_seq)) \
+                        + (gene_seq.count('C') / len(gene_seq))
+
+                        current_gene.set_gc_content(gene_gc)
+
+                # refresh for new contig
+                raw_seq = ''
                 tmp_array = line.split()
                 tmp_contig_name = tmp_array[0][1:]
-                if tmp_contig_name in a.get_contigs().keys():
-                    current_contig = a.get_contig(tmp_contig_name)
-                else: #contig in FASTA but not in GFF -> geneless, skip line with sequence
-                    next(fasta)
-            else:
+                current_contig = a.get_contig(tmp_contig_name)
+                if current_contig.geneless_info() == 1: # if contig is geneless
+                    # a.remove_contig(tmp_contig_name)     #TODO: remove from list?!?!
+                    a.add_geneless_contig(tmp_contig_name, current_contig)
+                    current_contig = None               # don't process further
+
+            elif current_contig: # current contig is assigned
                 # just in case (for case-insensitive counting)
-                orig_seq = line.upper() # convert all bases to upper-case
+                raw_seq = raw_seq + line.upper() # convert all bases to upper-case
 
-                # get a set holding the (1-based) positions of all Ns in this contig
-                contig_N_pos = return_positions_of_Ns(orig_seq)
-                # pass the set to the contig
-                current_contig.set_positions_of_Ns(contig_N_pos)
-
-                contig_seq = orig_seq.replace("N", "") # remove all ambiguous characters
-                # CAUTION!! LENGTH OF CONTIGS / GENES IS *WITH* AMBIGUOUS CHARACTERS
-
-                # ----- OLIGOTEST
-                # count all tetra-/tri-/dinucleotides in the contig sequence and assign to contig
-                contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs = \
-                get_all_obsfreqs(contig_seq)
-                current_contig.set_oligofreqs(contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs)
-
-                # calculate and set the vector of the 256 oligonucleotide freq z-scores of this contig
-                contig_z_score_vector =\
-                calculate_z_score_vector(contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs)
-                current_contig.set_z_score_vector(contig_z_score_vector)
-
-                # add oligofrequencies in contig to total oligofrequencies observed so far
-                total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs = \
-                update_observed_oligofreqs(total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs,
-                                          contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs)
-                # ----- OLIGOTEST
-
-
-
-                # compute GC content of this contig
-                contig_gc = (contig_seq.count('G')  / len(contig_seq)) \
-                + (contig_seq.count('C')  / len(contig_seq))
-
-                current_contig.set_gc_content(contig_gc)
-
-
-                # for each gene on this contig
-                for gene_name in current_contig.get_genes():
-                    current_gene = a.get_gene(gene_name)
-
-                    # ---- get start and end position ------------
-                    # because bp are 1-based but python lists are 0-based:
-                    gene_seq_start = current_gene.get_start_pos() - 1
-
-                    # because list slicing ([cov_start:cov_end]) stops BEFORE the given index:
-                    gene_seq_end = current_gene.get_end_pos()
-                    # (one would want to have gene_end+1, but since the array is 0-based
-                    # it's already "shifted" +1 to the right
-                    # --------------------------------------------
-
-                    # regard only gene region on contig
-                    gene_seq = orig_seq[gene_seq_start:gene_seq_end].replace("N", "")
-
-                    # count all tetra-/tri-/dinucleotides in the gene sequence and assign to gene
-                    gene_tetranuc_freqs, gene_trinuc_freqs, gene_dinuc_freqs = \
-                    get_all_obsfreqs(gene_seq)
-                    current_gene.set_oligofreqs(gene_tetranuc_freqs, gene_trinuc_freqs, gene_dinuc_freqs)
-
-                    # calculate and set the vector of the 256 oligonucleotide freq z-scores of this gene
-                    gene_z_score_vector =\
-                    calculate_z_score_vector(gene_tetranuc_freqs, gene_trinuc_freqs, gene_dinuc_freqs)
-                    current_gene.set_z_score_vector(gene_z_score_vector)
-
-                    # compute GC content of current gene
-                    gene_gc = (gene_seq.count('G') / len(gene_seq)) \
-                    + (gene_seq.count('C') / len(gene_seq))
-
-                    current_gene.set_gc_content(gene_gc)
-
-
+            else:
+                # do nothing if current contig is not annotated in GFF (geneless)
+                continue
 
 
     a.set_total_z_score_vector(calculate_z_score_vector(total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs))
@@ -1390,7 +1393,7 @@ def read_pbc(a, include_coverage):
                             current_contig = None # set this to None so that all other info for this contig gets ignored
                             '''print("No coverage information for contig ", current_contig_name,
                                   " stored since it has no genes.", file=open("error.txt", "a"))'''
-                    if current_contig is not None: # only add to contigs which exist in GFF file
+                    if current_contig: # only add to contigs which exist in GFF file
                         base = int(pbc_info_array[1])
                         coverage = int(float(pbc_info_array[2]))
                         current_contig.add_base_coverage(pbc_index, base, coverage)
@@ -1416,7 +1419,7 @@ def main():
     gff_path=config_obj['gff_path'] # GFF file path
     pbc_paths=config_obj['pbc_paths'] # per base coverage (PBC) file path(s)
     output_path=config_obj['output_path'] # complete output path (ENDING ON A SLASH!)
-    fasta_path=output_path+'tmp/tmp.MILTS.fasta' # path to tmp FASTA file
+    fasta_path= config_obj['fasta_path'] # path to FASTA file
     include_pseudogenes = config_obj['include_pseudogenes'] # boolean signifying whether pseudogenes should be included in the analysis
     include_coverage = config_obj['include_coverage']
 
@@ -1494,7 +1497,7 @@ def main():
     output_table(a, imputed_array, "imputed_gene_table")
 
 
-    output_summary_file(a, stats_for_all_contigs, "summary.txt")
+    output_summary_file(a, stats_for_all_contigs, "summary.txt", include_coverage)
 
 
 if __name__ == '__main__':

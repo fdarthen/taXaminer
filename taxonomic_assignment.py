@@ -9,7 +9,8 @@ import csv
 import os
 
 
-TAX_DB = taxopy.TaxDb(nodes_dmp="./nodes.dmp", names_dmp="./names.dmp", keep_files=True)
+TAX_DB = taxopy.TaxDb(keep_files=True)
+# TAX_DB = taxopy.TaxDb(nodes_dmp="./nodes.dmp", names_dmp="./names.dmp", keep_files=True)
 
 missing_taxids = set()
 
