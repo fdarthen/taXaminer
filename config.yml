@@ -1,41 +1,41 @@
 
 ## Input and output options ##
-gff_path: "./example/test.gff"
 fasta_path: "./example/test.fasta"
+gff_path: "./example/test.gff"
+output_path: "./MILTS_report/" # directory to save results to
+taxon_id: "107806" # NCBI Taxon ID of you query species
+
+## Coverage options ##
+include_coverage: "TRUE"
+compute_coverage: "FALSE"
 pbc_paths: ["./example/test.pbc.txt","./example/test.pbc_2.txt"]
-proteins_path: "./example/test_proteins.fasta"
-output_path: "./MILTS_report/"
-output_pdf: "TRUE"
-output_png: "FALSE"
-reads_1: "path/to/readset_1.fa"
-reads_2: "path/to/readset_2.fa"
-ins_size: ""
-reads_un: "path/to/readset_unpaired.fa"
 bam: "path/to/mapping.bam"
+reads: "path/to/reads"
+insert_size: ""
 
 ## Gene info options ##
-include_coverage: "TRUE"
 include_pseudogenes: "FALSE"
 
-## Run options ##
-compute_pbc: "FALSE"
-extract_proteins: "FALSE"
-compute_tax_assignment: "FALSE"
-only_plotting: "TRUE"
-
 ## Taxonomic assignment options ##
+compute_tax_assignment: "FALSE"
+extract_proteins: "FALSE"       # set proteins_path as output path
+proteins_path: "./example/test_proteins.fasta"
+tax_assignment_path: "./example/top10_hits.txt"
+nr_db_path: "path/to/nrTaxonomy.dmnd"
+taxon_exclude: "TRUE"
 assignment_mode: "quick"
 quick_mode_search_rank: "phylum"
 quick_mode_match_rank: "class"
-tax_assignment_path: "./example/top10_hits.txt"
-nr_db_path: "/share/gluster/Databases/NCBI/nr_taxonomy.dmnd" #"path/to/nrTaxonomy.dmnd"
-taxon_exclude: "TRUE"
-tax_id: "107806"
+
+## Plot output options ##
+update_plots: "TRUE"
+num_groups_plot: "25"
+merging_labels: ["strain"]
+output_pdf: "TRUE"
+output_png: "FALSE"
 
 ## PCA options ##
-all_input_variables: "c_name,c_num_of_genes,c_len,c_genelenm,c_genelensd,g_len,g_lendev_c,g_abspos,g_terminal,c_cov,c_covsd,g_cov,g_covsd,g_covdev_c,g_cov_z_bool,c_pearson_r,g_pearson_r_o,g_pearson_r_c"
 input_variables: "c_name,c_num_of_genes,c_len,c_genelenm,c_genelensd,g_len,g_lendev_c,g_abspos,g_terminal,c_cov,c_covsd,g_cov,g_covsd,g_covdev_c,c_pearson_r,g_pearson_r_o,g_pearson_r_c"
-
 perform_parallel_analysis: "FALSE"
 num_pcs: "3"
 coverage_cutoff_mode: "default"
@@ -51,8 +51,3 @@ perform_dbscan: "TRUE"
 dbscan_groups: "default"
 custom_eps: "0.3"
 custom_minPts: "10"
-
-## Plotting options ##
-num_groups_plot: "25"
-abundancy_mode: "low"
-merging_labels: ["strain"]
