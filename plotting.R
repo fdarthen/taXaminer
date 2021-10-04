@@ -7,8 +7,6 @@ library(plotly)
 library(htmlwidgets)
 library(yaml) # for reading config file
 
-library(gridExtra)
-
 
 args <- commandArgs(trailingOnly = TRUE)
 config_path <- args[1]
@@ -149,11 +147,8 @@ getQualColForVector <- function(x = NULL) {
 #  _________________ READING DATA __________________ #
 
 genes_coords_taxon <- data.table::fread(paste0(cfg$output_path,'taxonomic_assignment/gene_table_taxon_assignment.csv'), sep=",", header=TRUE)
-query_label_name <- genes_coords_taxon$plot_label[genes_coords_taxon$plot_label != genes_coords_taxon$taxon_assignment & genes_coords_taxon$plot_label != "Unassigned" & genes_coords_taxon$plot_label != "Otherwise assigned"][1] #TODO: change in future (with new merging this hold not true anymore)
+query_label_name <- read.table(paste0(cfg$output_path,'tmp/tmp.query_label'),header = F,nrows = 1)[1,1]
 print(query_label_name)
-if (is.null(query_label_name) | is.na(query_label_name)) {
-    query_label_name <- "Undefined"
-}
 
 # ________________ PLOT PREPARATION _______________ #
 
@@ -167,7 +162,7 @@ prot_fasta <- Biostrings::readAAStringSet(cfg$proteins_path)
 protID <- names(prot_fasta)
 query_seq <- paste(prot_fasta)
 prot_sequences <- data.frame(protID, query_seq)
-prot_sequences$protID <- gsub('\\ .*', '' , prot_sequences$protID)
+prot_sequences$protID <- gsub('\\s.*', '' , prot_sequences$protID)
 prot_sequences$query_seq <- gsub("(.{70}?)", "\\1</br>", prot_sequences$query_seq)
 genes_coords_taxon <- merge(genes_coords_taxon, prot_sequences, by="protID", all.x=TRUE)
 
@@ -195,6 +190,7 @@ label_ncols <- (length(label)%/%26)+1
 genes_coords_taxon$label_color[genes_coords_taxon$plot_label == query_label_name] <- "#404a4a" #dark grey
 genes_coords_taxon$label_color[genes_coords_taxon$plot_label == "Unassigned"] <- "#778899" # light grey
 genes_coords_taxon$label_color[genes_coords_taxon$plot_label != query_label_name & genes_coords_taxon$plot_label != "Unassigned"] <- getQualColForVector(genes_coords_taxon$plot_label_freq[genes_coords_taxon$plot_label != query_label_name & genes_coords_taxon$plot_label != "Unassigned"]) # color palette
+
 
 # subset data into three groups
 # this enables to stack the data point in the desired order in the plot

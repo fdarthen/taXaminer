@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --partition=all
-#SBATCH --account=freya
+#SBATCH --account=user
 #SBATCH --cpus-per-task=24
 #SBATCH --mem-per-cpu=16gb
 #SBATCH --job-name="milts"
-#SBATCH --output=./%A_%a.o.out     # Standard output  /share/project/freya/T_draco/%A_%a.o.out
-#SBATCH --error=./%A_%a.e.out      # and error log    /share/project/freya/invertebrates/logs
+#SBATCH --output=./%A_%a.o.out     # Standard output
+#SBATCH --error=./%A_%a.e.out      # and error log
 #SBATCH --array=1
 
 PATH=$PWD/tools:$PATH

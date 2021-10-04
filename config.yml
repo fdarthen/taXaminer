@@ -21,7 +21,7 @@ compute_tax_assignment: "FALSE"
 extract_proteins: "FALSE"       # set proteins_path as output path
 proteins_path: "./example/test_proteins.fasta"
 tax_assignment_path: "./example/top10_hits.txt"
-nr_db_path: "path/to/nrTaxonomy.dmnd"
+database_path: "path/to/nrTaxonomy.dmnd"
 taxon_exclude: "TRUE"
 assignment_mode: "quick"
 quick_mode_search_rank: "phylum"
