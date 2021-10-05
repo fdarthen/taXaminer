@@ -1202,7 +1202,7 @@ def read_faidx(a):
 
 
 
-def read_gff(a, include_pseudogenes):
+def read_gff(a, gene_tag, source_type, include_pseudogenes):
 
     with open(a.get_gff_path(), 'r') as gff: # open GFF file
         for line in gff:
@@ -1210,7 +1210,9 @@ def read_gff(a, include_pseudogenes):
 
                 tmp_array = line.split()
 
-                if (tmp_array[2] == "gene" or (tmp_array[2] == "pseudogene" and include_pseudogenes == True)):
+                if ((source_type == "default" and tmp_array[2] == gene_tag) or \
+                   (tmp_array[1] == source_type and tmp_array[2] == gene_tag) or \
+                   (tmp_array[2] == "pseudogene" and include_pseudogenes == True)):
 
                     associated_contig = tmp_array[0]
                     source = tmp_array[1]
@@ -1406,6 +1408,36 @@ def read_pbc(a, include_coverage):
                         contig.add_base_coverage(pbc_index, base, mock_coverage)
 
 
+def parse_gff_source_rule(gff_source):
+    """ parsing which features in GFF to read (as genes) """
+    if gff_source == "default":
+        gene_tag = "gene"
+        source_type = "default"
+
+    elif gff_source == "maker":
+        gene_tag = "gene"
+        source_type = "maker"
+
+    elif gff_source == "augustus_masked":
+        gene_tag = "match"
+        source_type = "augustus_masked"
+
+    else:
+        rule_file_path = pathlib.Path(gff_source)
+        if rule_file_path.is_file():
+            rule_dict = {}
+            with open(rule_file_path, 'r') as rule_file:
+                for line in rule_file:
+                    rule_dict[line.split(":")[0].strip()] = line.split(":")[1].strip()
+            gene_tag = rule_dict.get("gene_tag")
+            source_type = rule_dict.get("source")
+
+        else:
+            print("ERROR: source type for GFF could not be interpreted. Please check your input. Computations will continue with default setting")
+            gene_tag = "gene"
+            source_type = "default"
+
+    return gene_tag, source_type
 
 
 # # !!!!!!!!!!!!!!!!!!!!!!!!!!! GENERATE OUTPUT PART !!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1422,6 +1454,9 @@ def main():
     fasta_path= config_obj['fasta_path'] # path to FASTA file
     include_pseudogenes = config_obj['include_pseudogenes'] # boolean signifying whether pseudogenes should be included in the analysis
     include_coverage = config_obj['include_coverage']
+    gff_source = config_obj['gff_source'] if 'gff_source' in config_obj.keys() else "default"
+
+    gene_tag, source_type = parse_gff_source_rule(gff_source)
 
     # read pseudogene decision:
     # note: trying to catch all user inputs such as 'TRUE', 'tru', True', 't', 'T', ...
@@ -1449,7 +1484,7 @@ def main():
     a = Assembly(gff_path, fasta_path, pbc_paths, output_path)
 
     read_faidx(a) # use faidx to initalize contigs
-    read_gff(a, include_pseudogenes)
+    read_gff(a, gene_tag, source_type, include_pseudogenes)
     read_fasta(a)
     read_pbc(a, include_coverage)
 
