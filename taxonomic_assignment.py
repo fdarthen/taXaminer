@@ -7,6 +7,7 @@ import sys
 import numpy as np
 import csv
 import os
+import pathlib
 
 
 TAX_DB = taxopy.TaxDb(keep_files=True)
@@ -484,23 +485,50 @@ def reset_tax_assignment(gene):
 
 
 
-def prot_gene_matching(output_path, gff_path, genes):
+def prot_gene_matching(output_path, gff_path, genes, gff_rule):
 
     prots = {}
 
-    child_parent_dict = {} # key = chile, value = parent
+    child_parent_dict = {} # key = child, value = parent
     with open(gff_path, 'r') as gff_file:
         for line in gff_file:
             if not line.startswith('#'):
                 spline = line.strip().split('\t')
-                if spline[2] == 'mRNA' or spline[2] == 'CDS':
-                    if spline[8].startswith('ID=') or ";ID=" in spline[8]:
-                        # print(spline[8])
-                        childID = get_gff_attribute(spline[8], 'ID') # strip_ID(spline[8].split('ID=')[1].split(';')[0])
-                        parentID = get_gff_attribute(spline[8], 'Parent') # strip_ID(spline[8].split('Parent=')[1].split(';')[0])
-                        # print(childID)
-                        # print(parentID)
-                        child_parent_dict[childID] = parentID
+                # read lines where fasta headers are contained and/or child-parent-relations are to be found
+                if gff_rule.get('source') == "default" or spline[1] == gff_rule.get('source'):
+                    if spline[2] in gff_rule.get('fasta_header_type'):
+                        if gff_rule.get('gene_connection') == "parent/child":
+                            # when attribute for child-parent-matching unequals attribute where header can be found,
+                            # match those attributes together
+                            if gff_rule.get('parent_child_attr').get('child') != gff_rule.get('fasta_header_attr'):
+                                child_attr = gff_rule.get('fasta_header_attr')
+                                parent_attr = gff_rule.get('parent_child_attr').get('child')
+                                if (spline[8].startswith(child_attr+"=") or ";"+child_attr+"=" in spline[8]) and \
+                                   (spline[8].startswith(parent_attr+"=") or ";"+parent_attr+"=" in spline[8]):
+                                    childID = get_gff_attribute(spline[8], child_attr)
+                                    parentID = get_gff_attribute(spline[8], parent_attr)
+                                    child_parent_dict[childID] = parentID
+                            if gff_rule.get('fasta_header_type') in gff_rule.get('parent_child_types'):
+                                child_attr = gff_rule.get('parent_child_attr').get('child')
+                                parent_attr = gff_rule.get('parent_child_attr').get('parent')
+                                if (spline[8].startswith(child_attr+"=") or ";"+child_attr+"=" in spline[8]) and \
+                                   (spline[8].startswith(parent_attr+"=") or ";"+parent_attr+"=" in spline[8]):
+                                    childID = get_gff_attribute(spline[8], child_attr)
+                                    parentID = get_gff_attribute(spline[8], parent_attr)
+                                    child_parent_dict[childID] = parentID
+                        elif gff_rule.get('gene_connection') == "inline":
+                            headerID = get_gff_attribute(spline[8], gff_rule.get('fasta_header_attr'))
+                            geneID = get_gff_attribute(spline[8], gff_rule.get('gene_attr'))
+                            child_parent_dict[headerID] = geneID
+                    elif gff_rule.get('parent_child_types') and spline[2] in gff_rule.get('parent_child_types'):
+                        child_attr = gff_rule.get('parent_child_attr').get('child')
+                        parent_attr = gff_rule.get('parent_child_attr').get('parent')
+                        if (spline[8].startswith(child_attr+"=") or ";"+child_attr+"=" in spline[8]) and \
+                           (spline[8].startswith(parent_attr+"=") or ";"+parent_attr+"=" in spline[8]):
+                            childID = get_gff_attribute(spline[8], child_attr)
+                            parentID = get_gff_attribute(spline[8], parent_attr)
+                            child_parent_dict[childID] = parentID
+
             elif "#FASTA" in line: # if FASTA block has been reached
                 break
 
@@ -726,6 +754,57 @@ def write_output(output_path, genes, header):
             writer.writerow(gene_dict)
 
 
+def parse_gff_source_rule(gff_source):
+    """ parsing which features in GFF to read (as genes) """
+    if gff_source == "default":
+        rule_dict = {}
+
+    elif gff_source == "maker":
+        rule_dict = {'source': 'maker',
+            'gene_tag': 'gene',
+            'fasta_header_type': 'mRNA',
+            'fasta_header_attr': 'ID',
+            'gene_connection': 'parent/child',
+            'parent_child_types': 'mRNA',
+            'parent_child_attr': {'parent': 'Parent', 'child': 'ID'}}
+
+    elif gff_source == "augustus_masked":
+        rule_dict = {'source': 'augustus_masked',
+            'gene_tag': 'match',
+            'fasta_header_type': 'match',
+            'fasta_header_attr': 'Name',
+            'gene_connection': 'inline',
+            'gene_attr': 'ID'}
+
+    else:
+        rule_file_path = pathlib.Path(gff_source)
+        if rule_file_path.is_file():
+            rule_dict = {}
+            with open(rule_file_path, 'r') as rule_file:
+                for line in rule_file:
+                    rule_dict[line.split(":")[0].strip()] = ":".join(line.split(":")[1:]).strip()
+            if "parent_child_attr" in rule_dict.keys():
+                pc_dict = {}
+                for kv_pair in rule_dict.get("parent_child_attr").strip("{}").split(","):
+                    pc_dict[kv_pair.split(":")[0].strip()] = kv_pair.split(":")[1].strip()
+                rule_dict["parent_child_attr"] = pc_dict
+        else:
+            rule_dict = {}
+            print("ERROR: source type for GFF could not be interpreted. Please check your input. Computations will continue with default setting")
+
+    if not rule_dict: #if not been set -> set to default
+        rule_dict = {'source': 'default',
+            'gene_tag': 'gene',
+            'fasta_header_type': 'mRNA,CDS',
+            'fasta_header_attr': 'ID',
+            'gene_connection': 'parent/child',
+            'parent_child_types': 'mRNA,CDS',
+            'parent_child_attr': {'parent': 'Parent', 'child': 'ID'}}
+
+
+    return rule_dict
+
+
 
 # ███    ███  █████  ██ ███    ██
 # ████  ████ ██   ██ ██ ████   ██
@@ -741,19 +820,22 @@ def main():
     # read parameters from config file
     config_obj=yaml.safe_load(open(config_path,'r'))
     output_path=config_obj['output_path'] # complete output path (ENDING ON A SLASH!)
-    nr_db_path=config_obj['nr_db_path']
+    nr_db_path=config_obj['database_path']
     proteins_path=config_obj['proteins_path'] # path to FASTA w/ protein seqs
     gff_path=config_obj['gff_path'] # path to GFF
     taxon_exclude = config_obj['taxon_exclude'] # bool to exclude query taxon from sequence alignment
     compute_tax_assignment = config_obj['compute_tax_assignment']
-    only_plotting = config_obj['only_plotting']
+    only_plotting = config_obj['update_plots']
     assignment_mode = config_obj['assignment_mode']
     quick_mode_search_rank = config_obj['quick_mode_search_rank'] if 'quick_mode_search_rank' in config_obj.keys() else None
     quick_mode_match_rank = config_obj['quick_mode_match_rank'] if 'quick_mode_match_rank' in config_obj.keys() else None
     tax_assignment_path = config_obj['tax_assignment_path']
-    queryID = int(config_obj['tax_id'])
+    queryID = int(config_obj['taxon_id'])
     merging_labels = config_obj['merging_labels']
     num_groups_plot = config_obj['num_groups_plot']
+    gff_source = config_obj['gff_source'] if 'gff_source' in config_obj.keys() else "default"
+
+    gff_rule = parse_gff_source_rule(gff_source)
 
     tmp_prot_path = output_path+"tmp/tmp.subset.protein.fasta"
 
@@ -793,7 +875,7 @@ def main():
     # read file
     genes, header = read_genes_coords(output_path)
 
-    prots = prot_gene_matching(output_path, gff_path, genes)
+    prots = prot_gene_matching(output_path, gff_path, genes, gff_rule)
 
     if compute_tax_assignment and not only_plotting:
         subset_prots_longest_cds(genes, proteins_path, tmp_prot_path)

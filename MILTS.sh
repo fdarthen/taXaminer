@@ -25,14 +25,14 @@ if [ "${assignment_mode}" = "quick" ]; then
 else
     echo "Exhaustive taxonomic assignment mode"
 fi
-echo "Database: " $nr_db_path
-echo "NCBI Taxon ID: " $tax_id "(taxon excluded: $taxon_exclude)"
+echo "Database: " $database_path
+echo "NCBI Taxon ID: " $taxon_id "(taxon excluded: $taxon_exclude)"
 echo -e "\n"
 
 [[ ! -d "${output_path}" ]] && mkdir -p "${output_path}"
 [[ ! -d "${output_path}tmp/" ]] && mkdir -p "${output_path}tmp/"
 
-if [ "${only_plotting}" = "FALSE" ]; then
+if [ "${update_plots}" = "FALSE" ]; then
 
     samtools faidx "${fasta_path}" -o "${output_path}tmp/tmp.MILTS.fasta.fai"
 

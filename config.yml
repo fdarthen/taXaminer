@@ -2,6 +2,7 @@
 ## Input and output options ##
 fasta_path: "./example/test.fasta"
 gff_path: "./example/test.gff"
+gff_source: "default" # which source to use in GFF
 output_path: "./MILTS_report/" # directory to save results to
 taxon_id: "107806" # NCBI Taxon ID of you query species
 
@@ -28,7 +29,7 @@ quick_mode_search_rank: "phylum"
 quick_mode_match_rank: "class"
 
 ## Plot output options ##
-update_plots: "TRUE"
+update_plots: "FALSE"
 num_groups_plot: "25"
 merging_labels: ["strain"]
 output_pdf: "TRUE"
