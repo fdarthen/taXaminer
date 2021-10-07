@@ -49,7 +49,7 @@ orca_static_3d <- function(plot, plot_filename, eye_x, eye_y, eye_z) {
     s <- list(camera = list(eye = list(x = eye_x, y = eye_y, z = eye_z)),
         xaxis=list(title="PC 1"),yaxis=list(title="PC 2"),zaxis=list(title="PC 3"),
         aspectmode='cube')
-    plot <- plot %>% layout(scene = s, margin = m) #title = 'taxonomic assignment',
+    plot <- plot %>% layout(scene = s, margin = m)
 
     # save plots to json files to generate static plots exterenally with orca
     # orca function in R does not work and using system() does not work on cluster
@@ -147,8 +147,11 @@ getQualColForVector <- function(x = NULL) {
 #  _________________ READING DATA __________________ #
 
 genes_coords_taxon <- data.table::fread(paste0(cfg$output_path,'taxonomic_assignment/gene_table_taxon_assignment.csv'), sep=",", header=TRUE)
-query_label_name <- read.table(paste0(cfg$output_path,'tmp/tmp.query_label'),header = F,nrows = 1)[1,1]
+tmp_query_info <- data.table::fread(paste0(cfg$output_path,'tmp/tmp.query_label'), sep='\t', header = FALSE)
+query_label_name <- tmp_query_info$V1[1]
+query_name <- tmp_query_info$V1[2]
 print(query_label_name)
+print(query_name)
 
 # ________________ PLOT PREPARATION _______________ #
 
@@ -230,7 +233,7 @@ if (nrow(genes_taxon_1dim) > 0) {
         geom_density() +
         colScale_1D +
         theme_bw() +
-        ggtitle("density of Dim.1") +
+        ggtitle(paste0(query_name,", density of Dim.1")) +
         guides(col=guide_legend(ncol=label_1d_ncols))
 
     plot_pdf_andor_png(plot_x, paste(c(cfg$output_path, "taxonomic_assignment/density_x"), collapse=""), TRUE, label_1d_ncols)
@@ -239,7 +242,7 @@ if (nrow(genes_taxon_1dim) > 0) {
         geom_density() +
         colScale_1D +
         theme_bw() +
-        ggtitle("density of Dim.2") +
+        ggtitle(paste0(query_name,", density of Dim.2")) +
         guides(col=guide_legend(ncol=label_1d_ncols))
 
     plot_pdf_andor_png(plot_y, paste(c(cfg$output_path, "taxonomic_assignment/density_y"), collapse=""), TRUE, label_1d_ncols)
@@ -265,7 +268,7 @@ if (nrow(genes_coords_taxon_rest) > 0) {
 }
 plot_2 <- plot_2 +
       theme_bw() +
-      ggtitle("2D density") +
+      ggtitle(paste0(query_name,", 2D density")) +
       guides(col=guide_legend(ncol=label_ncols))
 plot_pdf_andor_png(plot_2, paste(c(cfg$output_path, "taxonomic_assignment/density_2d"), collapse=""), TRUE, label_ncols)
 
@@ -276,7 +279,7 @@ if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
             geom_density() +
             colScale_1D +
             theme_bw() +
-            ggtitle("density of Dim.3") +
+            ggtitle(paste0(query_name,", density of Dim.3")) +
             guides(col=guide_legend(ncol=label_1d_ncols))
 
         plot_pdf_andor_png(plot_z, paste(c(cfg$output_path, "taxonomic_assignment/density_z"), collapse=""), TRUE, label_1d_ncols)
@@ -331,11 +334,13 @@ if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
         name=~plot_label_freq
     )
 
+    fig <- fig %>% layout(title = query_name)
+
     orca_static_3d(fig, "2D_plot_1_2", 0, 0, 2.25)
     orca_static_3d(fig, "2D_plot_1_3", 0, 2.25, 0)
     orca_static_3d(fig, "2D_plot_2_3", 2.25, 0, 0)
     orca_static_3d(fig, "3D_plot", 1.55, 1.55, 1.55)
 
-    fig <- fig %>% layout(title = 'taxonomic assignment', scene = list(xaxis=list(title="PC 1"),yaxis=list(title="PC 2"),zaxis=list(title="PC 3"),aspectmode='cube'))
+    fig <- fig %>% layout(scene = list(xaxis=list(title="PC 1"),yaxis=list(title="PC 2"),zaxis=list(title="PC 3"),aspectmode='cube'))
     withr::with_dir(paste0(cfg$output_path, "taxonomic_assignment/"), saveWidget(as_widget(fig), file="3D_plot.html", selfcontained=FALSE))
 }
