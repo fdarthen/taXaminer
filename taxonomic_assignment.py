@@ -484,6 +484,17 @@ def reset_tax_assignment(gene):
 # ██████  ██   ██    ██    ██   ██     ██      ██   ██ ███████ ██      ██   ██ ██   ██ ██   ██    ██    ██  ██████  ██   ████
 
 
+def get_child_parent(attrs, child_parent_dict):
+    """ use GFF attributes and retrieve child-parent pairs, given certain attributes """
+    child_attr = child_parent_dict.get('child')
+    parent_attr = child_parent_dict.get('parent')
+    if child_attr+"=" in attrs and parent_attr+"=" in attrs:
+        childID = get_gff_attribute(attrs, child_attr)
+        parentID = get_gff_attribute(attrs, parent_attr)
+    else:
+        return None, None
+    return childID, parentID
+
 
 def prot_gene_matching(output_path, gff_path, genes, gff_rule):
 
@@ -501,32 +512,21 @@ def prot_gene_matching(output_path, gff_path, genes, gff_rule):
                             # when attribute for child-parent-matching unequals attribute where header can be found,
                             # match those attributes together
                             if gff_rule.get('parent_child_attr').get('child') != gff_rule.get('fasta_header_attr'):
-                                child_attr = gff_rule.get('fasta_header_attr')
-                                parent_attr = gff_rule.get('parent_child_attr').get('child')
-                                if (spline[8].startswith(child_attr+"=") or ";"+child_attr+"=" in spline[8]) and \
-                                   (spline[8].startswith(parent_attr+"=") or ";"+parent_attr+"=" in spline[8]):
-                                    childID = get_gff_attribute(spline[8], child_attr)
-                                    parentID = get_gff_attribute(spline[8], parent_attr)
+                                childID, parentID = get_child_parent(spline[8].strip().split(';'), gff_rule.get('parent_child_attr'))
+                                if childID:
                                     child_parent_dict[childID] = parentID
+
                             if gff_rule.get('fasta_header_type') in gff_rule.get('parent_child_types'):
-                                child_attr = gff_rule.get('parent_child_attr').get('child')
-                                parent_attr = gff_rule.get('parent_child_attr').get('parent')
-                                if (spline[8].startswith(child_attr+"=") or ";"+child_attr+"=" in spline[8]) and \
-                                   (spline[8].startswith(parent_attr+"=") or ";"+parent_attr+"=" in spline[8]):
-                                    childID = get_gff_attribute(spline[8], child_attr)
-                                    parentID = get_gff_attribute(spline[8], parent_attr)
+                                childID, parentID = get_child_parent(spline[8].strip().split(';'), gff_rule.get('parent_child_attr'))
+                                if childID:
                                     child_parent_dict[childID] = parentID
                         elif gff_rule.get('gene_connection') == "inline":
                             headerID = get_gff_attribute(spline[8], gff_rule.get('fasta_header_attr'))
                             geneID = get_gff_attribute(spline[8], gff_rule.get('gene_attr'))
                             child_parent_dict[headerID] = geneID
                     elif gff_rule.get('parent_child_types') and spline[2] in gff_rule.get('parent_child_types'):
-                        child_attr = gff_rule.get('parent_child_attr').get('child')
-                        parent_attr = gff_rule.get('parent_child_attr').get('parent')
-                        if (spline[8].startswith(child_attr+"=") or ";"+child_attr+"=" in spline[8]) and \
-                           (spline[8].startswith(parent_attr+"=") or ";"+parent_attr+"=" in spline[8]):
-                            childID = get_gff_attribute(spline[8], child_attr)
-                            parentID = get_gff_attribute(spline[8], parent_attr)
+                        childID, parentID = get_child_parent(spline[8].strip().split(';'), gff_rule.get('parent_child_attr'))
+                        if childID:
                             child_parent_dict[childID] = parentID
 
             elif "#FASTA" in line: # if FASTA block has been reached
@@ -919,7 +919,7 @@ def main():
 
     elif assignment_mode == 'exhaustive':
         print("Exhaustive mode for taxonomic assignment selected")
-        if compute_tax_assignment:
+        if compute_tax_assignment and not only_plotting:
             diamond_cmd = diamond_cmd + diamond_o + taxon_exclude
             print("Diamond command for exhaustive search: ")
             print(diamond_cmd)
@@ -940,8 +940,10 @@ def main():
         set_unassigned_labels(genes)
 
     query_label = ident_query_label(genes, queryID)
+    query_name = TAX_DB.taxid2name[queryID]
     with open(output_path+'tmp/tmp.query_label', 'w') as tmp_file:
         tmp_file.write(query_label+'\n')
+        tmp_file.write(query_name+'\n')
 
     if missing_taxids:
         print("The following Taxon ID(s) could not be found in the NCBI: ")
