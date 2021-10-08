@@ -1449,7 +1449,7 @@ def main():
     # read parameters from config file
     config_obj=yaml.safe_load(open(config_path,'r'))
     gff_path=config_obj['gff_path'] # GFF file path
-    pbc_paths=config_obj['pbc_paths'] # per base coverage (PBC) file path(s)
+    pbc_paths=list(config_obj['pbc_paths']) if 'pbc_paths' in config_obj.keys() else [] # per base coverage (PBC) file path(s)
     output_path=config_obj['output_path'] # complete output path (ENDING ON A SLASH!)
     fasta_path= config_obj['fasta_path'] # path to FASTA file
     include_pseudogenes = config_obj['include_pseudogenes'] # boolean signifying whether pseudogenes should be included in the analysis
