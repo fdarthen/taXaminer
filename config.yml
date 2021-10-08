@@ -1,32 +1,26 @@
 
 ## Input and output options ##
-fasta_path: "./example/test.fasta"
-gff_path: "./example/test.gff"
-gff_source: "default" # which source to use in GFF
-output_path: "./MILTS_report/" # directory to save results to
-taxon_id: "107806" # NCBI Taxon ID of you query species
+fasta_path: "path/to/assembly.fasta"
+gff_path: "path/to/assembly.gff"
+output_path: "path/to/output_directory/" # directory to save results to
+taxon_id: "<NCBI taxon ID>" # NCBI Taxon ID of query species
 
 ## Coverage options ##
-include_coverage: "TRUE"
+include_coverage: "FALSE"
 compute_coverage: "FALSE"
-pbc_paths: ["./example/test.pbc.txt","./example/test.pbc_2.txt"]
-bam: "path/to/mapping.bam"
-reads: "path/to/reads"
-insert_size: ""
-
-## Gene info options ##
-include_pseudogenes: "FALSE"
+pbc_paths: ["paths/to/pbc.txt"]
+bam: "path/to/bam"
+reads: ["paths/to/read_files"]
+insert_size: "200" # insert size for paired end reads
 
 ## Taxonomic assignment options ##
-compute_tax_assignment: "FALSE"
-extract_proteins: "FALSE"       # set proteins_path as output path
-proteins_path: "./example/test_proteins.fasta"
-tax_assignment_path: "./example/top10_hits.txt"
-database_path: "path/to/nrTaxonomy.dmnd"
+compute_tax_assignment: "TRUE"
+extract_proteins: "TRUE"       # set proteins_path as output path
+proteins_path: "path/to/proteins.fasta"
+tax_assignment_path: "path/to/taxonomic_hits.txt"
+database_path: "path/to/database.dmnd" #
 taxon_exclude: "TRUE"
-assignment_mode: "quick"
-quick_mode_search_rank: "phylum"
-quick_mode_match_rank: "class"
+assignment_mode: "exhaustive"
 
 ## Plot output options ##
 update_plots: "FALSE"
@@ -35,6 +29,9 @@ merging_labels: ["strain"]
 output_pdf: "TRUE"
 output_png: "FALSE"
 
+## Gene info options ##
+include_pseudogenes: "FALSE"
+
 ## PCA options ##
 input_variables: "c_name,c_num_of_genes,c_len,c_genelenm,c_genelensd,g_len,g_lendev_c,g_abspos,g_terminal,c_cov,c_covsd,g_cov,g_covsd,g_covdev_c,c_pearson_r,g_pearson_r_o,g_pearson_r_c"
 perform_parallel_analysis: "FALSE"
@@ -42,13 +39,13 @@ num_pcs: "3"
 coverage_cutoff_mode: "default"
 
 ## Clustering options ##
-perform_kmeans: "TRUE"
+perform_kmeans: "FALSE"
 kmeans_k: "default"
-perform_hclust: "TRUE"
+perform_hclust: "FALSE"
 hclust_k: "default"
-perform_mclust: "TRUE"
+perform_mclust: "FALSE"
 mclust_k: "default"
-perform_dbscan: "TRUE"
+perform_dbscan: "FALSE"
 dbscan_groups: "default"
 custom_eps: "0.3"
 custom_minPts: "10"

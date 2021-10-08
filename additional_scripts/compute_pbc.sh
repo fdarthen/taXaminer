@@ -50,6 +50,7 @@ else
     echo ">>>MAPPING"
     if [[ -f "${reads_1}" &&  -f "${reads_2}" ]]; then
         echo "mapping paired end data"
+        [ "$insert_size" == "" ] && insert_size=200
         echo "Insert size: " $((insert_size-200)) "-" $((insert_size+200))
         bowtie2 --sensitive -I $((insert_size-200)) -X $((insert_size+200)) -a -p 16 -x ${cov_path}my_assembly -1 ${reads_1} -2 ${reads_2} -S ${cov_path}my_mapping.sam
     elif [[ -f "${reads_un}" ]]; then
