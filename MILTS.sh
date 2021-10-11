@@ -10,6 +10,7 @@ config_path=$1
 # read variables from config file
 source <(grep : $config_path | sed 's/ *: */=/g')
 
+
 # extract first pbc_path from list in $pbc_paths
 pbc_path=$(echo $pbc_paths | cut -d ',' -f1 | awk -F '[' '{print $2}' | awk -F ']' '{print $1}')
 
@@ -173,8 +174,8 @@ echo "plot taxonomic assignment end (time elapsed:" $(($time6_2-$time6_1)) "s)"
 
 # 5.c) create static plots from json files
 # ${output_path}tmp/*.json not in "" so that filenames are preserved
-[[ "${output_pdf}" = "TRUE" ]] && xvfb-run -a orca graph ${output_path}tmp/*.json -f "pdf" -d "${output_path}taxonomic_assignment/"
-[[ "${output_png}" = "TRUE" ]] && xvfb-run -a orca graph ${output_path}tmp/*.json -f "png" -d "${output_path}taxonomic_assignment/"
+[[ "${output_pdf}" = "TRUE" ]] && orca graph ${output_path}tmp/*.json -f "pdf" -d "${output_path}taxonomic_assignment/"
+[[ "${output_png}" = "TRUE" ]] && orca graph ${output_path}tmp/*.json -f "png" -d "${output_path}taxonomic_assignment/"
 
 
 # 6) remove the temporarily created files
