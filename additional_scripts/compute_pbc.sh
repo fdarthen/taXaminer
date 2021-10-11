@@ -31,8 +31,6 @@ else
     reads_un=$(echo $reads | awk -F '[' '{print $2}' | awk -F '[' '{print $2}')
 fi
 
-[[ ! -d "${output_path}" ]] && mkdir -p "${output_path}"
-
 if [[ -f "${bam}" ]]; then # if bam file exists
     echo ">>>PER BASE COVERAGE"
     echo "computing PBC from BAM file"
@@ -40,6 +38,7 @@ if [[ -f "${bam}" ]]; then # if bam file exists
     touch ${pbc_path}
     bedtools genomecov -ibam ${bam} -d > $pbc_path
 else
+    [[ ! -d "${output_path}" ]] && mkdir -p "${output_path}"
     cov_path="${output_path}/mapping_files/"
     [[ ! -d "${cov_path}" ]] && mkdir -p "${cov_path}"
     [[ ! -d "${output_path}/tmp" ]] && mkdir -p "${output_path}/tmp"
@@ -50,6 +49,7 @@ else
     echo ">>>MAPPING"
     if [[ -f "${reads_1}" &&  -f "${reads_2}" ]]; then
         echo "mapping paired end data"
+        [ "$insert_size" == "" ] && insert_size=200
         echo "Insert size: " $((insert_size-200)) "-" $((insert_size+200))
         bowtie2 --sensitive -I $((insert_size-200)) -X $((insert_size+200)) -a -p 16 -x ${cov_path}my_assembly -1 ${reads_1} -2 ${reads_2} -S ${cov_path}my_mapping.sam
     elif [[ -f "${reads_un}" ]]; then

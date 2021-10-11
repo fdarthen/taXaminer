@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --partition=pool
+#SBATCH --partition=all
 #SBATCH --account=user
-#SBATCH --cpus-per-task=1
-#SBATCH --mem-per-cpu=1gb
+#SBATCH --cpus-per-task=24
+#SBATCH --mem-per-cpu=8gb
 #SBATCH --job-name="milts"
 #SBATCH --output=./%A_%a.o.out     # Standard output
 #SBATCH --error=./%A_%a.e.out      # and error log
