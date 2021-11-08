@@ -426,37 +426,38 @@ def read_tax_assignments(tax_assignment_path, prots, queryID):
             spline = line.strip().split('\t')
             gene = prots.get(spline[0])
             closest_hit = None
-            if not gene.best_hit or gene.best_hit == 'NA': # if first best hit had no matching to NCBI ID
-                if spline[-2]:
-                    if ';' in spline[-2]:
-                        hit_ids = [int(id) for id in spline[-2].split(';')]
-                        closest_hit = assess_best_of_multi_hits(hit_ids, queryID)
-                        if closest_hit:
-                            gene.best_hit = closest_hit.name
-                            gene.best_hitID = closest_hit.taxid
+            if gene:
+                if not gene.best_hit or gene.best_hit == 'NA': # if first best hit had no matching to NCBI ID
+                    if spline[-2]:
+                        if ';' in spline[-2]:
+                            hit_ids = [int(id) for id in spline[-2].split(';')]
+                            closest_hit = assess_best_of_multi_hits(hit_ids, queryID)
+                            if closest_hit:
+                                gene.best_hit = closest_hit.name
+                                gene.best_hitID = closest_hit.taxid
+                            else:
+                                gene.best_hit = 'NA'
+                                gene.best_hitID = 'NA'
                         else:
-                            gene.best_hit = 'NA'
-                            gene.best_hitID = 'NA'
-                    else:
-                        gene.best_hit = spline[-1]
-                        gene.best_hitID = int(spline[-2])
-                    gene.bh_evalue = spline[10]
-                else: # ncbiID for match could not be found
-                    gene.best_hit = 'NA'
-                    gene.best_hitID = 'NA'
-                    gene.bh_evalue = 'NA'
+                            gene.best_hit = spline[-1]
+                            gene.best_hitID = int(spline[-2])
+                        gene.bh_evalue = spline[10]
+                    else: # ncbiID for match could not be found
+                        gene.best_hit = 'NA'
+                        gene.best_hitID = 'NA'
+                        gene.bh_evalue = 'NA'
 
-            if closest_hit:
-                gene.tax_assignments.append(spline[1:-2]+[str(closest_hit.taxid),closest_hit.name])
-            elif ';' in spline[-2]:
-                hit_ids = [int(id) for id in spline[-2].split(';')]
-                closest_hit = assess_best_of_multi_hits(hit_ids, queryID)
                 if closest_hit:
                     gene.tax_assignments.append(spline[1:-2]+[str(closest_hit.taxid),closest_hit.name])
+                elif ';' in spline[-2]:
+                    hit_ids = [int(id) for id in spline[-2].split(';')]
+                    closest_hit = assess_best_of_multi_hits(hit_ids, queryID)
+                    if closest_hit:
+                        gene.tax_assignments.append(spline[1:-2]+[str(closest_hit.taxid),closest_hit.name])
+                    else:
+                        gene.tax_assignments.append(spline[1:])
                 else:
                     gene.tax_assignments.append(spline[1:])
-            else:
-                gene.tax_assignments.append(spline[1:])
 
 def taxonomic_assignment(tax_assignment_path, genes, prots, queryID):
     read_tax_assignments(tax_assignment_path, prots, queryID)
@@ -510,24 +511,38 @@ def prot_gene_matching(output_path, gff_path, genes, gff_rule):
                     if spline[2] in gff_rule.get('fasta_header_type'):
                         if gff_rule.get('gene_connection') == "parent/child":
                             # when attribute for child-parent-matching unequals attribute where header can be found,
-                            # match those attributes together
-                            if gff_rule.get('parent_child_attr').get('child') != gff_rule.get('fasta_header_attr'):
-                                childID, parentID = get_child_parent(spline[8].strip().split(';'), gff_rule.get('parent_child_attr'))
+                            # match attribute of fasta header and child of parent/child matching together
+                            if gff_rule.get('parent_child_attr').get('child') not in gff_rule.get('fasta_header_attr'):
+                                header_child_dict = {'child': gff_rule.get('fasta_header_attr'), 'parent': gff_rule.get('parent_child_attr').get('child')}
+                                childID, parentID = get_child_parent(spline[8], header_child_dict)
                                 if childID:
-                                    child_parent_dict[childID] = parentID
+                                    if not child_parent_dict.get(strip_ID(childID)):
+                                        child_parent_dict[strip_ID(childID)] = strip_ID(parentID)
+                                    elif child_parent_dict.get(strip_ID(childID)) == strip_ID(childID):
+                                        child_parent_dict[strip_ID(childID)] = strip_ID(parentID)
 
-                            if gff_rule.get('fasta_header_type') in gff_rule.get('parent_child_types'):
-                                childID, parentID = get_child_parent(spline[8].strip().split(';'), gff_rule.get('parent_child_attr'))
+                            # add the parent child matching if fasta header line (also) contains p/c matching info
+                            if spline[2] in gff_rule.get('parent_child_types'):
+                                childID, parentID = get_child_parent(spline[8], gff_rule.get('parent_child_attr'))
                                 if childID:
-                                    child_parent_dict[childID] = parentID
+                                    if not child_parent_dict.get(strip_ID(childID)):
+                                        child_parent_dict[strip_ID(childID)] = strip_ID(parentID)
+                                    elif child_parent_dict.get(strip_ID(childID)) == strip_ID(childID):
+                                        child_parent_dict[strip_ID(childID)] = strip_ID(parentID)
                         elif gff_rule.get('gene_connection') == "inline":
                             headerID = get_gff_attribute(spline[8], gff_rule.get('fasta_header_attr'))
                             geneID = get_gff_attribute(spline[8], gff_rule.get('gene_attr'))
-                            child_parent_dict[headerID] = geneID
-                    elif gff_rule.get('parent_child_types') and spline[2] in gff_rule.get('parent_child_types'):
-                        childID, parentID = get_child_parent(spline[8].strip().split(';'), gff_rule.get('parent_child_attr'))
+                            if not child_parent_dict.get(strip_ID(headerID)):
+                                child_parent_dict[strip_ID(headerID)] = strip_ID(geneID)
+                            elif child_parent_dict.get(strip_ID(headerID)) == strip_ID(headerID):
+                                child_parent_dict[strip_ID(headerID)] = strip_ID(geneID)
+                    elif spline[2] in gff_rule.get('parent_child_types'):
+                        childID, parentID = get_child_parent(spline[8], gff_rule.get('parent_child_attr'))
                         if childID:
-                            child_parent_dict[childID] = parentID
+                            if not child_parent_dict.get(strip_ID(childID)):
+                                child_parent_dict[strip_ID(childID)] = strip_ID(parentID)
+                            elif child_parent_dict.get(strip_ID(childID)) == strip_ID(childID):
+                                child_parent_dict[strip_ID(childID)] = strip_ID(parentID)
 
             elif "#FASTA" in line: # if FASTA block has been reached
                 break
@@ -539,20 +554,25 @@ def prot_gene_matching(output_path, gff_path, genes, gff_rule):
     with open(prot_index_path, 'r') as prot_index:
         for line in prot_index:
             id, length = line.split()[0], ((int(line.split()[1])*3)+3)
-            parent = child_parent_dict.get(id)
+            parent = child_parent_dict.get(strip_ID(id))
             if parent: # id in proteins fasta index matches the IDs in the GFF
                 while parent in child_parent_dict.keys():
                     if parent == child_parent_dict.get(parent):
                         break
                     else:
                         parent = child_parent_dict.get(parent)
-            elif child_parent_dict.get(id.split('|')[0]): # header might contain pipes
+            elif child_parent_dict.get(strip_ID(id.split('|')[0])): # header might contain pipes
                 parent = child_parent_dict.get(id.split('|')[0])
                 while parent in child_parent_dict.keys():
                     if parent == child_parent_dict.get(parent):
                         break
                     else:
                         parent = child_parent_dict.get(parent)
+            elif strip_ID(id) in genes.keys():
+                # fasta header is gene ID
+                parent = id
+            elif strip_ID(id).split('|')[0] in genes.keys():
+                parent = id
             else: # if not, look if any child ID is contained in the id
                 for child in child_parent_dict.keys():
                     if child in id:
@@ -819,50 +839,38 @@ def main():
 
     # read parameters from config file
     config_obj=yaml.safe_load(open(config_path,'r'))
-    output_path=config_obj['output_path'] # complete output path (ENDING ON A SLASH!)
-    nr_db_path=config_obj['database_path']
-    proteins_path=config_obj['proteins_path'] # path to FASTA w/ protein seqs
-    gff_path=config_obj['gff_path'] # path to GFF
-    taxon_exclude = config_obj['taxon_exclude'] # bool to exclude query taxon from sequence alignment
-    compute_tax_assignment = config_obj['compute_tax_assignment']
-    only_plotting = config_obj['update_plots']
-    assignment_mode = config_obj['assignment_mode']
-    quick_mode_search_rank = config_obj['quick_mode_search_rank'] if 'quick_mode_search_rank' in config_obj.keys() else None
-    quick_mode_match_rank = config_obj['quick_mode_match_rank'] if 'quick_mode_match_rank' in config_obj.keys() else None
-    tax_assignment_path = config_obj['tax_assignment_path']
-    queryID = int(config_obj['taxon_id'])
-    merging_labels = config_obj['merging_labels']
-    num_groups_plot = config_obj['num_groups_plot']
-    gff_source = config_obj['gff_source'] if 'gff_source' in config_obj.keys() else "default"
+    output_path=config_obj.get('output_path') # complete output path (ENDING ON A SLASH!)
+    nr_db_path=config_obj.get('database_path')
+    proteins_path=config_obj.get('proteins_path', None) # path to FASTA w/ protein seqs
+    gff_path=config_obj.get('gff_path') # path to GFF
+    taxon_exclude = config_obj.get('taxon_exclude') # bool to exclude query taxon from sequence alignment
+    compute_tax_assignment = config_obj.get('compute_tax_assignment')
+    only_plotting = config_obj.get('update_plots')
+    assignment_mode = config_obj.get('assignment_mode')
+    quick_mode_search_rank = config_obj.get('quick_mode_search_rank', None)
+    quick_mode_match_rank = config_obj.get('quick_mode_match_rank', None)
+    if assignment_mode == "quick":
+        tax_assignment_path_1, tax_assignment_path_2 = tax_assignment_path = config_obj.get('tax_assignment_path')
+    else:
+        tax_assignment_path = config_obj.get('tax_assignment_path')
+    queryID = int(config_obj.get('taxon_id'))
+    merging_labels = config_obj.get('merging_labels')
+    num_groups_plot = config_obj.get('num_groups_plot')
+    gff_source = config_obj.get('gff_source', 'default')
 
     gff_rule = parse_gff_source_rule(gff_source)
 
     tmp_prot_path = output_path+"tmp/tmp.subset.protein.fasta"
 
-    diamond_q = ' -q "' + tmp_prot_path + '"'
-    raw_tax_assignment_path = '.'.join(tax_assignment_path.split('.')[:-1])
-    diamond_o = ' -o "' + tax_assignment_path + '"'
-    diamond_o1 = ' -o "' + raw_tax_assignment_path + ".quick_1.txt" + '"'
-    diamond_o2 = ' -o "' + raw_tax_assignment_path + ".quick_2.txt" + '"'
-    diamond_d = ' -d "' + nr_db_path + '"'
-    diamond_cmd = 'diamond blastp -f 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore staxids sscinames -b2.0 --tmpdir /dev/shm --sensitive -c1 --top 10' + diamond_q + diamond_d
+    diamond_cmd = 'diamond blastp -f 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore staxids sscinames -b2.0 --tmpdir /dev/shm --sensitive -c1 --top 10 -q "{}" -d "{}"'.format(tmp_prot_path, nr_db_path)
 
-    if taxon_exclude.upper() == "TRUE":
-        taxon_exclude = ' --taxon-exclude "' + str(queryID) + '"'
+    if taxon_exclude:
+        taxon_exclude = ' --taxon-exclude "{}"'.format(queryID)
     else:
         taxon_exclude = ''
-
-    if compute_tax_assignment.upper() == "TRUE":
-        compute_tax_assignment = True
-    else:
-        compute_tax_assignment = False
-
-    if only_plotting.upper() == "TRUE":
-        only_plotting = True
-    else:
-        only_plotting = False
-
-    if num_groups_plot.isdigit() or type(num_groups_plot) == int:
+    if type(num_groups_plot) == int:
+        pass
+    elif num_groups_plot.isdigit():
         num_groups_plot = int(num_groups_plot)
     elif num_groups_plot == 'all':
         # no merging of taxonomic assignments desired
@@ -870,7 +878,6 @@ def main():
     else:
         print('No valid option for "num_groups_plot"')
         return
-
 
     # read file
     genes, header = read_genes_coords(output_path)
@@ -883,22 +890,23 @@ def main():
     if assignment_mode == 'quick':
         print("Quick mode for taxonomic assignment selected")
 
-        # TODO: check if file exists
         if compute_tax_assignment and not only_plotting:
             if quick_mode_search_rank.isdigit() or type(quick_mode_search_rank) == int:
                 quick_mode_search_id = int(quick_mode_search_rank)
             else:
                 quick_mode_search_id = get_id_for_rank_of_species(queryID, quick_mode_search_rank)
-            exclude_ids_string = ','.join(diamond_inclusion_by_exclusion(quick_mode_search_id))
-            diamond_cmd_1 = diamond_cmd + diamond_o1 + taxon_exclude.rstrip('"') + ',' + exclude_ids_string + '"'
+            if taxon_exclude:
+                q1_exclude = taxon_exclude.rstrip('"') + ',' + ','.join(diamond_inclusion_by_exclusion(quick_mode_search_id))
+            else:
+                q1_exclude = ' --taxon-exclude "{}"'.format(','.join(diamond_inclusion_by_exclusion(quick_mode_search_id)))
+            diamond_cmd_1 = diamond_cmd + ' -o "{}" {}'.format(tax_assignment_path_1, q1_exclude)
             ###taxonlist###  diamond_cmd_1 = diamond_cmd + diamond_o1 + ' --taxonlist "' + str(quick_mode_search_id) + '" --taxon-exclude "' + str(queryID) + '"'
-
 
             print("Diamond command for quick search round 1: ")
             print(diamond_cmd_1)
             os.system(diamond_cmd_1)
 
-        taxonomic_assignment(raw_tax_assignment_path + ".quick_1.txt", genes, prots, queryID)
+        taxonomic_assignment(tax_assignment_path_1, genes, prots, queryID)
 
         # write_output(output_path, genes, header)
 
@@ -909,18 +917,18 @@ def main():
                 quick_mode_match_id = get_id_for_rank_of_species(queryID, quick_mode_match_rank)
             filter_prots_quick_hits(genes, quick_mode_match_id, tmp_prot_path, tmp_prot_path)
 
-            diamond_cmd_2 = diamond_cmd + diamond_o2 + taxon_exclude
+            diamond_cmd_2 = diamond_cmd + ' -o "{}" '.format(tax_assignment_path_1) + taxon_exclude
             print("Diamond command for quick search round 2: ")
             print(diamond_cmd_2)
             os.system(diamond_cmd_2)
 
-        taxonomic_assignment(raw_tax_assignment_path + ".quick_2.txt", genes, prots, queryID)
+        taxonomic_assignment(tax_assignment_path_1, genes, prots, queryID)
 
 
     elif assignment_mode == 'exhaustive':
         print("Exhaustive mode for taxonomic assignment selected")
         if compute_tax_assignment and not only_plotting:
-            diamond_cmd = diamond_cmd + diamond_o + taxon_exclude
+            diamond_cmd = diamond_cmd + ' -o "{}" '.format(tax_assignment_path) + taxon_exclude
             print("Diamond command for exhaustive search: ")
             print(diamond_cmd)
             os.system(diamond_cmd)
@@ -949,6 +957,8 @@ def main():
         print("The following Taxon ID(s) could not be found in the NCBI: ")
         print(missing_taxids)
         print("Skipped for taxonomic assignment.")
+
+    pathlib.Path(output_path+'taxonomic_assignment/').mkdir(parents=True, exist_ok=True)
 
     write_output(output_path, genes, header)
 

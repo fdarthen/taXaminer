@@ -1394,7 +1394,7 @@ def read_pbc(a, include_coverage):
 
 
     if include_coverage:
-        for pbc_index, pbc_path in enumerate(a.get_pbc_paths()):
+        for pbc_index, pbc_path in a.get_pbc_paths().items():
             with open(pbc_path, 'r') as pbc: # open PBC file
                 for line in pbc:
 
@@ -1411,14 +1411,14 @@ def read_pbc(a, include_coverage):
                     if current_contig: # only add to contigs which exist in GFF file
                         base = int(pbc_info_array[1])
                         coverage = int(float(pbc_info_array[2]))
-                        current_contig.add_base_coverage(pbc_index, base, coverage)
+                        current_contig.add_base_coverage(pbc_index-1, base, coverage)
     else: # if user does not want to include coverage information or it is not available
         mock_coverage = 1 # coverage that is set for all bases
         for contig_name, contig in a.get_contigs().items():
             if contig.geneless_info() == 0: # only store "info" if contig has genes
                 for base in range(1, contig.get_length()+1): # set coverage for every base to mock coverage
                     for pbc_index in range(a.get_num_pbc()):
-                        contig.add_base_coverage(pbc_index, base, mock_coverage)
+                        contig.add_base_coverage(pbc_index-1, base, mock_coverage)
 
 
 def parse_gff_source_rule(gff_source):
@@ -1460,36 +1460,18 @@ def main():
     config_path = sys.argv[1]
 
     # read parameters from config file
-    config_obj=yaml.safe_load(open(config_path,'r'))
-    gff_path=config_obj['gff_path'] # GFF file path
-    pbc_paths=list(config_obj['pbc_paths']) if 'pbc_paths' in config_obj.keys() else [] # per base coverage (PBC) file path(s)
-    output_path=config_obj['output_path'] # complete output path (ENDING ON A SLASH!)
-    fasta_path= config_obj['fasta_path'] # path to FASTA file
-    include_pseudogenes = config_obj['include_pseudogenes'] # boolean signifying whether pseudogenes should be included in the analysis
-    include_coverage = config_obj['include_coverage']
-    gff_source = config_obj['gff_source'] if 'gff_source' in config_obj.keys() else "default"
+    config_obj = yaml.safe_load(open(config_path,'r'))
+    gff_path = config_obj.get('gff_path') # GFF file path
+    pbc_paths = dict(config_obj.get('pbc_paths', {})) # per base coverage (PBC) file path(s)
+    output_path = config_obj.get('output_path') # complete output path (ENDING ON A SLASH!)
+    fasta_path = config_obj.get('fasta_path') # path to FASTA file
+    include_pseudogenes = config_obj.get('include_pseudogenes') # boolean signifying whether pseudogenes should be included in the analysis
+    include_coverage = config_obj.get('include_coverage')
+    gff_source = config_obj.get('gff_source', 'default')
 
     gene_tag, source_type = parse_gff_source_rule(gff_source)
 
-    # read pseudogene decision:
-    # note: trying to catch all user inputs such as 'TRUE', 'tru', True', 't', 'T', ...
-    # --> read only the first letter
-    # .lower() transforms the given string to all lower case letters
-    # [0] treats the string as an array and takes the first item (= 1st letter of thsi word)
-    if include_pseudogenes.lower()[0] == 't': # if this 1st letter is 't'
-        include_pseudogenes = True # set boolean in this script to True
-    elif include_pseudogenes.lower()[0] == 'f': # if this first letter is 'f'
-        include_pseudogenes = False # set the boolean in this script to False
-    else: # if the user input is invalid,
-        include_pseudogenes = False # set the boolean to false by default
     print("include pseudogenes = " + str(include_pseudogenes))
-
-    if include_coverage.lower()[0] == 't': # if this 1st letter is 't'
-        include_coverage = True # set boolean in this script to True
-    elif include_coverage.lower()[0] == 'f': # if this first letter is 'f'
-        include_coverage = False # set the boolean in this script to False
-    else: # if the user input is invalid,
-        include_coverage = False # set the boolean to false by default
     print("include coverage = " + str(include_coverage))
 
     # ====================== VARIABLES ======================

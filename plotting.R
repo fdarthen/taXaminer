@@ -342,5 +342,5 @@ if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
     orca_static_3d(fig, "3D_plot", 1.55, 1.55, 1.55)
 
     fig <- fig %>% layout(scene = list(xaxis=list(title="PC 1"),yaxis=list(title="PC 2"),zaxis=list(title="PC 3"),aspectmode='cube'))
-    withr::with_dir(paste0(cfg$output_path, "taxonomic_assignment/"), saveWidget(as_widget(fig), file="3D_plot.html", selfcontained=FALSE))
+    withr::with_dir(paste0(cfg$output_path, "tmp/"), saveWidget(as_widget(fig), file="3D_plot.html", selfcontained=FALSE))
 }
