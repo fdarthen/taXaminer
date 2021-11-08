@@ -1,6 +1,7 @@
 #!/bin/bash
 
-conda create -n milts python=3.6 -y
+conda create -n milts python=3.8 r-base=4.0.5 -y
+source ~/anaconda3/etc/profile.d/conda.sh
 conda activate milts
 
 conda config --add channels defaults
@@ -8,18 +9,20 @@ conda config --add channels bioconda
 conda config --add channels conda-forge
 echo "channels added"
 
+echo "install mamba"
+conda install -c conda-forge mamba -y
+
 echo "python packages"
-conda install biopython scipy pyyaml taxopy=0.8.0 -y
+mamba install biopython scipy pyyaml beautifulsoup4 jsmin taxopy=0.8.0 -y
 
 echo "R & R packages"
-conda install r-base=4.0.5 r-factoextra r-htmlwidgets=1.5.2 r-mclust r-dbscan r-plotly=4.9.2.1 bioconductor-biostrings -y
-conda install -c plotly plotly-orca -y
-conda install -c hcc r-paran -y
-
+mamba install r-ggplot2 r-factoextra r-htmlwidgets r-mclust r-dbscan r-plotly bioconductor-biostrings r-viridis orca -y
+mamba install -c plotly plotly-orca -y
+mamba install -c hcc r-paran -y
 
 # other tools
 echo "additional software"
-conda install samtools bedtools bowtie2 diamond=2.0.11 gffread=0.12.1 -y
+mamba install samtools bedtools bowtie2 diamond gffread=0.12.1 -y
 
 # setting MILTS.sh as an executable
 chmod +x MILTS.sh
