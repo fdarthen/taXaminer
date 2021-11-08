@@ -65,6 +65,30 @@ def set_variable_default(config_obj, key_name, *default):
     else: # key not given in config file and no given default value
         print('Error: no default value available for "{}". Please state specifically.'.format(key_name))
 
+def pca_cov_variables(vars, include, cov_set_num):
+    """ exclude cov_vars if coverage_include == FALSE;
+    else add indices to the cov_vars """
+
+    cov_vars = "c_cov,c_covsd,g_cov,g_covsd,g_covdev_c"
+
+    out_vars = ""
+
+    if include:
+        for var in vars.split(','):
+            if var in cov_vars:
+                for i in range(cov_set_num):
+                    out_vars = out_vars + ',' + var + '_' + str(i)
+            else:
+                out_vars = out_vars + ',' + var
+    else:
+        for var in vars.split(','):
+            if var not in cov_vars:
+                out_vars = out_vars + ',' + var
+
+
+
+
+    return out_vars[1:]
 
 
 def set_config_defaults(config_obj):
@@ -72,7 +96,7 @@ def set_config_defaults(config_obj):
 
     config_vars = {}
 
-    default_pca_vars = "c_name,c_num_of_genes,c_len,c_genelenm,c_genelensd,g_len,g_lendev_c,g_abspos,g_terminal,c_cov,c_covsd,g_cov,g_covsd,g_covdev_c,c_pearson_r,g_pearson_r_o,g_pearson_r_c"
+    default_pca_vars = "c_name,c_num_of_genes,c_len,c_genelenm,c_genelensd,g_len,g_lendev_c,g_abspos,g_terminal,c_pearson_r,g_pearson_r_o,g_pearson_r_c,c_cov,c_covsd,g_cov,g_covsd,g_covdev_c"
 
     # General options
     config_vars['fasta_path'] = set_variable_default(config_obj, 'fasta_path')
@@ -96,12 +120,12 @@ def set_config_defaults(config_obj):
 
     config_vars['cov_set_exists'] = cov_set_exists
 
-    if len(cov_set_exists) == 0:
+    if len(config_vars.get('cov_set_exists')) == 0:
         config_vars['include_coverage'] = set_variable_default(config_obj, 'include_coverage', 'FALSE')
     else:
         config_vars['include_coverage'] = set_variable_default(config_obj, 'include_coverage', 'TRUE')
 
-    if list(cov_set_exists.values()).count('pbc_paths') == len(cov_set_exists) or \
+    if list(config_vars.get('cov_set_exists').values()).count('pbc_paths') == len(config_vars.get('cov_set_exists')) or \
         config_vars.get('include_coverage') == 'FALSE':
         config_vars['compute_coverage'] = set_variable_default(config_obj, 'compute_coverage', 'FALSE')
     else:
@@ -137,8 +161,10 @@ def set_config_defaults(config_obj):
     # Gene info
     config_vars['include_pseudogenes'] = set_variable_default(config_obj, 'include_pseudogenes', 'FALSE')
     config_vars['gff_source'] = set_variable_default(config_obj, 'gff_source', 'default')
+
     # PCA
-    config_vars['input_variables'] = set_variable_default(config_obj, 'input_variables', default_pca_vars)
+    config_vars['input_variables'] = pca_cov_variables(set_variable_default(config_obj, 'input_variables', default_pca_vars), config_vars.get('include_coverage'), len(config_vars.get('cov_set_exists')))
+
     config_vars['perform_parallel_analysis'] = set_variable_default(config_obj, 'perform_parallel_analysis', 'FALSE')
     config_vars['num_pcs'] = set_variable_default(config_obj, 'num_pcs', '3')
     config_vars['coverage_cutoff_mode'] = set_variable_default(config_obj, 'coverage_cutoff_mode', 'default')
@@ -165,6 +191,70 @@ def write_cfg2file(config_obj, config_vars):
         for key, value in config_vars.items():
                 out_cfg.write('{}: {}\n'.format(key,value))
 
+def write_run_overview(config_path, config_vars):
+
+    print('')
+    print("Config:\t{}".format(config_path))
+    print("FASTA:\t{}".format(config_vars.get('fasta_path')))
+    print("GFF:\t{}".format(config_vars.get('gff_path')))
+    print("Taxon ID:\t{}".format(config_vars.get('taxon_id')))
+    print("Output:\t{}\n".format(config_vars.get('output_path')))
+
+    if config_vars.get('include_coverage') == 'TRUE':
+        for cov_set, pbc_path in config_vars.get('pbc_paths').items():
+            if config_vars.get('cov_set_exists').get(cov_set) == 'pbc_paths':
+                print("PBC {}:\t{} [exists]".format(cov_set, pbc_path))
+            else:
+                if config_vars.get('cov_set_exists').get(cov_set) == 'bam_paths':
+                    basis = 'BAM'
+                else:
+                    basis = 'read mapping'
+                print("PBC {}:\t{}".format(cov_set, pbc_path))
+                print("  computation based on:\t{} [{}]".format( config_vars.get(config_vars.get('cov_set_exists').get(cov_set)).get(cov_set), basis))
+        print('')
+    else:
+        print("no valid coverage information provided\n")
+
+    if config_vars.get('extract_proteins') == 'FALSE':
+        print("Proteins:\t{} [exists]".format(config_vars.get('proteins_path')))
+    else:
+        print("Proteins:\t{}".format(config_vars.get('proteins_path')))
+    if config_vars.get('assignment_mode') == 'quick':
+        print("Quick assignment mode selected")
+        print("Filtering search performed on level {}".format(config_vars.get('quick_mode_search_rank')))
+        print("Hits accepted on level {}".format(config_vars.get('quick_mode_match_rank')))
+        if config_vars.get('compute_tax_assignment') == 'FALSE':
+            print("Taxonomic hits files [exist]:\n{}{}".format(config_vars.get('tax_assignment_path')[0],config_vars.get('tax_assignment_path')[1]))
+        else:
+            print("Taxonomic hits files:\n{}{}".format(config_vars.get('tax_assignment_path')[0],config_vars.get('tax_assignment_path')[1]))
+
+
+    else:
+        print("Exhaustive assignment mode selected")
+        if config_vars.get('compute_tax_assignment') == 'FALSE':
+            print("Taxonomic hits file:{} [exists]".format(config_vars.get('tax_assignment_path')))
+        else:
+            print("Taxonomic hits file:{}".format(config_vars.get('tax_assignment_path')))
+
+    print("Query taxon excluded:\t{}\n".format(config_vars.get('taxon_exclude')))
+
+    print("Pseudogenes included:\t{}".format(config_vars.get('include_pseudogenes')))
+    if config_vars.get('gff_source') != 'default':
+        print("Rule for GFF parsing:\t{}".format(config_vars.get('gff_source')))
+    print('\n')
+
+    print("PCA variables:\t{}".format(config_vars.get('input_variables')))
+    print("Parallel analysis performed:\t{}".format(config_vars.get('perform_parallel_analysis')))
+    if config_vars.get('coverage_cutoff_mode') != 'default':
+        print("Coverage cutoff:\t{}".format(config_vars.get('coverage_cutoff_mode')))
+
+    for clustering in ['kmeans', 'hclust', 'mclust']:
+        if config_vars.get('perform_'+clustering) == 'TRUE':
+            print("{} clustering performed with number of groups:\t{}".format(clustering, config_vars.get(clustering+'k')))
+    if config_vars.get('perform_dbscan') == 'TRUE':
+        print("DBSCAN clustering performed with settings:\t{}".format(config_vars.get('dbscan_groups')))
+    print('')
+
 
 def main():
 
@@ -176,6 +266,9 @@ def main():
     config_vars = set_config_defaults(config_obj)
 
     write_cfg2file(config_obj, config_vars)
+
+    write_run_overview(config_path, config_vars)
+
 
 
 if __name__ == '__main__':

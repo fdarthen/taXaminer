@@ -147,17 +147,6 @@ rawdata <- read.table(paste0(cfg$output_path,'gene_info/imputed_gene_table.txt')
 # WITHOUT GC AND ONLY WITH PEARSON R NUCLEOTIDE FREQS
 
 myvars <- unlist(strsplit(cfg$input_variables,",")) # variable to be used for PCA specified by user in config file
-if (cfg$include_coverage){
-  cov_vars <- c("c_cov","c_covsd","g_cov","g_covsd","g_covdev_c") # coverage variables
-  header_vars <- colnames(rawdata) # variables in input file
-  my_cov_vars <- grep(paste(cov_vars,collapse="|"),myvars, value=TRUE) # extract which of the coverage variables shall be used (selected by user in config)
-  all_my_cov_vars <- grep(paste(my_cov_vars,collapse="_*[0-9]|"),header_vars, value=TRUE) #extract variables matching my_cov_vars from the header of rawdata -> '_X' appended
-  myvars <- myvars[!myvars %in% my_cov_vars] # remove un-indexed cov variables from the user selection in config
-  myvars <- c(myvars,all_my_cov_vars) # merge in config file selected variables with extracted coverage variables
-}else {
-  cov_vars <- c("c_cov","c_covsd","g_cov","g_covsd","g_covdev_c","g_cov_z_bool")
-  myvars <- myvars[!myvars %in% cov_vars]
-}
 print(myvars)
 # select only the subset of variables
 subsetted_data <- subset(rawdata, select=myvars)
