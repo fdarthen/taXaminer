@@ -1,51 +1,29 @@
 
 ## Input and output options ##
-fasta_path: "path/to/assembly.fasta"
-gff_path: "path/to/assembly.gff"
+# this section is the minimum information that is required and you must state
+fasta_path: "path/to/assembly.fasta" # path to assembly FASTA
+gff_path: "path/to/assembly.gff" # path to GFF
 output_path: "path/to/output_directory/" # directory to save results to
 taxon_id: "<NCBI taxon ID>" # NCBI Taxon ID of query species
+database_path: "path/to/database.dmnd" # path to database for protein alignment
 
 ## Coverage options ##
-include_coverage: "FALSE"
-compute_coverage: "FALSE"
-pbc_paths: ["paths/to/pbc.txt"]
-bam: "path/to/bam"
-reads: ["paths/to/read_files"]
-insert_size: "200" # insert size for paired end reads
+# state one of the following files to include coverage information
+pbc_path: "path/to/pbc.txt" # path to PBC file; omit to use default location in output directory
+bam_path: "path/to/mapping.bam" # path to BAM; file; omit to use default location in output directory
+read_paths: ["paths/to/read_files.fa"] # path to read file(s)
+insert_size: "200" # average insert size for paired end reads
+# to add multiple coverage sets number the parameter names by appending the suffix '_X' (e.g. 'bam_path_1')
 
 ## Taxonomic assignment options ##
-compute_tax_assignment: "TRUE"
-extract_proteins: "TRUE"       # set proteins_path as output path
-proteins_path: "path/to/proteins.fasta"
-tax_assignment_path: "path/to/taxonomic_hits.txt"
-database_path: "path/to/database.dmnd" #
-taxon_exclude: "TRUE"
-assignment_mode: "exhaustive"
-
-## Plot output options ##
-update_plots: "FALSE"
-num_groups_plot: "25"
-merging_labels: ["strain"]
-output_pdf: "TRUE"
-output_png: "FALSE"
-
-## Gene info options ##
-include_pseudogenes: "FALSE"
+taxon_exclude: "TRUE" # exclude query taxon from taxonomic assignment [TRUE/FALSE]
+assignment_mode: "exhaustive" # mode for taxonomic assignment [exhaustive/quick]
 
 ## PCA options ##
+# gene descriptors to be used in the PCA; see Documentation for details on options
 input_variables: "c_name,c_num_of_genes,c_len,c_genelenm,c_genelensd,g_len,g_lendev_c,g_abspos,g_terminal,c_cov,c_covsd,g_cov,g_covsd,g_covdev_c,c_pearson_r,g_pearson_r_o,g_pearson_r_c"
-perform_parallel_analysis: "FALSE"
-num_pcs: "3"
-coverage_cutoff_mode: "default"
 
-## Clustering options ##
-perform_kmeans: "FALSE"
-kmeans_k: "default"
-perform_hclust: "FALSE"
-hclust_k: "default"
-perform_mclust: "FALSE"
-mclust_k: "default"
-perform_dbscan: "FALSE"
-dbscan_groups: "default"
-custom_eps: "0.3"
-custom_minPts: "10"
+## Plot output options ##
+update_plots: "FALSE" # only update the plots (use if you changed settings below) [TRUE/FALSE]
+num_groups_plot: "25" # number of taxa to display in plot (taxa are automatically merged at higher ranks) [X/all]
+merging_labels: ["strain"] # influence the merging of taxa; see Documentation for details on options
