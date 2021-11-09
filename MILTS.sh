@@ -2,6 +2,7 @@
 
 # add path to locally installed tools to PATH
 PATH=$PWD/tools:$PATH
+SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 start=`date +%s`
 
@@ -13,16 +14,15 @@ output_path=$(cat "$user_cofig" | python3 -c "import sys, yaml; print(yaml.safe_
 
 echo "make data and user input validity check start:"
 time0_1=`date +%s`
-python3 prepare_and_check.py "$user_cofig"
+python3 $SCRIPT_DIR/prepare_and_check.py "$user_cofig"
 time0_2=`date +%s`
 echo "make data and user input validity check  end (time elapsed:" $(($time0_2-$time0_1)) "s)"
 
 config_path="${output_path}tmp/tmp.cfg.yml"
-# read variables from config file
 
+# read variables from config file
 source <(grep : $config_path | sed 's/ *: */="/' | sed 's/$/"/g')
 
-#TODO: print run info from python
 
 if [ "${update_plots}" = "FALSE" ]; then
 
@@ -31,7 +31,7 @@ if [ "${update_plots}" = "FALSE" ]; then
     if [[ "${compute_coverage}" = 'TRUE' ]]; then
         echo "compute per pase coverage start:"
         time0_1=`date +%s`
-        python3 prepare_coverage.py "$config_path"
+        python3 $SCRIPT_DIR/prepare_coverage.py "$config_path" "$SCRIPT_DIR"
         time0_2=`date +%s`
         echo "compute per pase coverage end (time elapsed:" $(($time0_2-$time0_1)) "s)"
     fi
@@ -39,7 +39,7 @@ if [ "${update_plots}" = "FALSE" ]; then
     # 2) start python script --> produces descriptive gene statistics
     echo -e "produce gene info start:"
     time1_1=`date +%s`
-    python3 produce_gene_info.py "$config_path"
+    python3 $SCRIPT_DIR/produce_gene_info.py "$config_path"
     time1_2=`date +%s`
     echo "produce gene info end (time elapsed:" $(($time1_2-$time1_1)) "s)"
 
@@ -47,7 +47,7 @@ if [ "${update_plots}" = "FALSE" ]; then
     # 3) start R script for PCA and clustering
     echo "perform PCA and clustering start:"
     time2_1=`date +%s`
-    Rscript perform_PCA_and_clustering.R "$config_path"
+    Rscript $SCRIPT_DIR/perform_PCA_and_clustering.R "$config_path"
     time2_2=`date +%s`
     echo "perform PCA and clustering end (time elapsed:" $(($time2_2-$time2_1)) "s)"
 
@@ -70,14 +70,14 @@ samtools faidx "${proteins_path}" -o "${output_path}tmp/tmp.proteins.fa.fai"
 # 5.a) run DIAMOND and compute taxonomic assignment from LCA and best hit
 echo "compute taxonomic assignment start:"
 time5_1=`date +%s`
-python3 taxonomic_assignment.py "$config_path"
+python3 $SCRIPT_DIR/taxonomic_assignment.py "$config_path"
 time5_2=`date +%s`
 echo "compute taxonomic assignment end (time elapsed:" $(($time5_2-$time5_1)) "s)"
 
 # 5.b) plot genes with PCA coordinates and taxonomic assignment
 echo "plot taxonomic assignment start:"
 time6_1=`date +%s`
-Rscript plotting.R "$config_path"
+Rscript $SCRIPT_DIR/plotting.R "$config_path"
 time6_2=`date +%s`
 echo "plot taxonomic assignment end (time elapsed:" $(($time6_2-$time6_1)) "s)"
 
@@ -85,7 +85,7 @@ echo "plot taxonomic assignment end (time elapsed:" $(($time6_2-$time6_1)) "s)"
 # 5.c) make html self-contained, hoverwindow text selectable and change title
 echo "modify HTML start:"
 time6_1=`date +%s`
-python3 modify_html.py "$config_path"
+python3 $SCRIPT_DIR/modify_html.py "$config_path"
 time6_2=`date +%s`
 echo "modify HTML end (time elapsed:" $(($time6_2-$time6_1)) "s)"
 
