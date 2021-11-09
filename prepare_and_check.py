@@ -58,7 +58,7 @@ def set_variable_default(config_obj, key_name, *default):
     """ check if variable is given in users config file
     else set to default value """
 
-    if key_name in config_obj.keys():
+    if config_obj.get(key_name):
         return config_obj[key_name]
     elif default: # if default value is given this is evaluated to True
         return default[0]
