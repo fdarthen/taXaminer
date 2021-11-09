@@ -1,6 +1,6 @@
 
 ## Input and output options ##
-# this section is the minimum information that is required and you must state
+# this section is the minimum information that is required and must be stated
 fasta_path: "path/to/assembly.fasta" # path to assembly FASTA
 gff_path: "path/to/assembly.gff" # path to GFF
 output_path: "path/to/output_directory/" # directory to save results to
@@ -17,7 +17,7 @@ insert_size: "200" # average insert size for paired end reads
 
 ## Taxonomic assignment options ##
 taxon_exclude: "TRUE" # exclude query taxon from taxonomic assignment [TRUE/FALSE]
-assignment_mode: "exhaustive" # mode for taxonomic assignment [exhaustive/quick]
+assignment_mode: "exhaustive" # mode for taxonomic assignment [exhaustive/quick]; see Documentation for details
 
 ## PCA options ##
 # gene descriptors to be used in the PCA; see Documentation for details on options
@@ -26,4 +26,4 @@ input_variables: "c_name,c_num_of_genes,c_len,c_genelenm,c_genelensd,g_len,g_len
 ## Plot output options ##
 update_plots: "FALSE" # only update the plots (use if you changed settings below) [TRUE/FALSE]
 num_groups_plot: "25" # number of taxa to display in plot (taxa are automatically merged at higher ranks) [X/all]
-merging_labels: ["strain"] # influence the merging of taxa; see Documentation for details on options
+merging_labels: [] # influence the merging of taxa; see Documentation for details on options
