@@ -1,5 +1,8 @@
 #!/bin/bash
 
+source ~/anaconda3/etc/profile.d/conda.sh
+conda activate milts
+
 # add path to locally installed tools to PATH
 PATH=$PWD/tools:$PATH
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -106,3 +109,5 @@ hours=$((runtime / 3600))
 minutes=$(( (runtime % 3600) / 60 ))
 seconds=$(( (runtime % 3600) % 60 ))
 echo "Total runtime: $hours:$minutes:$seconds (hh:mm:ss)"
+
+conda deactivate
