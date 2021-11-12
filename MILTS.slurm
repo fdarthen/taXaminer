@@ -10,6 +10,9 @@
 
 PATH=$PWD/tools:$PATH
 
+CMD=$(scontrol show job $SLURM_JOBID | awk -F= '/Command=/{print $2}')
+SCRIPT_DIR=$(dirname $(realpath $(echo $CMD | cut -d' ' -f1)))
+
 if [[ "$1" == '-s' || "$1" == '--seed' ]]; then
     config_path=$(awk -v arrayID=$SLURM_ARRAY_TASK_ID 'FNR==arrayID{print $0}' $2)
 elif [[ -f "${1}" ]]; then
@@ -21,4 +24,4 @@ fi
 
 echo $SLURM_ARRAY_TASK_ID $config_path
 
-./MILTS.sh "$config_path"
+$SCRIPT_DIR/MILTS.sh "$config_path"
