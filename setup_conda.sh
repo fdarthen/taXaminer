@@ -17,6 +17,7 @@ mamba install biopython scipy pyyaml beautifulsoup4 jsmin taxopy=0.8.0 -y
 
 echo "R & R packages"
 mamba install r-ggplot2 r-factoextra r-htmlwidgets r-mclust r-dbscan r-plotly bioconductor-biostrings r-viridis orca -y
+mamba install -c r r-mass
 mamba install -c plotly plotly-orca -y
 mamba install -c hcc r-paran -y
 
