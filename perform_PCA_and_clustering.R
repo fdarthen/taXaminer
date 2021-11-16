@@ -147,7 +147,7 @@ rawdata <- read.table(paste0(cfg$output_path,'gene_info/imputed_gene_table.txt')
 # WITHOUT GC AND ONLY WITH PEARSON R NUCLEOTIDE FREQS
 
 myvars <- unlist(strsplit(cfg$input_variables,",")) # variable to be used for PCA specified by user in config file
-print(myvars)
+# print(myvars)
 # select only the subset of variables
 subsetted_data <- subset(rawdata, select=myvars)
 
