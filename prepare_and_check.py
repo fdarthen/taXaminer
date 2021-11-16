@@ -5,12 +5,23 @@ import yaml # read config file
 import sys # parse command line arguments
 import os
 
+def check_assembly_ids(config_obj):
+    """ checks wether header in FASTA of assembly match the IDs in the GFF """
+    pass
+    #TODO
+
+    #with open(fasta)
+
 def enumerated_key(config_obj, key_name, pre_keys, *default):
+    # get matches for key_name in user config file
+
     matches = []
     for key in config_obj.keys():
         if key_name in key:
             matches.append(key)
 
+    # check if there is a digit in the matches
+    # to identify the index of the coverage set
     dict = {}
     for match in matches:
         if match.split('_')[2].isdigit():
@@ -20,7 +31,7 @@ def enumerated_key(config_obj, key_name, pre_keys, *default):
     for pre_key in pre_keys:
         # if there are more values required than given, fill them up with default paths
         if not dict.get(pre_key):
-            if '/' in default:
+            if '/' in default[0]:
                 dict[pre_key] = '.'.join(default[0].split('.')[:-1])+'_'+str(pre_key)+'.'+default[0].split('.')[-1]
             else:
                 dict[pre_key] = default[0]
@@ -192,6 +203,7 @@ def write_cfg2file(config_obj, config_vars):
                 out_cfg.write('{}: {}\n'.format(key,value))
 
 def write_run_overview(config_path, config_vars):
+    """ print relevant config parameters to console """
 
     print('')
     print("Config:\t{}".format(config_path))
@@ -266,6 +278,8 @@ def main():
     config_vars = set_config_defaults(config_obj)
 
     write_cfg2file(config_obj, config_vars)
+
+    check_assembly_ids(config_obj)
 
     write_run_overview(config_path, config_vars)
 
