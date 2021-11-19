@@ -9,11 +9,11 @@ database_path: "path/to/database.dmnd" # path to database for protein alignment
 
 ## Coverage options ##
 # state one of the following files to include coverage information
-pbc_path: "path/to/pbc.txt" # path to PBC file; omit to use default location in output directory
-bam_path: "path/to/mapping.bam" # path to BAM; file; omit to use default location in output directory
-read_paths: ["paths/to/read_files.fa"] # path to read file(s)
-insert_size: "200" # average insert size for paired end reads
-# to add multiple coverage sets number the parameter names by appending the suffix '_X' (e.g. 'bam_path_1')
+pbc_path_1: "path/to/pbc.txt" # path to PBC file; omit to use default location in output directory
+bam_path_1: "path/to/mapping.bam" # path to BAM; file; omit to use default location in output directory
+read_paths_1: ["paths/to/read_files.fa"] # path to read file(s)
+insert_size_1: "200" # average insert size for paired end reads
+# to add multiple coverage sets duplicate the parameter you need and increase the number in the suffix
 
 ## Taxonomic assignment options ##
 taxon_exclude: "TRUE" # exclude query taxon from taxonomic assignment [TRUE/FALSE]
