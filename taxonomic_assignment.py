@@ -10,8 +10,9 @@ import os
 import pathlib
 
 
-TAX_DB = taxopy.TaxDb(keep_files=True)
-# TAX_DB = taxopy.TaxDb(nodes_dmp="./nodes.dmp", names_dmp="./names.dmp", keep_files=True)
+# TAX_DB = taxopy.TaxDb(keep_files=True)
+TAX_DB = taxopy.TaxDb(nodes_dmp="./nodes.dmp",
+                        names_dmp="./names.dmp", keep_files=True)
 
 missing_taxids = set()
 
@@ -25,11 +26,16 @@ class Gene:
         self.c_genelenm = line_array[header_index.get('c_genelenm')]
         self.c_genelensd = line_array[header_index.get('c_genelensd')]
 
-        self.c_cov = tuple([line_array[index] for index in header_index.get('c_cov')])
-        self.c_covsd = tuple([line_array[index] for index in header_index.get('c_covsd')])
-        self.c_covdev = tuple([line_array[index] for index in header_index.get('c_covdev')])
-        self.c_genecovm = tuple([line_array[index] for index in header_index.get('c_genecovm')])
-        self.c_genecovsd = tuple([line_array[index] for index in header_index.get('c_genecovsd')])
+        self.c_cov = tuple([line_array[index] for index in
+                            header_index.get('c_cov')])
+        self.c_covsd = tuple([line_array[index] for index in
+                            header_index.get('c_covsd')])
+        self.c_covdev = tuple([line_array[index] for index in
+                            header_index.get('c_covdev')])
+        self.c_genecovm = tuple([line_array[index] for index in
+                            header_index.get('c_genecovm')])
+        self.c_genecovsd = tuple([line_array[index] for index in
+                            header_index.get('c_genecovsd')])
 
         self.c_pearson_r = line_array[header_index.get('c_pearson_r')]
         self.c_pearson_p = line_array[header_index.get('c_pearson_p')]
@@ -43,12 +49,15 @@ class Gene:
         self.g_terminal = line_array[header_index.get('g_terminal')]
         self.g_single = line_array[header_index.get('g_single')]
 
-        self.g_cov = tuple([line_array[index] for index in header_index.get('g_cov')])
-        self.g_covsd = tuple([line_array[index] for index in header_index.get('g_covsd')])
-        self.g_covdev_c = tuple([line_array[index] for index in header_index.get('g_covdev_c')])
-        self.g_covdev_o = tuple([line_array[index] for index in header_index.get('g_covdev_o')])
-        self.g_cov_zscore = tuple([line_array[index] for index in header_index.get('g_cov_zscore')])
-        self.g_cov_z_bool = line_array[header_index.get('g_cov_z_bool')]
+        self.g_cov = tuple([line_array[index] for index in
+                            header_index.get('g_cov')])
+        self.g_covsd = tuple([line_array[index] for index in
+                            header_index.get('g_covsd')])
+        self.g_covdev_c = tuple([line_array[index] for index in
+                            header_index.get('g_covdev_c')])
+        self.g_covdev_o = tuple([line_array[index] for index in
+                            header_index.get('g_covdev_o')])
+                            header_index.get('g_cov_zscore')])
 
         self.g_pearson_r_o = line_array[header_index.get('g_pearson_r_o')]
         self.g_pearson_p_o = line_array[header_index.get('g_pearson_p_o')]
@@ -58,12 +67,12 @@ class Gene:
         self.g_gcdev_c = line_array[header_index.get('g_gcdev_c')]
         self.g_gcdev_o = line_array[header_index.get('g_gcdev_o')]
 
-        self.coords = tuple([line_array[index] for index in header_index.get('Dim.')])
+        self.coords = tuple([line_array[i] for i in header_index.get('Dim.')])
 
         self.protID = None # ID of transcript with longest CDS
         self.lencds = 0 # lenght of self.protID
 
-        self.tax_assignments = []
+        self.tax_assignments = [] # all taxonomic hits for the gene
         self.best_hit = None
         self.best_hitID = None
         self.bh_evalue = None
@@ -77,28 +86,34 @@ class Gene:
         self.plot_label = None
         self.plot_labelID = None
 
-
-
-# ██   ██ ███████ ██      ██████  ███████ ██████      ███████ ██    ██ ███    ██  ██████ ████████ ██  ██████  ███    ██ ███████
-# ██   ██ ██      ██      ██   ██ ██      ██   ██     ██      ██    ██ ████   ██ ██         ██    ██ ██    ██ ████   ██ ██
-# ███████ █████   ██      ██████  █████   ██████      █████   ██    ██ ██ ██  ██ ██         ██    ██ ██    ██ ██ ██  ██ ███████
-# ██   ██ ██      ██      ██      ██      ██   ██     ██      ██    ██ ██  ██ ██ ██         ██    ██ ██    ██ ██  ██ ██      ██
-# ██   ██ ███████ ███████ ██      ███████ ██   ██     ██       ██████  ██   ████  ██████    ██    ██  ██████  ██   ████ ███████
+###############################################################################
+############################ HELPER FUNCTIONS #################################
+###############################################################################
 
 def remove_prefix(text, prefix):
+    """Removes given prefix from text -> return text w/o prefix."""
     if text.startswith(prefix):
         return text[len(prefix):]
     return text
 
 def strip_ID(id):
-    """ remove GFFs prefixes from IDs """
-    for prefix in ['gene:','gene-','transcript:','transcript-','rna:','rna-','cds:','cds-']:
+    """Removes GFFs prefixes from ID -> return striped ID."""
+    for prefix in ['gene:','gene-','transcript:','transcript-',
+                    'rna:','rna-','cds:','cds-']:
         id = remove_prefix(id,prefix)
     return id
 
 
 def get_id_for_rank_of_species(queryID, rank):
-    """ for a query taxon and a rank; get the ID of the taxon at the given rank for given taxon """
+    """Returns ID of taxon at the given rank for given taxon ID.
+
+    Args:
+      queryID (int): NCBI ID of taxon for wich to find ID at given rank
+      rank (str): rank of which to get the NCBI ID of given taxon with queryID
+
+    Returns:
+      int: NCBI ID of taxon at the given rank for given taxon ID
+    """
     query_taxon = taxopy.Taxon(queryID, TAX_DB)
     query_ranks = query_taxon.rank_name_dictionary
     rank_of_interest = query_ranks.get(rank)
@@ -111,12 +126,12 @@ def get_id_for_rank_of_species(queryID, rank):
         return None
 
 def get_children_ids(parent):
-    # get children for parent
+    """return list of taxon IDs which are children of given parent taxon"""
     # taxid2parent: dict with key = child, value = parent
     return [key for key in TAX_DB.taxid2parent.keys() if TAX_DB.taxid2parent[key] == parent]
 
 def get_gff_attribute(attr_list, attr):
-    """ stable version of: strip_ID(spline[8].split('ID=')[1].split(';')[0]) """
+    """return value for GFF attribute of given list of attributes"""
     tmp = attr_list.split(attr+'=')[1]
     if len(tmp.split(';')) > 1:
         value = strip_ID(tmp.split(';')[0])
@@ -125,11 +140,9 @@ def get_gff_attribute(attr_list, attr):
     return value
 
 
-# ██████  ██       ██████  ████████     ██       █████  ██████  ███████ ██      ███████
-# ██   ██ ██      ██    ██    ██        ██      ██   ██ ██   ██ ██      ██      ██
-# ██████  ██      ██    ██    ██        ██      ███████ ██████  █████   ██      ███████
-# ██      ██      ██    ██    ██        ██      ██   ██ ██   ██ ██      ██           ██
-# ██      ███████  ██████     ██        ███████ ██   ██ ██████  ███████ ███████ ███████
+###############################################################################
+######################### PLOT LABEL COMPUTATION ##############################
+###############################################################################
 
 
 def init_label_taxa_dict(genes):
@@ -163,7 +176,11 @@ def get_children_for_label(taxa, labelID):
     return children
 
 def merge_assignments_at_rank(genes, rank):
-    """  """
+    """Merge taxonomic assignments at given rank.
+    Args:
+      genes (dict): dictionary of genes {g_name: gene object}
+      rank (str): rank at which to merge all taxonomic assignments at
+    """
     for g_name, gene in genes.items():
         if gene.taxon_assignmentID == 'NA':
             gene.plot_label = 'Unassigned'
@@ -180,6 +197,13 @@ def merge_assignments_at_rank(genes, rank):
             gene.plot_labelID = gene.taxon_assignmentID
 
 def merge_assignments_at_id(genes, ids):
+    """Merge taxonomic assignments at given NCBI taxon IDs.
+
+    Args:
+      genes (dict): dictionary of genes {g_name: gene object}
+      ids (int,list): list of taxon IDs at which to merge taxonomic assignments
+    """
+
     if type(ids) != list:
         ids = [ids]
 
@@ -252,6 +276,15 @@ def iterative_merging_top(genes, num_groups_plot):
 
 
 def filter_labeled_genes(genes):
+    """Filter genes which already have a label and return number of labels.
+
+    Args:
+      genes (dict): dictionary of genes {g_name: gene object}
+
+    Returns:
+      dict: dictionary of genes without label {g_name: gene object}
+      int: number of distinct labels in the set of labeled genes
+    """
     unlabeled_genes = {}
     labels = set()
 
@@ -267,6 +300,19 @@ def filter_labeled_genes(genes):
 
 
 def merge_labels(genes, queryID, merging_labels):
+    """Merge plot labels based on user input.
+
+    Args:
+      genes (dict): dictionary of genes {g_name: gene object}
+      queryID (int): NCBI taxon ID for query species
+      merging_labels (list/int): user input for merging labels
+        1. taxonomic rank with suffix '-all'
+            -> merge all taxonomic assignment at that rank
+        2. taxonomic rank
+            -> merge query lineage at that rank
+        3. list of NCBI taxon IDs
+            -> merge at each of the taxa provided
+    """
 
     merger_ids = []
     all_merger_rank = None
@@ -304,6 +350,7 @@ def merge_labels(genes, queryID, merging_labels):
 
 
 def set_unassigned_labels(genes):
+    """Set missing plot labels to taxonomic assignment or 'Unassigned'."""
     for g_name, gene in genes.items():
         if not gene.plot_label:
             if gene.taxon_assignmentID == 'NA':
@@ -315,7 +362,7 @@ def set_unassigned_labels(genes):
 
 
 def ident_query_label(genes, queryID):
-    """ identify which label represent the query species """
+    """Identify which label represents the query species."""
 
     query_taxon = taxopy.Taxon(queryID, TAX_DB)
     query_lineage = query_taxon.taxid_lineage
@@ -327,19 +374,82 @@ def ident_query_label(genes, queryID):
             if query_lineage.index(gene.plot_labelID) < label_candidate[1]:
                 label_candidate = (gene.plot_label, query_lineage.index(gene.plot_labelID))
 
-
     return label_candidate[0]
 
 
-# ████████  █████  ██   ██  ██████  ███    ██  ██████  ███    ███ ██  ██████      █████  ███████ ███████ ██  ██████  ███    ██ ███    ███ ███████ ███    ██ ████████
-#    ██    ██   ██  ██ ██  ██    ██ ████   ██ ██    ██ ████  ████ ██ ██          ██   ██ ██      ██      ██ ██       ████   ██ ████  ████ ██      ████   ██    ██
-#    ██    ███████   ███   ██    ██ ██ ██  ██ ██    ██ ██ ████ ██ ██ ██          ███████ ███████ ███████ ██ ██   ███ ██ ██  ██ ██ ████ ██ █████   ██ ██  ██    ██
-#    ██    ██   ██  ██ ██  ██    ██ ██  ██ ██ ██    ██ ██  ██  ██ ██ ██          ██   ██      ██      ██ ██ ██    ██ ██  ██ ██ ██  ██  ██ ██      ██  ██ ██    ██
-#    ██    ██   ██ ██   ██  ██████  ██   ████  ██████  ██      ██ ██  ██████     ██   ██ ███████ ███████ ██  ██████  ██   ████ ██      ██ ███████ ██   ████    ██
+###############################################################################
+########################## TAXONOMIC ASSIGNMENT ###############################
+###############################################################################
+
+def get_subset_id(queryID, subset_marker):
+    """Return input if input.isdigit() or return ID for rank of query."""
+    if type(subset_marker) == int:
+        return subset_marker
+    elif subset_marker.isdigit()
+        return int(subset_marker)
+    else:
+        return get_id_for_rank_of_species(queryID, subset_marker)
+
+
+def perform_quick_search_1(perform_diamond, diamond_cmd, tax_assignment_path_1,
+                            quick_mode_search_rank, taxon_exclude, queryID):
+    """Perform first DIAMOND run for quick assignment mode."""
+    print("Quick mode for taxonomic assignment selected")
+
+    if perform_diamond:
+        # quick_mode_search_rank can be either taxon ID or rank
+        quick_mode_search_id = get_subset_id(queryID, quick_mode_search_rank)
+
+        if taxon_exclude:
+            q1_exclude = taxon_exclude.rstrip('"') + ',' + ','.join(diamond_inclusion_by_exclusion(quick_mode_search_id))
+        else:
+            q1_exclude = ' --taxon-exclude "{}"'.format(','.join(diamond_inclusion_by_exclusion(quick_mode_search_id)))
+        diamond_cmd_1 = diamond_cmd + ' -o "{}" {}'.format(tax_assignment_path_1, q1_exclude)
+        ###taxonlist###  diamond_cmd_1 = diamond_cmd + diamond_o1 + ' --taxonlist "' + str(quick_mode_search_id) + '" --taxon-exclude "' + str(queryID) + '"'
+
+        print("Diamond command for quick search round 1: ")
+        print(diamond_cmd_1)
+        try:
+            dmdnOut = subprocess.run([diamond_cmd_1], shell=True, capture_output=True, check=True)
+        except:
+            sys.exit('Error running\n%s' % diamond_cmd_1)
+
+def perform_quick_search_2(perform_diamond, diamond_cmd, tax_assignment_path_2,
+                        quick_mode_match_rank, genes, tmp_prot_path,
+                        taxon_exclude, queryID):
+    """Perform second DIAMOND run for quick assignment mode."""
+    print("Quick mode for taxonomic assignment selected")
+
+    if perform_diamond:
+        quick_mode_match_id = get_subset_id(queryID, quick_mode_match_rank)
+
+        filter_prots_quick_hits(genes, quick_mode_match_id, tmp_prot_path, tmp_prot_path)
+
+        diamond_cmd_2 = diamond_cmd + ' -o "{}" '.format(tax_assignment_path_2) + taxon_exclude
+        print("Diamond command for quick search round 2: ")
+        print(diamond_cmd_2)
+        try:
+            dmdnOut = subprocess.run([diamond_cmd_2], shell=True, capture_output=True, check=True)
+        except:
+            sys.exit('Error running\n%s' % diamond_cmd_2)
+
+
+def perform_exhaustive_search(perform_diamond, diamond_cmd,
+                                tax_assignment_path, taxon_exclude):
+    """Perform  DIAMOND run for exhaustive assignment mode."""
+    print("Exhaustive mode for taxonomic assignment selected")
+    if perform_diamond:
+        diamond_cmd = diamond_cmd + ' -o "{}" '.format(tax_assignment_path) + taxon_exclude
+        print("Diamond command for exhaustive search: ")
+        print(diamond_cmd)
+        try:
+            dmdnOut = subprocess.run([diamond_cmd], shell=True, capture_output=True, check=True)
+        except:
+            sys.exit('Error running\n%s' % diamond_cmd)
 
 
 def assess_best_of_multi_hits(taxIDs, queryID):
-    """ for a list of taxa IDs, get the one where LCA with queryID is closest to query """
+    """for a list of taxa IDs, get the one where LCA with queryID is closest to query"""
 
     query_taxon = taxopy.Taxon(queryID, TAX_DB)
     query_lineage = query_taxon.taxid_lineage
@@ -359,9 +469,11 @@ def assess_best_of_multi_hits(taxIDs, queryID):
     return bestID[0]
 
 def set_taxon_assignment(genes):
-    # assess taxonomic assignment for each gene:
-    # if there is a corrected_lca; taxonomic assignment = corrected_lca
-    # else; taxonomic assignment = lca
+    """Assess taxonomic assignment for each gene.
+
+    If there is a corrected_lca; taxonomic assignment = corrected_lca
+    else; taxonomic assignment = lca
+    """
     for g_name, gene in genes.items():
         if gene.corrected_lca != 'NA':
             gene.taxon_assignment = gene.corrected_lca
@@ -372,7 +484,7 @@ def set_taxon_assignment(genes):
 
 
 def calc_corrected_lca(genes, queryID):
-
+    """Calculate the corrected LCA for each gene based on best hit and query."""
     query_taxon = taxopy.Taxon(queryID, TAX_DB)
     query_lineage = query_taxon.taxid_lineage
 
@@ -393,6 +505,7 @@ def calc_corrected_lca(genes, queryID):
 
 
 def calc_lca(genes):
+    """Calculate the LCA for each gene based on taxonomic hits."""
 
     for g_name, gene in genes.items():
         lca_query = []
@@ -418,6 +531,7 @@ def calc_lca(genes):
 
 
 def read_tax_assignments(tax_assignment_path, prots, queryID):
+    """Read DIAMOND output file and assign hits to genes."""
 
     with open(tax_assignment_path, 'r') as tax_assignment:
         # cols: qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore taxid taxname
@@ -460,12 +574,14 @@ def read_tax_assignments(tax_assignment_path, prots, queryID):
                     gene.tax_assignments.append(spline[1:])
 
 def taxonomic_assignment(tax_assignment_path, genes, prots, queryID):
+    """Run functions to save taxonomic assignment to gene objects"""
     read_tax_assignments(tax_assignment_path, prots, queryID)
     calc_lca(genes)
     calc_corrected_lca(genes, queryID)
     set_taxon_assignment(genes)
 
 def reset_tax_assignment(gene):
+    """Delete all taxonomc assignment info for given gene"""
     gene.tax_assignments = []
     gene.best_hit = None
     gene.best_hitID = None
@@ -478,15 +594,13 @@ def reset_tax_assignment(gene):
 
 
 
-# ██████   █████  ████████  █████      ██████  ██████  ███████ ██████   █████  ██████   █████  ████████ ██  ██████  ███    ██
-# ██   ██ ██   ██    ██    ██   ██     ██   ██ ██   ██ ██      ██   ██ ██   ██ ██   ██ ██   ██    ██    ██ ██    ██ ████   ██
-# ██   ██ ███████    ██    ███████     ██████  ██████  █████   ██████  ███████ ██████  ███████    ██    ██ ██    ██ ██ ██  ██
-# ██   ██ ██   ██    ██    ██   ██     ██      ██   ██ ██      ██      ██   ██ ██   ██ ██   ██    ██    ██ ██    ██ ██  ██ ██
-# ██████  ██   ██    ██    ██   ██     ██      ██   ██ ███████ ██      ██   ██ ██   ██ ██   ██    ██    ██  ██████  ██   ████
+###############################################################################
+############################# DATA PREPARATION ################################
+###############################################################################
 
 
 def get_child_parent(attrs, child_parent_dict):
-    """ use GFF attributes and retrieve child-parent pairs, given certain attributes """
+    """Use GFF attributes and retrieve child-parent pairs, given certain attributes."""
     child_attr = child_parent_dict.get('child')
     parent_attr = child_parent_dict.get('parent')
     if child_attr+"=" in attrs and parent_attr+"=" in attrs:
@@ -498,6 +612,10 @@ def get_child_parent(attrs, child_parent_dict):
 
 
 def prot_gene_matching(output_path, gff_path, genes, gff_rule):
+    """Match headers in protein FASTA to gene ID.
+
+    Parses the GFF using the given gff parsing rule
+    """
 
     prots = {}
 
@@ -616,6 +734,7 @@ def prot_gene_matching(output_path, gff_path, genes, gff_rule):
 
 
 def parse_header(header):
+    """Returns dictionary mapping column names to index in the header of gene_table_coords."""
 
     indexing = {}
     for index, item in enumerate(header.split(',')):
@@ -630,6 +749,7 @@ def parse_header(header):
 
 
 def read_genes_coords(output_path):
+    """Read gene_table_coords.csv and save information to Gene objects."""
 
     input_path = output_path + 'PCA_and_clustering/gene_table_coords.csv'
 
@@ -648,23 +768,21 @@ def read_genes_coords(output_path):
     return genes, header
 
 
+###############################################################################
+########################### PROTEIN FASTA FILE ################################
+###############################################################################
 
-# ██████  ██████   ██████  ████████ ███████ ██ ███    ██     ███████  █████  ███████ ████████  █████
-# ██   ██ ██   ██ ██    ██    ██    ██      ██ ████   ██     ██      ██   ██ ██         ██    ██   ██
-# ██████  ██████  ██    ██    ██    █████   ██ ██ ██  ██     █████   ███████ ███████    ██    ███████
-# ██      ██   ██ ██    ██    ██    ██      ██ ██  ██ ██     ██      ██   ██      ██    ██    ██   ██
-# ██      ██   ██  ██████     ██    ███████ ██ ██   ████     ██      ██   ██ ███████    ██    ██   ██
 
 def subset_protein_fasta(proteins_path, prot_list, path_out, mode):
-    # use the list of IDs to write to the tmp prot fasta only those
-    # proteins whose ID appears in (not) the list
+    """use the list of IDs to write to the tmp prot fasta only those
+    proteins whose ID appears (not) in the list
+    """
 
     # mode: include or exclude list
     if mode == 'include':
         mode = True
     else:
         mode = False
-
 
     with open(proteins_path, 'r') as file_prot:
         lines = file_prot.readlines()
@@ -698,6 +816,9 @@ def subset_prots_longest_cds(genes,proteins_path, path_out):
 
 
 def filter_prots_quick_hits(genes, quick_mode_match_id, prot_path_in, prot_path_out):
+    """write proteins to tmp protein FASTA which were not assigned in first
+    quick search with DIAMOND
+    """
 
     no_match = []
 
@@ -720,11 +841,9 @@ def filter_prots_quick_hits(genes, quick_mode_match_id, prot_path_in, prot_path_
     subset_protein_fasta(prot_path_in, no_match, prot_path_out, "include")
 
 
-# ███    ███ ██ ███████  ██████
-# ████  ████ ██ ██      ██
-# ██ ████ ██ ██ ███████ ██
-# ██  ██  ██ ██      ██ ██
-# ██      ██ ██ ███████  ██████
+###############################################################################
+################################### MISC ######################################
+###############################################################################
 
 
 def diamond_inclusion_by_exclusion(include_id):
@@ -744,6 +863,7 @@ def diamond_inclusion_by_exclusion(include_id):
 
 
 def write_output(output_path, genes, header):
+    """Write information in gene objects to gene_table_taxon_assignment.csv."""
 
     out_path = output_path + 'taxonomic_assignment/gene_table_taxon_assignment.csv'
 
@@ -787,7 +907,6 @@ def parse_gff_source_rule(gff_source):
             'gene_connection': 'parent/child',
             'parent_child_types': 'mRNA',
             'parent_child_attr': {'parent': 'Parent', 'child': 'ID'}}
-
     elif gff_source == "augustus_masked":
         rule_dict = {'source': 'augustus_masked',
             'gene_tag': 'match',
@@ -824,14 +943,18 @@ def parse_gff_source_rule(gff_source):
 
     return rule_dict
 
+def write_tmp_query_info(output_path, genes, queryID):
+    """Write temporary file which has information about query taxon."""
+    query_label = ident_query_label(genes, queryID)
+    query_name = TAX_DB.taxid2name[queryID]
+    with open(output_path+'tmp/tmp.query_label', 'w') as tmp_file:
+        tmp_file.write(query_label+'\n')
+        tmp_file.write(query_name+'\n')
 
 
-# ███    ███  █████  ██ ███    ██
-# ████  ████ ██   ██ ██ ████   ██
-# ██ ████ ██ ███████ ██ ██ ██  ██
-# ██  ██  ██ ██   ██ ██ ██  ██ ██
-# ██      ██ ██   ██ ██ ██   ████
 
+###############################################################################
+###############################################################################
 
 def main():
 
@@ -840,12 +963,13 @@ def main():
     # read parameters from config file
     config_obj=yaml.safe_load(open(config_path,'r'))
     output_path=config_obj.get('output_path') # complete output path (ENDING ON A SLASH!)
-    nr_db_path=config_obj.get('database_path')
+    nr_db_path=config_obj.get('database_path') # path to database
     proteins_path=config_obj.get('proteins_path', None) # path to FASTA w/ protein seqs
     gff_path=config_obj.get('gff_path') # path to GFF
     taxon_exclude = config_obj.get('taxon_exclude') # bool to exclude query taxon from sequence alignment
-    compute_tax_assignment = config_obj.get('compute_tax_assignment')
-    only_plotting = config_obj.get('update_plots')
+    compute_tax_assignment = config_obj.get('compute_tax_assignment') # whether taxonomic assigned should be computed
+    only_plotting = config_obj.get('update_plots') # whether only the plots should be update
+    # -> recompute the taxonomic assignment based on exisiting alignment hits as settings might be changed
     assignment_mode = config_obj.get('assignment_mode')
     quick_mode_search_rank = config_obj.get('quick_mode_search_rank', None)
     quick_mode_match_rank = config_obj.get('quick_mode_match_rank', None)
@@ -884,61 +1008,26 @@ def main():
 
     prots = prot_gene_matching(output_path, gff_path, genes, gff_rule)
 
-    if compute_tax_assignment and not only_plotting:
+    perform_diamond = compute_tax_assignment and not only_plotting
+
+    if perform_diamond:
         subset_prots_longest_cds(genes, proteins_path, tmp_prot_path)
 
     if assignment_mode == 'quick':
-        print("Quick mode for taxonomic assignment selected")
-
-        if compute_tax_assignment and not only_plotting:
-            if quick_mode_search_rank.isdigit() or type(quick_mode_search_rank) == int:
-                quick_mode_search_id = int(quick_mode_search_rank)
-            else:
-                quick_mode_search_id = get_id_for_rank_of_species(queryID, quick_mode_search_rank)
-            if taxon_exclude:
-                q1_exclude = taxon_exclude.rstrip('"') + ',' + ','.join(diamond_inclusion_by_exclusion(quick_mode_search_id))
-            else:
-                q1_exclude = ' --taxon-exclude "{}"'.format(','.join(diamond_inclusion_by_exclusion(quick_mode_search_id)))
-            diamond_cmd_1 = diamond_cmd + ' -o "{}" {}'.format(tax_assignment_path_1, q1_exclude)
-            ###taxonlist###  diamond_cmd_1 = diamond_cmd + diamond_o1 + ' --taxonlist "' + str(quick_mode_search_id) + '" --taxon-exclude "' + str(queryID) + '"'
-
-            print("Diamond command for quick search round 1: ")
-            print(diamond_cmd_1)
-            os.system(diamond_cmd_1)
-
+        perform_quick_search_1(perform_diamond, diamond_cmd,
+                                tax_assignment_path_1, quick_mode_search_rank,
+                                taxon_exclude, queryID)
         taxonomic_assignment(tax_assignment_path_1, genes, prots, queryID)
-
-        # write_output(output_path, genes, header)
-
-        if compute_tax_assignment and not only_plotting:
-            if quick_mode_match_rank.isdigit() or type(quick_mode_match_rank) == int:
-                quick_mode_match_id = int(quick_mode_match_rank)
-            else:
-                quick_mode_match_id = get_id_for_rank_of_species(queryID, quick_mode_match_rank)
-            filter_prots_quick_hits(genes, quick_mode_match_id, tmp_prot_path, tmp_prot_path)
-
-            diamond_cmd_2 = diamond_cmd + ' -o "{}" '.format(tax_assignment_path_1) + taxon_exclude
-            print("Diamond command for quick search round 2: ")
-            print(diamond_cmd_2)
-            os.system(diamond_cmd_2)
-
-        taxonomic_assignment(tax_assignment_path_1, genes, prots, queryID)
-
-
+        perform_quick_search_2(perform_diamond, diamond_cmd,
+                                tax_assignment_path_2, quick_mode_match_rank,
+                                genes, tmp_prot_path, taxon_exclude, queryID)
+        taxonomic_assignment(tax_assignment_path_2, genes, prots, queryID)
     elif assignment_mode == 'exhaustive':
-        print("Exhaustive mode for taxonomic assignment selected")
-        if compute_tax_assignment and not only_plotting:
-            diamond_cmd = diamond_cmd + ' -o "{}" '.format(tax_assignment_path) + taxon_exclude
-            print("Diamond command for exhaustive search: ")
-            print(diamond_cmd)
-            os.system(diamond_cmd)
-
+        perform_exhaustive_search(perform_diamond, diamond_cmd,
+                                    tax_assignment_path, taxon_exclude)
         taxonomic_assignment(tax_assignment_path, genes, prots, queryID)
-
-
     else:
         print('Assignment mode not one of quick or exhaustive')
-
 
     merge_labels(genes, queryID, merging_labels)
     if num_groups_plot:
@@ -947,11 +1036,7 @@ def main():
     else:
         set_unassigned_labels(genes)
 
-    query_label = ident_query_label(genes, queryID)
-    query_name = TAX_DB.taxid2name[queryID]
-    with open(output_path+'tmp/tmp.query_label', 'w') as tmp_file:
-        tmp_file.write(query_label+'\n')
-        tmp_file.write(query_name+'\n')
+    write_tmp_query_info(output_path, genes, queryID)
 
     if missing_taxids:
         print("The following Taxon ID(s) could not be found in the NCBI: ")
