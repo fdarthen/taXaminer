@@ -9,7 +9,6 @@ def check_assembly_ids(config_obj):
     """ checks wether header in FASTA of assembly match the IDs in the GFF """
     pass
     #TODO
-
     #with open(fasta)
 
 def enumerated_key(config_obj, key_name, pre_keys, *default):
@@ -271,11 +270,14 @@ def write_run_overview(config_path, config_vars):
 def main():
 
     config_path = sys.argv[1]
+    script_dir = sys.argv[2]
+
 
     # read parameters from config file
     config_obj = yaml.safe_load(open(config_path,'r'))
 
     config_vars = set_config_defaults(config_obj)
+    config_vars["script_dir"] = script_dir
 
     write_cfg2file(config_obj, config_vars)
 

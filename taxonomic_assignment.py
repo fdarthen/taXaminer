@@ -10,9 +10,11 @@ import os
 import pathlib
 
 
-# TAX_DB = taxopy.TaxDb(keep_files=True)
-TAX_DB = taxopy.TaxDb(nodes_dmp="./nodes.dmp",
-                        names_dmp="./names.dmp", keep_files=True)
+script_dir = sys.argv[2]
+
+TAX_DB = taxopy.TaxDb(nodes_dmp=script_dir+"/nodes.dmp",
+                        names_dmp=script_dir+"/names.dmp", keep_files=True)
+
 
 missing_taxids = set()
 
@@ -57,7 +59,6 @@ class Gene:
                             header_index.get('g_covdev_c')])
         self.g_covdev_o = tuple([line_array[index] for index in
                             header_index.get('g_covdev_o')])
-                            header_index.get('g_cov_zscore')])
 
         self.g_pearson_r_o = line_array[header_index.get('g_pearson_r_o')]
         self.g_pearson_p_o = line_array[header_index.get('g_pearson_p_o')]
@@ -385,7 +386,7 @@ def get_subset_id(queryID, subset_marker):
     """Return input if input.isdigit() or return ID for rank of query."""
     if type(subset_marker) == int:
         return subset_marker
-    elif subset_marker.isdigit()
+    elif subset_marker.isdigit():
         return int(subset_marker)
     else:
         return get_id_for_rank_of_species(queryID, subset_marker)

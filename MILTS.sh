@@ -17,7 +17,7 @@ output_path=$(cat "$user_cofig" | python3 -c "import sys, yaml; print(yaml.safe_
 
 echo "make data and user input validity check start:"
 time0_1=`date +%s`
-python3 $SCRIPT_DIR/prepare_and_check.py "$user_cofig"
+python3 $SCRIPT_DIR/prepare_and_check.py "${user_cofig}" "${SCRIPT_DIR}"
 time0_2=`date +%s`
 echo "make data and user input validity check  end (time elapsed:" $(($time0_2-$time0_1)) "s)"
 
@@ -73,7 +73,7 @@ samtools faidx "${proteins_path}" -o "${output_path}tmp/tmp.proteins.fa.fai"
 # 5.a) run DIAMOND and compute taxonomic assignment from LCA and best hit
 echo "compute taxonomic assignment start:"
 time5_1=`date +%s`
-python3 $SCRIPT_DIR/taxonomic_assignment.py "$config_path"
+python3 $SCRIPT_DIR/taxonomic_assignment.py "$config_path" "${SCRIPT_DIR}"
 time5_2=`date +%s`
 echo "compute taxonomic assignment end (time elapsed:" $(($time5_2-$time5_1)) "s)"
 
