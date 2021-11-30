@@ -668,6 +668,7 @@ def prot_gene_matching(output_path, gff_path, genes, gff_rule):
             elif "#FASTA" in line: # if FASTA block has been reached
                 break
 
+
     prot_index_path = output_path + 'tmp/tmp.proteins.fa.fai'
 
     unmatched = [] #list of proteins where gene could not be matched
@@ -676,6 +677,7 @@ def prot_gene_matching(output_path, gff_path, genes, gff_rule):
         for line in prot_index:
             id, length = line.split()[0], ((int(line.split()[1])*3)+3)
             parent = child_parent_dict.get(strip_ID(id))
+
             if parent: # id in proteins fasta index matches the IDs in the GFF
                 while parent in child_parent_dict.keys():
                     if parent == child_parent_dict.get(parent):
@@ -691,9 +693,9 @@ def prot_gene_matching(output_path, gff_path, genes, gff_rule):
                         parent = child_parent_dict.get(parent)
             elif strip_ID(id) in genes.keys():
                 # fasta header is gene ID
-                parent = id
+                parent = strip_ID(id)
             elif strip_ID(id).split('|')[0] in genes.keys():
-                parent = id
+                parent = strip_ID(id)
             else: # if not, look if any child ID is contained in the id
                 for child in child_parent_dict.keys():
                     if child in id:
