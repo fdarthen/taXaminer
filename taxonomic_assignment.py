@@ -8,6 +8,7 @@ import numpy as np
 import csv
 import os
 import pathlib
+import subprocess
 
 
 script_dir = sys.argv[2]
@@ -364,6 +365,7 @@ def set_unassigned_labels(genes):
 
 def ident_query_label(genes, queryID):
     """Identify which label represents the query species."""
+
 
     query_taxon = taxopy.Taxon(queryID, TAX_DB)
     query_lineage = query_taxon.taxid_lineage
