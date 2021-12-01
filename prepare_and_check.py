@@ -5,11 +5,33 @@ import yaml # read config file
 import sys # parse command line arguments
 import os
 
+from classes import Config
+
 def check_assembly_ids(config_obj):
     """ checks wether header in FASTA of assembly match the IDs in the GFF """
-    pass
-    #TODO
-    #with open(fasta)
+
+    fasta_ids = set()
+    gff_ids = set()
+
+    with open(config_obj.output_path+'tmp/tmp.MILTS.fasta.fai', 'r') as gfai:
+        for line in gfai:
+            fasta_ids.add(line.split()[0])
+
+    with open(config_obj.gff_path, 'r') as gff:
+        for line in gff:
+            if not line.startswith('#'):
+                gff_ids.add(line.split()[0])
+
+    missing = set()
+    for f_id in fasta_ids:
+        if not f_id in gff_ids:
+            missing.add(f_id)
+
+    # geneless scaffolds may not be annotated in GFF
+    # thus check if sets of IDs in FASTA and missing are unequal
+    if len(fasta_ids) == len(missing):
+        sys.exit('Error: FASTA headers and scaffold IDs in GFF do not match')
+
 
 def enumerated_key(config_obj, key_name, pre_keys, *default):
     # get matches for key_name in user config file
@@ -196,10 +218,9 @@ def set_config_defaults(config_obj):
 def write_cfg2file(config_obj, config_vars):
 
     with open(config_obj.get('output_path')+'tmp/tmp.cfg.yml', 'w') as out_cfg:
-
-
         for key, value in config_vars.items():
                 out_cfg.write('{}: {}\n'.format(key,value))
+
 
 def write_run_overview(config_path, config_vars):
     """ print relevant config parameters to console """
@@ -267,24 +288,46 @@ def write_run_overview(config_path, config_vars):
     print('')
 
 
-def main():
-
-    config_path = sys.argv[1]
-    script_dir = sys.argv[2]
-
-
+def process_config(config_path, script_dir):
     # read parameters from config file
     config_obj = yaml.safe_load(open(config_path,'r'))
 
     config_vars = set_config_defaults(config_obj)
     config_vars["script_dir"] = script_dir
+    config_vars["usr_cfg_path"] = config_path
+    config_vars["cfg_path"] = config_obj.get('output_path')+'tmp/tmp.cfg.yml'
 
+
+    # write config to file and to console
     write_cfg2file(config_obj, config_vars)
-
-    check_assembly_ids(config_obj)
-
     write_run_overview(config_path, config_vars)
 
+
+def make_checks(config_obj):
+    """data validity checks"""
+    check_assembly_ids(config_obj)
+
+
+def cfg2obj(config_path):
+    """ make class object of config parameters from config file"""
+
+    config_obj = yaml.safe_load(open(config_path,'r'))
+    cfg = Config(config_obj)
+
+    return cfg
+
+
+def main():
+
+    config_path = sys.argv[1]
+    script_dir = sys.argv[2]
+
+    # read config file and set defaults
+    # print to file and summary to console
+    process_config(config_path, script_dir)
+
+    # check input data
+    make_checks()
 
 
 if __name__ == '__main__':

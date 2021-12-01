@@ -8,15 +8,8 @@ import numpy as np
 import csv
 import os
 import pathlib
+import subprocess
 
-
-script_dir = sys.argv[2]
-
-TAX_DB = taxopy.TaxDb(nodes_dmp=script_dir+"/nodes.dmp",
-                        names_dmp=script_dir+"/names.dmp", keep_files=True)
-
-
-missing_taxids = set()
 
 class Gene:
     def __init__(self, line_array, header_index):
@@ -413,7 +406,7 @@ def perform_quick_search_1(perform_diamond, diamond_cmd, tax_assignment_path_1,
         try:
             dmdnOut = subprocess.run([diamond_cmd_1], shell=True, capture_output=True, check=True)
         except:
-            sys.exit('Error running\n%s' % diamond_cmd_1)
+            sys.exit('Error running\n{}'.format(diamond_cmd_1))
 
 def perform_quick_search_2(perform_diamond, diamond_cmd, tax_assignment_path_2,
                         quick_mode_match_rank, genes, tmp_prot_path,
@@ -432,7 +425,7 @@ def perform_quick_search_2(perform_diamond, diamond_cmd, tax_assignment_path_2,
         try:
             dmdnOut = subprocess.run([diamond_cmd_2], shell=True, capture_output=True, check=True)
         except:
-            sys.exit('Error running\n%s' % diamond_cmd_2)
+            sys.exit('Error running\n{}'.format(diamond_cmd_2))
 
 
 def perform_exhaustive_search(perform_diamond, diamond_cmd,
@@ -446,7 +439,7 @@ def perform_exhaustive_search(perform_diamond, diamond_cmd,
         try:
             dmdnOut = subprocess.run([diamond_cmd], shell=True, capture_output=True, check=True)
         except:
-            sys.exit('Error running\n%s' % diamond_cmd)
+            sys.exit('Error running\n{}'.format(diamond_cmd))
 
 
 def assess_best_of_multi_hits(taxIDs, queryID):
@@ -666,6 +659,7 @@ def prot_gene_matching(output_path, gff_path, genes, gff_rule):
             elif "#FASTA" in line: # if FASTA block has been reached
                 break
 
+
     prot_index_path = output_path + 'tmp/tmp.proteins.fa.fai'
 
     unmatched = [] #list of proteins where gene could not be matched
@@ -674,6 +668,7 @@ def prot_gene_matching(output_path, gff_path, genes, gff_rule):
         for line in prot_index:
             id, length = line.split()[0], ((int(line.split()[1])*3)+3)
             parent = child_parent_dict.get(strip_ID(id))
+
             if parent: # id in proteins fasta index matches the IDs in the GFF
                 while parent in child_parent_dict.keys():
                     if parent == child_parent_dict.get(parent):
@@ -689,9 +684,9 @@ def prot_gene_matching(output_path, gff_path, genes, gff_rule):
                         parent = child_parent_dict.get(parent)
             elif strip_ID(id) in genes.keys():
                 # fasta header is gene ID
-                parent = id
+                parent = strip_ID(id)
             elif strip_ID(id).split('|')[0] in genes.keys():
-                parent = id
+                parent = strip_ID(id)
             else: # if not, look if any child ID is contained in the id
                 for child in child_parent_dict.keys():
                     if child in id:
@@ -957,47 +952,35 @@ def write_tmp_query_info(output_path, genes, queryID):
 ###############################################################################
 ###############################################################################
 
-def main():
+def run_assignment(cfg):
 
-    config_path = sys.argv[1]
+    global TAX_DB
+    TAX_DB = taxopy.TaxDb(nodes_dmp=cfg.script_dir+"/nodes.dmp",
+                            names_dmp=cfg.script_dir+"/names.dmp", keep_files=True)
+    global missing_taxids
+    missing_taxids = set()
 
-    # read parameters from config file
-    config_obj=yaml.safe_load(open(config_path,'r'))
-    output_path=config_obj.get('output_path') # complete output path (ENDING ON A SLASH!)
-    nr_db_path=config_obj.get('database_path') # path to database
-    proteins_path=config_obj.get('proteins_path', None) # path to FASTA w/ protein seqs
-    gff_path=config_obj.get('gff_path') # path to GFF
-    taxon_exclude = config_obj.get('taxon_exclude') # bool to exclude query taxon from sequence alignment
-    compute_tax_assignment = config_obj.get('compute_tax_assignment') # whether taxonomic assigned should be computed
-    only_plotting = config_obj.get('update_plots') # whether only the plots should be update
-    # -> recompute the taxonomic assignment based on exisiting alignment hits as settings might be changed
-    assignment_mode = config_obj.get('assignment_mode')
-    quick_mode_search_rank = config_obj.get('quick_mode_search_rank', None)
-    quick_mode_match_rank = config_obj.get('quick_mode_match_rank', None)
-    if assignment_mode == "quick":
-        tax_assignment_path_1, tax_assignment_path_2 = tax_assignment_path = config_obj.get('tax_assignment_path')
+
+    if cfg.assignment_mode == "quick":
+        tax_assignment_path_1, tax_assignment_path_2 = cfg.tax_assignment_path
     else:
-        tax_assignment_path = config_obj.get('tax_assignment_path')
-    queryID = int(config_obj.get('taxon_id'))
-    merging_labels = config_obj.get('merging_labels')
-    num_groups_plot = config_obj.get('num_groups_plot')
-    gff_source = config_obj.get('gff_source', 'default')
+        tax_assignment_path = cfg.tax_assignment_path
 
-    gff_rule = parse_gff_source_rule(gff_source)
+    gff_rule = parse_gff_source_rule(cfg.gff_source)
 
-    tmp_prot_path = output_path+"tmp/tmp.subset.protein.fasta"
+    tmp_prot_path = cfg.output_path+"tmp/tmp.subset.protein.fasta"
 
-    diamond_cmd = 'diamond blastp -f 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore staxids sscinames -b2.0 --tmpdir /dev/shm --sensitive -c1 --top 10 -q "{}" -d "{}"'.format(tmp_prot_path, nr_db_path)
+    diamond_cmd = 'diamond blastp -f 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore staxids sscinames -b2.0 --tmpdir /dev/shm --sensitive -c1 --top 10 -q "{}" -d "{}"'.format(tmp_prot_path, cfg.database_path)
 
-    if taxon_exclude:
-        taxon_exclude = ' --taxon-exclude "{}"'.format(queryID)
+    if cfg.taxon_exclude:
+        taxon_exclude = ' --taxon-exclude "{}"'.format(cfg.taxon_id)
     else:
         taxon_exclude = ''
-    if type(num_groups_plot) == int:
-        pass
-    elif num_groups_plot.isdigit():
-        num_groups_plot = int(num_groups_plot)
-    elif num_groups_plot == 'all':
+    if type(cfg.num_groups_plot) == int:
+        num_groups_plot = cfg.num_groups_plot
+    elif cfg.num_groups_plot.isdigit():
+        num_groups_plot = int(cfg.num_groups_plot)
+    elif cfg.num_groups_plot == 'all':
         # no merging of taxonomic assignments desired
         num_groups_plot = False
     else:
@@ -1005,48 +988,56 @@ def main():
         return
 
     # read file
-    genes, header = read_genes_coords(output_path)
+    genes, header = read_genes_coords(cfg.output_path)
 
-    prots = prot_gene_matching(output_path, gff_path, genes, gff_rule)
+    prots = prot_gene_matching(cfg.output_path, cfg.gff_path, genes, gff_rule)
 
-    perform_diamond = compute_tax_assignment and not only_plotting
+    perform_diamond = cfg.compute_tax_assignment and not cfg.update_plots
 
     if perform_diamond:
-        subset_prots_longest_cds(genes, proteins_path, tmp_prot_path)
+        subset_prots_longest_cds(genes, cfg.proteins_path, tmp_prot_path)
 
-    if assignment_mode == 'quick':
+    if cfg.assignment_mode == 'quick':
         perform_quick_search_1(perform_diamond, diamond_cmd,
-                                tax_assignment_path_1, quick_mode_search_rank,
-                                taxon_exclude, queryID)
-        taxonomic_assignment(tax_assignment_path_1, genes, prots, queryID)
+                                tax_assignment_path_1, cfg.quick_mode_search_rank,
+                                taxon_exclude, cfg.taxon_id)
+        taxonomic_assignment(tax_assignment_path_1, genes, prots, cfg.taxon_id)
         perform_quick_search_2(perform_diamond, diamond_cmd,
                                 tax_assignment_path_2, quick_mode_match_rank,
-                                genes, tmp_prot_path, taxon_exclude, queryID)
-        taxonomic_assignment(tax_assignment_path_2, genes, prots, queryID)
-    elif assignment_mode == 'exhaustive':
+                                genes, tmp_prot_path, taxon_exclude, cfg.taxon_id)
+        taxonomic_assignment(tax_assignment_path_2, genes, prots, cfg.taxon_id)
+    elif cfg.assignment_mode == 'exhaustive':
         perform_exhaustive_search(perform_diamond, diamond_cmd,
                                     tax_assignment_path, taxon_exclude)
-        taxonomic_assignment(tax_assignment_path, genes, prots, queryID)
+        taxonomic_assignment(tax_assignment_path, genes, prots, cfg.taxon_id)
     else:
         print('Assignment mode not one of quick or exhaustive')
 
-    merge_labels(genes, queryID, merging_labels)
+    merge_labels(genes, cfg.taxon_id, cfg.merging_labels)
     if num_groups_plot:
         unlabeled_genes, num_labels = filter_labeled_genes(genes)
         iterative_merging_top(unlabeled_genes, num_groups_plot-num_labels)
     else:
         set_unassigned_labels(genes)
 
-    write_tmp_query_info(output_path, genes, queryID)
+    write_tmp_query_info(cfg.output_path, genes, cfg.taxon_id)
 
     if missing_taxids:
         print("The following Taxon ID(s) could not be found in the NCBI: ")
         print(missing_taxids)
         print("Skipped for taxonomic assignment.")
 
-    pathlib.Path(output_path+'taxonomic_assignment/').mkdir(parents=True, exist_ok=True)
+    pathlib.Path(cfg.output_path+'taxonomic_assignment/').mkdir(parents=True, exist_ok=True)
 
-    write_output(output_path, genes, header)
+    write_output(cfg.output_path, genes, header)
+
+def main():
+    config_path = sys.argv[1]
+    # create class object with configuration parameters
+    cfg = prepare_and_check.cfg2obj(config_path)
+
+
+    run_assignment(cfg)
 
 
 if __name__ == '__main__':

@@ -4,12 +4,17 @@ import yaml # read config file
 import sys
 import os
 import pathlib
+import subprocess
 
+import prepare_and_check
 
 def bam2pbc(bam, pbc):
 
     cmd = 'bedtools genomecov -ibam "{}" -d > "{}"'.format(bam, pbc)
-    os.system(cmd)
+    try:
+        out = subprocess.run([cmd], shell=True, capture_output=True, check=True)
+    except:
+        sys.exit('Error running\n{}'.format(cmd))
 
 
 def mapping(mapping_dir, fasta_path, read_paths, insert_size, bam_path):
@@ -28,50 +33,53 @@ def mapping(mapping_dir, fasta_path, read_paths, insert_size, bam_path):
 
     cmd_view = 'samtools view -b {}mapping.sam | samtools sort -o {}'.format(mapping_dir, bam_path)
 
-    os.system(cmd_build)
-    os.system(cmd_mapping)
+    try:
+        out = subprocess.run([cmd_build], shell=True, capture_output=True, check=True)
+    except:
+        sys.exit('Error running\n{}'.format(cmd_build))
+    try:
+        out = subprocess.run([cmd_mapping], shell=True, capture_output=True, check=True)
+    except:
+        sys.exit('Error running\n{}'.format(cmd_mapping))
+
+
+def process_coverage(cfg):
+
+    if cfg.compute_coverage:
+        for cov_set, status in cfg.cov_set_exists.items():
+            if status == 'pbc_paths':
+                continue
+
+            elif status == 'bam_paths':
+                bam_path = cfg.bam_paths.get(cov_set)
+                pbc_path = cfg.pbc_paths.get(cov_set)
+                bam2pbc(bam_path, pbc_path)
+
+            elif status == 'read_paths':
+                mapping_dir = cfg.output_path+'mapping_files_{}/'.format(str(cov_set))
+                pathlib.Path(mapping_dir).mkdir(parents=True, exist_ok=True)
+
+                read_paths_set = cfg.read_paths.get(cov_set)
+                insert_size_set = int(cfg.insert_size.get(cov_set))
+                bam_path = cfg.bam_paths.get(cov_set)
+                pbc_path = cfg.pbc_paths.get(cov_set)
+
+
+                mapping(mapping_dir, fasta_path, read_paths_set,
+                        insert_size_set, bam_path)
+                bam2pbc(bam_path, pbc_path)
+
+            else:
+                print("Error: status of coverage set {} unidentified".format(cov_set))
 
 
 def main():
 
     config_path = sys.argv[1]
-    # read parameters from config file
-    config_obj = yaml.safe_load(open(config_path,'r'))
+    # create class object with configuration parameters
+    cfg = prepare_and_check.cfg2obj(config_path)
 
-    if config_obj.get('compute_coverage'):
-        output_path = config_obj.get('output_path') # complete output path (ENDING ON A SLASH!)
-        fasta_path = config_obj.get('fasta_path')
-        bam_paths = config_obj.get('bam_paths')
-        read_paths = config_obj.get('read_paths')
-        gff_path = config_obj.get('gff_path')
-        pbc_paths = config_obj.get('pbc_paths')
-        cov_set_exists = config_obj.get('cov_set_exists')
-        insert_size = config_obj.get('insert_size')
-
-        for cov_set, status in cov_set_exists.items():
-            if status == 'pbc_paths':
-                continue
-
-            elif status == 'bam_paths':
-                bam_path = bam_paths.get(cov_set)
-                pbc_path = pbc_paths.get(cov_set)
-                bam2pbc(bam_path, pbc_path)
-
-            elif status == 'read_paths':
-                mapping_dir = output_path+'mapping_files_{}/'.format(str(cov_set))
-                pathlib.Path(mapping_dir).mkdir(parents=True, exist_ok=True)
-
-                read_paths_set = read_paths.get(cov_set)
-                insert_size_set = int(insert_size.get(cov_set))
-                bam_path = bam_paths.get(cov_set)
-                pbc_path = pbc_paths.get(cov_set)
-
-
-                mapping(mapping_dir, fasta_path, read_paths_set, insert_size_set, bam_path)
-                bam2pbc(bam_path, pbc_path)
-
-            else:
-                print("Error: status of coverage set {} unidentified".format(cov_set))
+    process_coverage(cfg)
 
 
 if __name__ == '__main__':

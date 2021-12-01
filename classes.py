@@ -3,6 +3,61 @@ import numpy as np
 from operator import itemgetter
 
 
+class Config:
+
+    def __init__(self, cfg_dict):
+        self.fasta_path = cfg_dict.get('fasta_path')
+        self.gff_path = cfg_dict.get('gff_path')
+        self.output_path = cfg_dict.get('output_path')
+        self.taxon_id = cfg_dict.get('taxon_id')
+
+        self.read_paths = cfg_dict.get('read_paths')
+        self.bam_paths = cfg_dict.get('bam_paths')
+        self.pbc_paths = cfg_dict.get('pbc_paths')
+        self.cov_set_exists = cfg_dict.get('cov_set_exists')
+        self.include_coverage = cfg_dict.get('include_coverage')
+        self.compute_coverage = cfg_dict.get('compute_coverage')
+        self.insert_size = cfg_dict.get('insert_size')
+
+        self.proteins_path = cfg_dict.get('proteins_path')
+        self.extract_proteins = cfg_dict.get('extract_proteins')
+        self.assignment_mode = cfg_dict.get('assignment_mode')
+        self.quick_mode_search_rank = cfg_dict.get('quick_mode_search_rank')
+        self.quick_mode_match_rank = cfg_dict.get('quick_mode_match_rank')
+        self.tax_assignment_path = cfg_dict.get('tax_assignment_path')
+        self.compute_tax_assignment = cfg_dict.get('compute_tax_assignment')
+        self.database_path = cfg_dict.get('database_path')
+        self.taxon_exclude = cfg_dict.get('taxon_exclude')
+
+        self.update_plots = cfg_dict.get('update_plots')
+        self.num_groups_plot = cfg_dict.get('num_groups_plot')
+        self.merging_labels = cfg_dict.get('merging_labels')
+        self.output_pdf = cfg_dict.get('output_pdf')
+        self.output_png = cfg_dict.get('output_png')
+
+        self.include_pseudogenes = cfg_dict.get('include_pseudogenes')
+        self.gff_source = cfg_dict.get('gff_source')
+        self.input_variables = cfg_dict.get('input_variables')
+        self.perform_parallel_analysis = cfg_dict.get('perform_parallel_analysis')
+        self.num_pcs = cfg_dict.get('num_pcs')
+        self.coverage_cutoff_mode = cfg_dict.get('coverage_cutoff_mode')
+
+        self.perform_kmeans = cfg_dict.get('perform_kmeans')
+        self.kmeans_k = cfg_dict.get('kmeans_k')
+        self.perform_hclust = cfg_dict.get('perform_hclust')
+        self.hclust_k = cfg_dict.get('hclust_k')
+        self.perform_mclust = cfg_dict.get('perform_mclust')
+        self.mclust_k = cfg_dict.get('mclust_k')
+        self.perform_dbscan = cfg_dict.get('perform_dbscan')
+        self.dbscan_groups = cfg_dict.get('dbscan_groups')
+        self.custom_eps = cfg_dict.get('custom_eps')
+        self.custom_minPts = cfg_dict.get('custom_minPts')
+
+        self.script_dir = cfg_dict.get('script_dir')
+        self.usr_cfg_path = cfg_dict.get('usr_cfg_path')
+        self.cfg_path = cfg_dict.get('cfg_path')
+
+
 class Assembly:
 
     def __init__(self, gff_path, fasta_path, pbc_paths, output_path):

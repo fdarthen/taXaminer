@@ -24,4 +24,4 @@ fi
 
 echo $SLURM_ARRAY_TASK_ID $config_path
 
-$SCRIPT_DIR/MILTS.sh "$config_path"
+python3 $SCRIPT_DIR/milts.py "$config_path"

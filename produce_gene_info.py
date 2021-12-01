@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # reads FASTA, GFF3 and per_base_coverage.txt file and produces gene_info directory
-# author: Simonida Zehr
+# author: Simonida Zehr and Freya Arthen
 # date: 18 June 2019
 
 from operator import itemgetter
@@ -14,7 +14,8 @@ from Bio.Seq import Seq as BioPython_Seq # to count oligonucleotides (also overl
 import yaml # read config file
 import sys # parse command line arguments
 
-from classes import Assembly, Contig, Gene #, Transcript
+from classes import Assembly, Contig, Gene
+import prepare_and_check
 
 # ====================== CONSTANTS ======================
 # define nucleotide alphabet
@@ -1332,33 +1333,21 @@ def parse_gff_source_rule(gff_source):
 
 # # !!!!!!!!!!!!!!!!!!!!!!!!!!! GENERATE OUTPUT PART !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-def main():
+def process_gene_info(cfg):
 
-    config_path = sys.argv[1]
+    gene_tag, source_type = parse_gff_source_rule(cfg.gff_source)
 
-    # read parameters from config file
-    config_obj = yaml.safe_load(open(config_path,'r'))
-    gff_path = config_obj.get('gff_path') # GFF file path
-    pbc_paths = dict(config_obj.get('pbc_paths', {})) # per base coverage (PBC) file path(s)
-    output_path = config_obj.get('output_path') # complete output path (ENDING ON A SLASH!)
-    fasta_path = config_obj.get('fasta_path') # path to FASTA file
-    include_pseudogenes = config_obj.get('include_pseudogenes') # boolean signifying whether pseudogenes should be included in the analysis
-    include_coverage = config_obj.get('include_coverage')
-    gff_source = config_obj.get('gff_source', 'default')
-
-    gene_tag, source_type = parse_gff_source_rule(gff_source)
-
-    print("include pseudogenes = " + str(include_pseudogenes))
-    print("include coverage = " + str(include_coverage))
+    print("include pseudogenes = " + str(cfg.include_pseudogenes))
+    print("include coverage = " + str(cfg.include_coverage))
 
     # ====================== VARIABLES ======================
 
-    a = Assembly(gff_path, fasta_path, pbc_paths, output_path)
+    a = Assembly(cfg.gff_path, cfg.fasta_path, cfg.pbc_paths, cfg.output_path)
 
     read_faidx(a) # use faidx to initalize contigs
-    read_gff(a, gene_tag, source_type, include_pseudogenes)
+    read_gff(a, gene_tag, source_type, cfg.include_pseudogenes)
     read_fasta(a)
-    read_pbc(a, include_coverage)
+    read_pbc(a, cfg.include_coverage)
 
     # store names of geneless contigs to a list
     # exclude all contigs and genes without coverage from further processing
@@ -1395,10 +1384,17 @@ def main():
 
     raw_array = get_raw_array(a, stats_for_all_contigs)
     output_table(a, raw_array, "raw_gene_table")
-    imputed_array = impute_array(a, raw_array, include_coverage)
+    imputed_array = impute_array(a, raw_array, cfg.include_coverage)
     output_table(a, imputed_array, "imputed_gene_table")
 
-    output_summary_file(a, stats_for_all_contigs, "summary.txt", include_coverage)
+    output_summary_file(a, stats_for_all_contigs, "summary.txt", cfg.include_coverage)
+
+def main():
+    config_path = sys.argv[1]
+    # create class object with configuration parameters
+    cfg = prepare_and_check.cfg2obj(config_path)
+
+    process_gene_info(cfg)
 
 if __name__ == '__main__':
     main()

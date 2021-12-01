@@ -105,20 +105,22 @@ def change_title(output_path, html_out_path):
         html_file.write(str(soup))
 
 
-def main():
+def perform_adjustments(cfg):
 
-    config_path = sys.argv[1]
-
-    # read parameters from config file
-    config_obj=yaml.safe_load(open(config_path,'r'))
-    output_path=config_obj['output_path'] # complete output path (ENDING ON A SLASH!)
-
-    html_file_path = output_path + 'tmp/3D_plot.html'
-    html_dependencies_grounddir = output_path + 'tmp/'
-    html_out_path = output_path + 'taxonomic_assignment/3D_plot.html'
+    html_file_path = cfg.output_path + 'tmp/3D_plot.html'
+    html_dependencies_grounddir = cfg.output_path + 'tmp/'
+    html_out_path = cfg.output_path + 'taxonomic_assignment/3D_plot.html'
 
     make_selfcontained(html_file_path, html_dependencies_grounddir, html_out_path)
-    change_title(output_path, html_out_path)
+    change_title(cfg.output_path, html_out_path)
+
+
+def main():
+    config_path = sys.argv[1]
+    # create class object with configuration parameters
+    cfg = prepare_and_check.cfg2obj(config_path)
+
+    perform_adjustments(cfg)
 
 
 if __name__ == '__main__':
