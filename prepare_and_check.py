@@ -4,6 +4,7 @@ import pathlib # to create directories
 import yaml # read config file
 import sys # parse command line arguments
 import os
+import logging
 
 from classes import Config
 
@@ -45,9 +46,10 @@ def enumerated_key(config_obj, key_name, pre_keys, *default):
     # to identify the index of the coverage set
     dict = {}
     for match in matches:
-        if match.split('_')[2].isdigit():
-            match_num = int(match.split('_')[2])
-            dict[match_num] = set_variable_default(config_obj, match, default)
+        if config_obj.get(match):
+            if match.split('_')[2].isdigit():
+                match_num = int(match.split('_')[2])
+                dict[match_num] = set_variable_default(config_obj, match, default)
 
     for pre_key in pre_keys:
         # if there are more values required than given, fill them up with default paths

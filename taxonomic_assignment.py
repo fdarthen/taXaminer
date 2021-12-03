@@ -9,6 +9,7 @@ import csv
 import os
 import pathlib
 import subprocess
+import logging
 
 
 class Gene:
@@ -388,7 +389,7 @@ def get_subset_id(queryID, subset_marker):
 def perform_quick_search_1(perform_diamond, diamond_cmd, tax_assignment_path_1,
                             quick_mode_search_rank, taxon_exclude, queryID):
     """Perform first DIAMOND run for quick assignment mode."""
-    print("Quick mode for taxonomic assignment selected")
+    logging.info("Quick mode for taxonomic assignment selected")
 
     if perform_diamond:
         # quick_mode_search_rank can be either taxon ID or rank
@@ -401,8 +402,7 @@ def perform_quick_search_1(perform_diamond, diamond_cmd, tax_assignment_path_1,
         diamond_cmd_1 = diamond_cmd + ' -o "{}" {}'.format(tax_assignment_path_1, q1_exclude)
         ###taxonlist###  diamond_cmd_1 = diamond_cmd + diamond_o1 + ' --taxonlist "' + str(quick_mode_search_id) + '" --taxon-exclude "' + str(queryID) + '"'
 
-        print("Diamond command for quick search round 1: ")
-        print(diamond_cmd_1)
+        logging.debug("Diamond command for quick search round 1:\n{}".format(diamond_cmd_1))
         try:
             dmdnOut = subprocess.run([diamond_cmd_1], shell=True, capture_output=True, check=True)
         except:
@@ -412,7 +412,6 @@ def perform_quick_search_2(perform_diamond, diamond_cmd, tax_assignment_path_2,
                         quick_mode_match_rank, genes, tmp_prot_path,
                         taxon_exclude, queryID):
     """Perform second DIAMOND run for quick assignment mode."""
-    print("Quick mode for taxonomic assignment selected")
 
     if perform_diamond:
         quick_mode_match_id = get_subset_id(queryID, quick_mode_match_rank)
@@ -420,8 +419,7 @@ def perform_quick_search_2(perform_diamond, diamond_cmd, tax_assignment_path_2,
         filter_prots_quick_hits(genes, quick_mode_match_id, tmp_prot_path, tmp_prot_path)
 
         diamond_cmd_2 = diamond_cmd + ' -o "{}" '.format(tax_assignment_path_2) + taxon_exclude
-        print("Diamond command for quick search round 2: ")
-        print(diamond_cmd_2)
+        logging.debug("Diamond command for quick search round 2:\n{}".format(diamond_cmd_2))
         try:
             dmdnOut = subprocess.run([diamond_cmd_2], shell=True, capture_output=True, check=True)
         except:
@@ -431,15 +429,18 @@ def perform_quick_search_2(perform_diamond, diamond_cmd, tax_assignment_path_2,
 def perform_exhaustive_search(perform_diamond, diamond_cmd,
                                 tax_assignment_path, taxon_exclude):
     """Perform  DIAMOND run for exhaustive assignment mode."""
-    print("Exhaustive mode for taxonomic assignment selected")
+    logging.info("Exhaustive mode for taxonomic assignment selected")
     if perform_diamond:
         diamond_cmd = diamond_cmd + ' -o "{}" '.format(tax_assignment_path) + taxon_exclude
-        print("Diamond command for exhaustive search: ")
-        print(diamond_cmd)
+        logging.debug("Diamond command for exhaustive search:\n{}".format(diamond_cmd))
         try:
             dmdnOut = subprocess.run([diamond_cmd], shell=True, capture_output=True, check=True)
         except:
-            sys.exit('Error running\n{}'.format(diamond_cmd))
+            dmdnOut = subprocess.run([diamond_cmd], shell=True, capture_output=True)
+            logging.error('Error running\n{}'.format(diamond_cmd))
+            logging.info(dmdnOut.stderr.decode())
+            #TODO: parse output
+            sys.exit()
 
 
 def assess_best_of_multi_hits(taxIDs, queryID):
@@ -720,12 +721,11 @@ def prot_gene_matching(output_path, gff_path, genes, gff_rule):
 
 
     if len(prots) == 0:
-        print("Proteins were unable to be matched with gene IDs via GFF. Please check that FASTA headers fit with IDs in GFF (string before first whitespace or pipe must match ID of mRNA or CDS of corresponding gene)")
+        logging.error("Proteins were unable to be matched with gene IDs via GFF. Please check that FASTA headers fit with IDs in GFF (string before first whitespace or pipe must match ID of mRNA or CDS of corresponding gene)")
+        sys.exit()
     else:
         if unmatched:
-            print("Protein(s) with FASTA following header could not be matched to a gene ID:" )
-            for id in unmatched:
-                print(id)
+            logging.warning("Protein(s) with following FASTA header could not be matched to a gene ID:\n{}".format(unmatched))
     return prots
 
 
@@ -807,7 +807,7 @@ def subset_prots_longest_cds(genes,proteins_path, path_out):
     # when matching prot ID to gene ID it is already checked for the one with the longest CDS
     longest_transcripts = [gene.protID for gene in genes.values() if gene.protID]
 
-    print(str(len(longest_transcripts)) + " proteins written to fasta file for taxonomic assignment (longest cds subsetting)")
+    logging.info("{} proteins written to fasta file for taxonomic assignment (subsetting for longest CDS)".format(len(longest_transcripts)))
     subset_protein_fasta(proteins_path, longest_transcripts, path_out, "include")
 
 
@@ -833,7 +833,7 @@ def filter_prots_quick_hits(genes, quick_mode_match_id, prot_path_in, prot_path_
                 no_match.append(gene.protID)
                 reset_tax_assignment(gene)
 
-    print(str(len(no_match)) + " proteins written to fasta file for taxonomic assignment (quick search subsetting)")
+    logging.info("{} proteins written to fasta file for 2nd DIAMOND run".format(len(no_match)))
     subset_protein_fasta(prot_path_in, no_match, prot_path_out, "include")
 
 
@@ -925,7 +925,8 @@ def parse_gff_source_rule(gff_source):
                 rule_dict["parent_child_attr"] = pc_dict
         else:
             rule_dict = {}
-            print("ERROR: source type for GFF could not be interpreted. Please check your input. Computations will continue with default setting")
+            logging.error("source type for GFF could not be interpreted. Please check your input.")
+            sys.exit()
 
     if not rule_dict: #if not been set -> set to default
         rule_dict = {'source': 'default',
@@ -984,8 +985,8 @@ def run_assignment(cfg):
         # no merging of taxonomic assignments desired
         num_groups_plot = False
     else:
-        print('No valid option for "num_groups_plot"')
-        return
+        logging.warning('No valid option for "num_groups_plot"')
+        sys.exit()
 
     # read file
     genes, header = read_genes_coords(cfg.output_path)
@@ -1011,7 +1012,8 @@ def run_assignment(cfg):
                                     tax_assignment_path, taxon_exclude)
         taxonomic_assignment(tax_assignment_path, genes, prots, cfg.taxon_id)
     else:
-        print('Assignment mode not one of quick or exhaustive')
+        logging.error('Assignment mode not one of quick or exhaustive')
+        sys.exit()
 
     merge_labels(genes, cfg.taxon_id, cfg.merging_labels)
     if num_groups_plot:
@@ -1023,9 +1025,8 @@ def run_assignment(cfg):
     write_tmp_query_info(cfg.output_path, genes, cfg.taxon_id)
 
     if missing_taxids:
-        print("The following Taxon ID(s) could not be found in the NCBI: ")
-        print(missing_taxids)
-        print("Skipped for taxonomic assignment.")
+        logging.info("The following Taxon ID(s) could not be found in the NCBI (skipped in taxonomic assignment):")
+        logging.info(missing_taxids)
 
     pathlib.Path(cfg.output_path+'taxonomic_assignment/').mkdir(parents=True, exist_ok=True)
 

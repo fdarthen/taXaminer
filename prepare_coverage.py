@@ -11,13 +11,18 @@ import prepare_and_check
 def bam2pbc(bam, pbc):
 
     cmd = 'bedtools genomecov -ibam "{}" -d > "{}"'.format(bam, pbc)
-    try:
-        out = subprocess.run([cmd], shell=True, capture_output=True, check=True)
-    except:
-        sys.exit('Error running\n{}'.format(cmd))
+    # try:
+    #     out = subprocess.run([cmd], shell=True, capture_output=True, check=True)
+    # except:
+    out = subprocess.run([cmd], shell=True, capture_output=True)
+    logging.error('Error running\n{}'.format(cmd))
+    logging.info(cmd.stderr.decode())
+        # sys.exit()
 
 
 def mapping(mapping_dir, fasta_path, read_paths, insert_size, bam_path):
+
+    #TODO: check if SAM file exists at default location
 
     if type(read_paths) != list:
         read_paths = [read_paths]
@@ -65,7 +70,7 @@ def process_coverage(cfg):
                 pbc_path = cfg.pbc_paths.get(cov_set)
 
 
-                mapping(mapping_dir, fasta_path, read_paths_set,
+                mapping(mapping_dir, cfg.fasta_path, read_paths_set,
                         insert_size_set, bam_path)
                 bam2pbc(bam_path, pbc_path)
 
