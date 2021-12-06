@@ -162,6 +162,7 @@ def set_config_defaults(config_obj):
     config_vars['compute_tax_assignment'] = set_variable_default(config_obj, 'compute_tax_assignment', check_file_inexistence(config_vars.get('tax_assignment_path'), 'AND'))
     config_vars['database_path'] = set_variable_default(config_obj, 'database_path')
     config_vars['taxon_exclude'] = set_variable_default(config_obj, 'taxon_exclude', 'TRUE')
+    config_vars['exclusion_rank'] = set_variable_default(config_obj, 'exclusion_rank', 'species')
     # Plotting
     config_vars['update_plots'] = set_variable_default(config_obj, 'update_plots', 'FALSE')
     config_vars['num_groups_plot'] = set_variable_default(config_obj, 'num_groups_plot', '25')

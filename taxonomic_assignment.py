@@ -972,6 +972,7 @@ def main():
     proteins_path=config_obj.get('proteins_path', None) # path to FASTA w/ protein seqs
     gff_path=config_obj.get('gff_path') # path to GFF
     taxon_exclude = config_obj.get('taxon_exclude') # bool to exclude query taxon from sequence alignment
+    exclusion_rank = config_obj.get('exclusion_rank') # bool to exclude query taxon from sequence alignment
     compute_tax_assignment = config_obj.get('compute_tax_assignment') # whether taxonomic assigned should be computed
     only_plotting = config_obj.get('update_plots') # whether only the plots should be update
     # -> recompute the taxonomic assignment based on exisiting alignment hits as settings might be changed
@@ -993,8 +994,10 @@ def main():
 
     diamond_cmd = 'diamond blastp -f 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore staxids sscinames -b2.0 --tmpdir /dev/shm --sensitive -c1 --top 10 -q "{}" -d "{}"'.format(tmp_prot_path, nr_db_path)
 
+
+
     if taxon_exclude:
-        taxon_exclude = ' --taxon-exclude "{}"'.format(queryID)
+        taxon_exclude = ' --taxon-exclude "{}"'.format(get_id_for_rank_of_species(queryID, exclusion_rank))
     else:
         taxon_exclude = ''
     if type(num_groups_plot) == int:
