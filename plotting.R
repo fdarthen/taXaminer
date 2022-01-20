@@ -349,21 +349,15 @@ if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
         color=~I(label_color),
         name=~plot_label_freq
     )
-
     fig <- fig %>% layout(title = query_name)
 
-    json<-plotly_json(fig,FALSE)
-    write(json,paste0(cfg$output_path, "tmp/3d_1.json"))
+    # json<-plotly_json(fig,FALSE)
+    # write(json,paste0(cfg$output_path, "tmp/3d_1.json"))
+    #
+    # json <- plotly:::to_JSON(plotly_build(fig))
+    # write(json,paste0(cfg$output_path, "tmp/3d_2.json"))
 
-
-    json <- plotly:::to_JSON(plotly_build(fig))
-    write(json,paste0(cfg$output_path, "tmp/3d_2.json"))
-
-
-
-
-
-    # prepare json to save 4 different angles of 3D plot as pdf
+    # different angles of 3D plot as pdf
     orca_static_3d(fig, "2D_plot_1_2", 0, 0, 2.25)
     orca_static_3d(fig, "2D_plot_1_3", 0, 2.25, 0)
     orca_static_3d(fig, "2D_plot_2_3", 2.25, 0, 0)

@@ -4,8 +4,132 @@ from operator import itemgetter
 
 
 class Config:
+    """
+    Object to hold all configuration options
+
+    Attributes
+    ----------
+    fasta_path : str
+      path to the FASTA file of the assembly
+    gff_path: str
+
+    output_path: str
+
+    taxon_id: str
+
+    read_paths: str
+
+    bam_paths: str
+
+    pbc_paths: str
+
+    cov_set_exists: str
+
+    include_coverage: str
+
+    compute_coverage: str
+
+    insert_size: str
+
+    proteins_path: str
+
+    extract_proteins: str
+
+    assignment_mode: str
+
+    quick_mode_search_rank: str
+
+    quick_mode_match_rank: str
+
+    tax_assignment_path: str
+
+    compute_tax_assignment: str
+
+    database_path: str
+
+    taxon_exclude: str
+
+    exclusion_rank: str
+
+    update_plots: str
+
+    num_groups_plot: str
+
+    merging_labels: str
+
+    output_pdf: str
+
+    output_png: str
+
+    include_pseudogenes: str
+
+    gff_source: str
+
+    input_variables: str
+
+    perform_parallel_analysis: str
+
+    num_pcs: str
+
+    coverage_cutoff_mode: str
+
+    perform_kmeans: str
+
+    kmeans_k: str
+
+    perform_hclust: str
+
+    hclust_k: str
+
+    perform_mclust: str
+
+    mclust_k: str
+
+    perform_dbscan: str
+
+    dbscan_groups: str
+
+    custom_eps: str
+
+    custom_minPts: str
+
+    script_dir: str
+
+    usr_cfg_path: str
+
+    cfg_path: str
+
+    gff_source: str
+
+    gff_gene_tag: str
+
+    gff_fasta_header_type: str
+
+    gff_fasta_header_attr: str
+
+    gff_gene_connection: str
+
+    gff_parent_child_types: str
+
+    gff_parent_child_attr: str
+
+    gff_gene_attr: str
+
+    gff_transcript_tag: str
+
+    gff_cds_tag: str
+
+    """
 
     def __init__(self, cfg_dict):
+        """
+        Constructs configuration object.
+
+        Parameters
+        ----------
+            cfg_dict : dict
+                dictionary holding the preprocessed configuration parameters
+        """
         self.fasta_path = cfg_dict.get('fasta_path')
         self.gff_path = cfg_dict.get('gff_path')
         self.output_path = cfg_dict.get('output_path')
@@ -28,6 +152,7 @@ class Config:
         self.compute_tax_assignment = cfg_dict.get('compute_tax_assignment')
         self.database_path = cfg_dict.get('database_path')
         self.taxon_exclude = cfg_dict.get('taxon_exclude')
+        self.exclusion_rank = cfg_dict.get('exclusion_rank')
 
         self.update_plots = cfg_dict.get('update_plots')
         self.num_groups_plot = cfg_dict.get('num_groups_plot')
@@ -57,8 +182,58 @@ class Config:
         self.usr_cfg_path = cfg_dict.get('usr_cfg_path')
         self.cfg_path = cfg_dict.get('cfg_path')
 
+        # GFF parsing rule
+        self.gff_source = cfg_dict.get('gff_dict').get('source')
+        self.gff_gene_tag = cfg_dict.get('gff_dict').get('gene_tag')
+        self.gff_fasta_header_type = cfg_dict.get('gff_dict').get('fasta_header_type') \
+                            if 'fasta_header_type' in cfg_dict.get('gff_dict').keys() \
+                            else cfg_dict.get('gff_dict').get('transcript_tag')
+        self.gff_fasta_header_attr = cfg_dict.get('gff_dict').get('fasta_header_attr')
+        self.gff_gene_connection = cfg_dict.get('gff_dict').get('gene_connection')
+        self.gff_parent_child_types = cfg_dict.get('gff_dict').get('parent_child_types')
+        self.gff_parent_child_attr = cfg_dict.get('gff_dict').get('parent_child_attr')
+        self.gff_gene_attr = cfg_dict.get('gff_dict').get('gene_attr')
+        self.gff_transcript_tag = cfg_dict.get('gff_dict').get('transcript_tag') \
+                            if 'transcript_tag' in cfg_dict.get('gff_dict').keys() \
+                            else cfg_dict.get('gff_dict').get('fasta_header_type')
+        self.gff_cds_tag = cfg_dict.get('gff_dict').get('cds_tag')
+
 
 class Assembly:
+    """
+    Object holding information regarding the assembly
+
+    Attributes
+    ----------
+    gff_path : str
+
+    fasta_path : str
+
+    pbc_paths : str
+
+    num_pbc : str
+
+    output_path : str
+
+    output_dir : str
+
+    total_z_score_vector : str
+
+    contigs : dict
+
+    all_contig_lengths : list
+
+    genes : dict
+
+    transcripts : dict
+
+    geneless_contigs : dict
+
+    contigs_without_cov : dict
+
+    genes_without_cov : dict
+
+    """
 
     def __init__(self, gff_path, fasta_path, pbc_paths, output_path):
         self.gff_path = gff_path
@@ -178,6 +353,51 @@ class Assembly:
 ########################## CONTIG #################################
 
 class Contig:
+    """
+    Object to store information for each contig
+
+    Attributes
+    ----------
+    name : str
+
+    length : str
+
+    centre_corrector : str
+
+    per_base_coverages : list
+
+    coverage : list
+
+    coverage_sd : list
+
+    positions_of_Ns : str
+
+    genes : list
+
+    gene_coverage_mean : list
+
+    gene_coverage_sd : list
+
+    gene_lengths_mean : str
+
+    gene_lengths_sd : str
+
+    gc_content : str
+
+    gene_gc_mean : str
+
+    gene_gc_sd : str
+
+    tetranuc_freqs : str
+
+    trinuc_freqs : str
+
+    dinuc_freqs : str
+
+    z_score_vector : str
+
+    """
+
     def __init__(self, name, length, a):
         self.name = name
         self.length = length
@@ -553,6 +773,44 @@ class Contig:
 ############################ GENE ###################################
 
 class Gene:
+    """
+    Object to store information for each gene
+
+    Attributes
+    ----------
+    name : str
+    start_pos : str
+    end_pos : str
+    contig : str
+    source : str
+    score : str
+    strand : str
+    attributes : str
+
+    # set length
+    length : int
+    percentage_of_contig_length : str
+    length_of_covered_bases : str
+
+    coverage : str
+    coverage_sd : str
+
+
+    absolute_pos : str
+    no_left_neighbour : str
+    no_right_neighbour : str
+
+    single_gene : str
+
+    gc_content : str
+
+    tetranuc_freqs : str
+    trinuc_freqs : str
+    dinuc_freqs : str
+
+    z_score_vector : str
+
+    """
 
     def __init__(self, name, start_pos, end_pos, contig, source, score, strand, attributes, a):
         self.name = name
