@@ -260,9 +260,9 @@ def pca_cov_variables(vars, include, cov_set_num):
     cov_vars = "c_cov,c_covsd,g_cov,g_covsd,g_covdev_c"
     out_vars = ""
 
-    #TEST: string or bool?
-    print(include)
-    print(bool(include))
+    #TODO: test string or bool?
+    # print(include)
+    # print(bool(include))
 
     if include:
         for var in vars.split(','):
@@ -493,7 +493,7 @@ def process_config(config_path, script_dir):
 
 
     # write config to file and to console
-    write_cfg2file(config_obj, config_vars)
+    write_cfg2file(config_vars)
     write_run_overview(config_path, config_vars)
 
 
