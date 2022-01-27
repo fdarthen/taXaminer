@@ -117,6 +117,7 @@ def strip_ID(id):
     for prefix in ['gene:','gene-','transcript:','transcript-',
                     'rna:','rna-','cds:','cds-']:
         id = remove_prefix(id,prefix)
+    return id
 
 
 def get_id_for_rank_of_species(queryID, rank):
@@ -491,11 +492,33 @@ def run_diamond(diamond_cmd):
             logging.error('Database does not exists. Please check your input.')
         #TODO: check for output when putting empty protein file
         elif 'chuighdseck' in dmdnOut.stderr.decode():
-            logging.error('Database does not exists. Please check your input.')
+            logging.error('Empty protein FASTA file. Please check your input.')
         else:
             logging.error('DIAMOND Error message:\n'+dmdnOut.stderr.decode())
         sys.exit()
-
+    else:
+        logging.info('DIAMOND ouput:\n')
+        for line in dmdnOut.stderr.decode().split('\n'):
+            if line.startswith('Scoring parameters:'):
+                logging.debug(line)
+            elif line.startswith('Temporary directory:'):
+                logging.debug(line)
+            elif line.startswith('Percentage range of top alignment score to report hits:'):
+                logging.debug(line)
+            elif line.startswith('Reference ='):
+                logging.debug(line)
+            elif line.startswith('Sequences ='):
+                logging.debug(line)
+            elif line.startswith('Letters ='):
+                logging.debug(line)
+            elif line.startswith('Block size ='):
+                logging.debug(line)
+            elif line.startswith('Total time ='):
+                logging.info(line)
+            elif ' pairwise alignments, ' in line:
+                logging.info(line)
+            elif ' queries aligned.' in line:
+                logging.info(line)
 
 
 def perform_quick_search_1(perform_diamond, diamond_cmd, tax_assignment_path_1,
@@ -882,7 +905,7 @@ def prot_gene_matching(output_path, gff_path, genes, cfg):
                             if spline[2] in cfg.gff_parent_child_types:
                                 childID, parentID = get_child_parent(spline[8], cfg.gff_parent_child_attr)
                                 if childID:
-                                     add_to_dict(child_parent_dict, strip_ID(childID), strip_ID(parentID))
+                                    add_to_dict(child_parent_dict, strip_ID(childID), strip_ID(parentID))
                         elif cfg.gff_gene_connection == "inline":
                             headerID = get_gff_attribute(spline[8], cfg.gff_fasta_header_attr)
                             geneID = get_gff_attribute(spline[8], cfg.gff_gene_attr)
@@ -896,6 +919,8 @@ def prot_gene_matching(output_path, gff_path, genes, cfg):
                 break
 
     prot_index_path = output_path + 'tmp/tmp.proteins.fa.fai'
+
+    # print(child_parent_dict)
 
     patternmatch = []
     unmatched = [] #list of proteins where gene could not be matched
@@ -1154,7 +1179,7 @@ def taxonomy_summary(cfg, genes):
     query_lineage = query_taxon.taxid_lineage
     total_assignments = 0
     outside_query_lineage = 0
-    tax_sum_dict = {'superkingdom': {}, 'kingdom': {}, 'phylum': {}, 'class': {}, 'order': {}, 'family': {}, 'genus': {}, 'species': {}}
+    tax_sum_dict = {'superkingdom': {}, 'kingdom': {}, 'phylum': {}, 'class': {}} #, 'order': {}, 'family': {}, 'genus': {}, 'species': {}}
     for gene in genes.values():
         if gene.taxon_assignmentID and gene.taxon_assignmentID != 'NA':
             total_assignments += 1
