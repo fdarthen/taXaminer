@@ -41,6 +41,8 @@ def main():
     # location of script on system to run from outside of directory
     SCRIPT_DIR = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 
+    start_time = time.time()
+
     # TODO: add more options to pass config parameters via command line
     # TODO: add levels of cleaning (temporarily) created data
     # process logging level information from command line input
@@ -79,6 +81,7 @@ def main():
 
     if not cfg.update_plots:
 
+        pre_time = time.time()
         logging.info('>>> creating genomic FASTA index')
         cmd_faidx_g = 'samtools faidx "{}" -o "{}tmp/tmp.MILTS.fasta.fai"'.format(
                             cfg.fasta_path, cfg.output_path)
@@ -87,22 +90,28 @@ def main():
             logging.error('creation of genomic FASTA index failed:\n{}'.format(cmd_faidx_g))
             logging.error('Error message:\n'+out_faidx_g.stderr.decode())
             sys.exit()
+        logging.debug('finished [{}s]\n'.format(int(time.time()-pre_time)))
 
         ## make data integrity checks
         # check GFF and assembly FASTA for ID compatibility
         prepare_and_check.make_checks(cfg)
 
         if cfg.compute_coverage:
+            pre_time = time.time()
             logging.info('>>> calculating coverage information')
             prepare_coverage.process_coverage(cfg)
+            logging.debug('finished [{}s]\n'.format(int(time.time()-pre_time)))
 
+        pre_time = time.time()
         logging.info('>>> computing gene descriptors')
-        try:
-            produce_gene_info.process_gene_info(cfg)
-        except:
-            logging.error('computing gene descriptors failed')
-            sys.exit()
+        # try:
+        produce_gene_info.process_gene_info(cfg)
+        # except:
+        #     logging.error('computing gene descriptors failed')
+        #     sys.exit()
+        logging.debug('finished [{}s]\n'.format(int(time.time()-pre_time)))
 
+        pre_time = time.time()
         logging.info('>>> executing PCA and clustering ')
         cmd_r_pca = 'Rscript {}/perform_PCA_and_clustering.R "{}"'.format(SCRIPT_DIR, cfg.cfg_path)
         out_r_pca = subprocess.run([cmd_r_pca], shell=True, capture_output=True)
@@ -115,12 +124,16 @@ def main():
             else:
                 logging.error('PCA Error message:\n'+out_r_pca.stderr.decode())
             sys.exit()
+        logging.debug('finished [{}s]\n'.format(int(time.time()-pre_time)))
 
         if cfg.extract_proteins:
+            pre_time = time.time()
             logging.info('>>> extracting protein sequences')
             # TODO: finish checking this
             extract_prot_seq.generate_fasta(cfg)
+            logging.debug('finished [{}s]\n'.format(int(time.time()-pre_time)))
 
+    pre_time = time.time()
     logging.info('>>> creating protein FASTA index')
     cmd_faidx_p = 'samtools faidx "{}" -o "{}tmp/tmp.proteins.fa.fai"'.format(
                         cfg.proteins_path, cfg.output_path)
@@ -129,10 +142,14 @@ def main():
         logging.error('creation of protein FASTA index failed:\n{}'.format(cmd_faidx_p))
         logging.error('Error message:\n'+out_faidx_p.stderr.decode())
         sys.exit()
+    logging.debug('finished [{}s]\n'.format(int(time.time()-pre_time)))
 
+    pre_time = time.time()
     logging.info('>>> running taxonomic assignment')
     taxonomic_assignment.run_assignment(cfg)
+    logging.debug('finished [{}s]\n'.format(int(time.time()-pre_time)))
 
+    pre_time = time.time()
     logging.info('>>> creating plots')
     cmd_r_plot = 'Rscript {}/plotting.R "{}"'.format(SCRIPT_DIR, cfg.cfg_path)
     out_r_plot = subprocess.run([cmd_r_plot], shell=True, capture_output=True)
@@ -174,12 +191,18 @@ def main():
                     pass
             else:
                 print(line)
+    logging.debug('finished [{}s]\n'.format(int(time.time()-pre_time)))
 
     try:
+        pre_time = time.time()
         logging.info('>>> deleting temporary files')
         shutil.rmtree("{}tmp/".format(cfg.output_path))
+        logging.debug('finished [{}s]\n'.format(int(time.time()-pre_time)))
     except OSError as e:
         print("Error: %s : %s" % ("{}tmp/".format(cfg.output_path), e.strerror))
+
+
+    logging.info('Total runtime: {}s\n'.format(int(time.time()-start_time)))
 
 
 if __name__ == '__main__':
