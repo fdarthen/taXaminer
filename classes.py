@@ -253,6 +253,7 @@ class Assembly:
         self.geneless_contigs = {} # dictionary of contigs without genes
         self.contigs_without_cov = {} # dictionary to which all contigs without cov info will be moved to
         self.genes_without_cov = {} # dictionary to which all genes without cov info will be moved to
+        self.partial_genes = {}
 
     def get_gff_path(self):
         return self.gff_path
@@ -349,6 +350,22 @@ class Assembly:
 
     def get_gene_without_cov(self, gene):
         return self.genes_without_cov[gene]
+
+
+    def add_partial_gene(self, gene_name, gene):
+        if gene_name in self.partial_genes.keys():
+            self.partial_genes[gene_name].append(gene)
+        else:
+            self.partial_genes[gene_name] = [gene]
+
+    def remove_partial_gene(self, gene):
+        del self.partial_genes[gene]
+
+    def get_partial_genes(self):
+        return self.partial_genes
+
+    def get_partial_gene(self, gene):
+        return self.partial_genes[gene]
 
 ########################## CONTIG #################################
 

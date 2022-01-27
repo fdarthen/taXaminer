@@ -13,6 +13,7 @@ from itertools import product as itertools_product # to generate all possible ol
 from Bio.Seq import Seq as BioPython_Seq # to count oligonucleotides (also overlapping ones! not implemented in normal count)
 import yaml # read config file
 import sys # parse command line arguments
+import logging
 
 from classes import Assembly, Contig, Gene
 import prepare_and_check
@@ -1415,6 +1416,8 @@ def read_gff(a, gene_tag, source_type, include_pseudogenes):
                    (tmp_array[1] == source_type and tmp_array[2] == gene_tag) or \
                    (tmp_array[2] == "pseudogene" and include_pseudogenes == True)):
 
+
+
                     associated_contig = tmp_array[0]
                     source = tmp_array[1]
                     start_pos = int(tmp_array[3])
@@ -1422,7 +1425,7 @@ def read_gff(a, gene_tag, source_type, include_pseudogenes):
 
                     if tmp_array[5] == '.':          # if there is no score
                         score = tmp_array[5]         # simply add the '.'
-                    else:                                 # if a score is given
+                    else:                            # if a score is given
                         score = float(tmp_array[5])  # add it as a float
 
                     strand = tmp_array[6]
@@ -1432,6 +1435,12 @@ def read_gff(a, gene_tag, source_type, include_pseudogenes):
 
                     # initialise gene
                     gene = Gene(gene_name, start_pos, end_pos, associated_contig, source, score, strand, attributes, a)
+
+                    if 'part=' in tmp_array[8]:
+                        # dont add partial genes
+                        # TODO: add ability to handle partial genes
+                        a.add_partial_gene(gene_name, gene)
+                        continue
 
                     # add to dictionary of genes
                     a.add_gene(gene_name, gene)
@@ -1661,8 +1670,9 @@ def process_gene_info(cfg):
 
     """
 
-    print("include pseudogenes = " + str(cfg.include_pseudogenes))
-    print("include coverage = " + str(cfg.include_coverage))
+    # TODO: add to logging info in beginning
+    # logging.debug("include pseudogenes = " + str(cfg.include_pseudogenes))
+    # logging.debug("include coverage = " + str(cfg.include_coverage))
 
     # ====================== VARIABLES ======================
 
@@ -1670,6 +1680,8 @@ def process_gene_info(cfg):
 
     read_faidx(a) # use faidx to initalize contigs
     read_gff(a, cfg.gff_gene_tag, cfg.gff_source, cfg.include_pseudogenes)
+    if a.partial_genes:
+        logging.warning('Gene(s) excluded due to partialness:\n{}'.format(list(a.partial_genes.keys())))
     read_fasta(a)
     read_pbc(a, cfg.include_coverage)
 
