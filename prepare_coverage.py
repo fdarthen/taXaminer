@@ -41,7 +41,7 @@ def bam2pbc(bam, pbc):
         # sys.exit()
 
 
-def mapping(mapping_dir, fasta_path, read_paths, insert_size, bam_path):
+def mapping(mapping_dir, fasta_path, read_paths, insert_size, bam_path, threads):
     """Mapping reads to assembly using Bowtie2.
 
     Uses Bowtie2 to map reads to reference assembly. Options used:
@@ -66,13 +66,12 @@ def mapping(mapping_dir, fasta_path, read_paths, insert_size, bam_path):
 
     ## prepare commands
     cmd_build = 'bowtie2-build "{}" {}assembly'.format(fasta_path, mapping_dir)
-    # TODO: number of threads (p) specified by user
     # depending on number of paths in list read_paths different cmd
     # for mapping of paired end or single end data is used
     if len(read_paths) == 2:
-        cmd_mapping =  'bowtie2 --sensitive -I {} -X {} -a -p 16 -x {}assembly -1 {} -2 {} -S {}mapping.sam'.format(str(insert_size-200), str(insert_size+200), mapping_dir, read_paths[0], read_paths[1], mapping_dir)
+        cmd_mapping =  'bowtie2 --sensitive -I {} -X {} -a -p {} -x {}assembly -1 {} -2 {} -S {}mapping.sam'.format(str(insert_size-200), str(insert_size+200), threads, mapping_dir, read_paths[0], read_paths[1], mapping_dir)
     elif len(read_paths) == 1:
-        cmd_mapping =  'bowtie2 --sensitive -a -p 16 -x {}assembly -U {} -S {}mapping.sam'.format(mapping_dir, read_paths[0], mapping_dir)
+        cmd_mapping =  'bowtie2 --sensitive -a -p {} -x {}assembly -U {} -S {}mapping.sam'.format(threads, mapping_dir, read_paths[0], mapping_dir)
     else:
         print('Error: unexpected number of read paths detected for coverage set (max allowed: 2; given: {}). Please recheck your input.'.format(str(len(read_paths))))
     cmd_view = 'samtools view -b {}mapping.sam | samtools sort -o {}'.format(mapping_dir, bam_path)
@@ -135,7 +134,7 @@ def process_coverage(cfg):
 
 
                 mapping(mapping_dir, cfg.fasta_path, read_paths_set,
-                        insert_size_set, bam_path)
+                        insert_size_set, bam_path, cfg.threads)
                 bam2pbc(bam_path, pbc_path)
 
             else:

@@ -1302,7 +1302,7 @@ def run_assignment(cfg):
 
     tmp_prot_path = cfg.output_path+"tmp/tmp.subset.protein.fasta"
 
-    diamond_cmd = 'diamond blastp -f 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore staxids sscinames -b2.0 --tmpdir /dev/shm --sensitive -c1 --top 10 -q "{}" -d "{}"'.format(tmp_prot_path, cfg.database_path)
+    diamond_cmd = 'diamond blastp -p {} -f 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore staxids sscinames -b2.0 --tmpdir /dev/shm --sensitive -c1 --top 10 -q "{}" -d "{}"'.format(cfg.threads, tmp_prot_path, cfg.database_path)
 
     if cfg.taxon_exclude:
         taxon_exclude = ' --taxon-exclude "{}"'.format(get_id_for_rank_of_species(cfg.taxon_id, cfg.exclusion_rank))

@@ -307,6 +307,9 @@ def set_config_defaults(config_obj):
     config_vars['gff_path'] = set_variable_default(config_obj, 'gff_path')
     config_vars['output_path'] = check_dir_slash(set_variable_default(config_obj, 'output_path'))
     config_vars['taxon_id'] = set_variable_default(config_obj, 'taxon_id')
+
+    config_vars['threads'] = set_variable_default(config_obj, 'threads', 1)
+
     ## Coverage
     # check user input for coverage data and fill missing with default paths
     config_vars['read_paths'] = enumerated_key(config_obj, 'read_paths', [])
@@ -338,6 +341,7 @@ def set_config_defaults(config_obj):
     else:
         config_vars['compute_coverage'] = set_variable_default(config_obj, 'compute_coverage', 'TRUE')
     config_vars['insert_size'] = enumerated_key(config_obj, 'insert_size', list(config_vars.get('read_paths').keys()), '200')
+
     ## Taxonomic assignment
     config_vars['proteins_path'] = set_variable_default(config_obj, 'proteins_path', config_vars.get('output_path')+'proteins.faa')
     config_vars['extract_proteins'] = set_variable_default(config_obj, 'extract_proteins', check_file_inexistence(config_vars.get('proteins_path'), 'AND'))
@@ -360,21 +364,25 @@ def set_config_defaults(config_obj):
     config_vars['database_path'] = set_variable_default(config_obj, 'database_path')
     config_vars['taxon_exclude'] = set_variable_default(config_obj, 'taxon_exclude', 'TRUE')
     config_vars['exclusion_rank'] = set_variable_default(config_obj, 'exclusion_rank', 'species')
+
     ## Plotting
     config_vars['update_plots'] = set_variable_default(config_obj, 'update_plots', 'FALSE')
     config_vars['num_groups_plot'] = set_variable_default(config_obj, 'num_groups_plot', '25')
     config_vars['merging_labels'] = set_variable_default(config_obj, 'merging_labels', 'None')
     config_vars['output_pdf'] = set_variable_default(config_obj, 'output_pdf', 'TRUE')
     config_vars['output_png'] = set_variable_default(config_obj, 'output_png', 'FALSE')
+
     ## Gene info
     config_vars['include_pseudogenes'] = set_variable_default(config_obj, 'include_pseudogenes', 'FALSE')
     config_vars['gff_source'] = set_variable_default(config_obj, 'gff_source', 'default')
     config_vars['gff_dict'] = set_gff_parsing_rules(config_vars.get('gff_source'))
+
     ## PCA
     config_vars['input_variables'] = pca_cov_variables(set_variable_default(config_obj, 'input_variables', default_pca_vars), config_vars.get('include_coverage'), len(config_vars.get('cov_set_exists')))
     config_vars['perform_parallel_analysis'] = set_variable_default(config_obj, 'perform_parallel_analysis', 'FALSE')
     config_vars['num_pcs'] = set_variable_default(config_obj, 'num_pcs', '3')
     config_vars['coverage_cutoff_mode'] = set_variable_default(config_obj, 'coverage_cutoff_mode', 'default')
+
     ## Clustering
     config_vars['perform_kmeans'] = set_variable_default(config_obj, 'perform_kmeans', 'FALSE')
     config_vars['kmeans_k'] = set_variable_default(config_obj, 'kmeans_k', 'default')
