@@ -4,14 +4,12 @@
 # author: Simonida Zehr and Freya Arthen
 # date: 18 June 2019
 
-from operator import itemgetter
 import numpy as np
 import pathlib # to create directories
 import operator # for quick comparisons
 import scipy.stats as stats # for Pearson's R
 from itertools import product as itertools_product # to generate all possible oligonucleotides from base alphabet
 from Bio.Seq import Seq as BioPython_Seq # to count oligonucleotides (also overlapping ones! not implemented in normal count)
-import yaml # read config file
 import sys # parse command line arguments
 import logging
 

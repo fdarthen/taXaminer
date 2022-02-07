@@ -23,7 +23,7 @@ mamba install -c hcc r-paran -y
 
 # other tools
 echo "additional software"
-mamba install samtools bedtools bowtie2 diamond gffread=0.12.1 -y
+mamba install samtools bedtools bowtie2 diamond -y
 
 # setting MILTS.sh as an executable
 chmod +x MILTS.sh

@@ -8,7 +8,6 @@ Expects processed config file
 """
 
 import sys
-import re
 from Bio import Seq
 import logging
 
@@ -212,7 +211,7 @@ def get_longest_transcript(contigs, features):
             gene.transl_table = cds.transl_table
             if not gene.transl_table:
                 gene.transl_table = '1'
-                
+
 
 def set_seqs(proteins_file, contigs, features, current_contig, contig_seq):
     """Extract nuc sequences and translate to AA for genes on contig.

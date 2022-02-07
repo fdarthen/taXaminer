@@ -1,12 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import yaml # read config file
 import taxopy
-import time
 import sys
-import numpy as np
 import csv
-import os
 import pathlib
 import subprocess
 import logging
@@ -514,7 +510,7 @@ def run_diamond(diamond_cmd):
             elif line.startswith('Block size ='):
                 logging.debug(line)
             elif line.startswith('Total time ='):
-                logging.info(line)
+                logging.info('DIAMOND runtime: {}'.format(line.split(' = ')[1]))
             elif ' pairwise alignments, ' in line:
                 logging.info(line)
             elif ' queries aligned.' in line:

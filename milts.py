@@ -184,14 +184,16 @@ def main():
             if 'error' in line.lower():
                 if '[.DisplayCompositor]GL ERROR :GL_INVALID_OPERATION : glBufferData' in line:
                     pass
-                elif 'Gtk-WARNING' in line and 'cannot open display' in line:
-                    logging.warning('Creation of static versions of 3D plot unavailable on cluster environment. \
-                                    Rerun with setting option "update_plots" to TRUE on a workstation to create plots.')
+            elif 'Gtk-WARNING' in line and 'cannot open display' in line:
+                logging.warning('Creation of static versions of 3D plot unavailable on cluster environment. \
+                                Rerun with setting option "update_plots" to TRUE on a workstation to create plots.')
             elif 'done with code' in line:
                     pass
             else:
                 print(line)
     logging.debug('finished [{}s]\n'.format(int(time.time()-pre_time)))
+
+
 
     try:
         pre_time = time.time()
