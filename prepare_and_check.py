@@ -308,7 +308,7 @@ def set_config_defaults(config_obj):
     config_vars['output_path'] = check_dir_slash(set_variable_default(config_obj, 'output_path'))
     config_vars['taxon_id'] = set_variable_default(config_obj, 'taxon_id')
 
-    config_vars['threads'] = set_variable_default(config_obj, 'threads', 1)
+    config_vars['threads'] = set_variable_default(config_obj, 'threads', 'auto')
 
     ## Coverage
     # check user input for coverage data and fill missing with default paths

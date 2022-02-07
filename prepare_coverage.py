@@ -132,9 +132,11 @@ def process_coverage(cfg):
                 bam_path = cfg.bam_paths.get(cov_set)
                 pbc_path = cfg.pbc_paths.get(cov_set)
 
+                num_threads = cfg.threads if cfg.threads != 'auto' else 1
+
 
                 mapping(mapping_dir, cfg.fasta_path, read_paths_set,
-                        insert_size_set, bam_path, cfg.threads)
+                        insert_size_set, bam_path, num_threads)
                 bam2pbc(bam_path, pbc_path)
 
             else:
