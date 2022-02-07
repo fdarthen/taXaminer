@@ -132,6 +132,11 @@ def main():
             # TODO: finish checking this
             extract_prot_seq.generate_fasta(cfg)
             logging.debug('finished [{}s]\n'.format(int(time.time()-pre_time)))
+        else:
+            # create symlink if proteins.faa file does not exist in milts
+            # report (for GUI)
+            if not pathlib.Path(cfg.output_path+'proteins.faa').exists():
+                pathlib.Path(cfg.output_path+'proteins.faa').symlink_to(pathlib.Path(cfg.proteins_path).resolve())
 
     pre_time = time.time()
     logging.info('>>> creating protein FASTA index')
