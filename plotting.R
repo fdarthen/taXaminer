@@ -310,7 +310,7 @@ if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
             '</br>Coverage:',g_coverages, '(SD from contig mean:',g_covdeviations,')',
             '</br>Terminal:',g_terminal,'(Genes on contig:',c_num_of_genes,')',
             '</br>LCA:',lca,
-            '</br>Best hit:',best_hit,'(e-value:',bh_evalue,')',
+            '</br>Best hit:',best_hit,'(e-value:',bh_evalue,', pident: ',bh_pident,')',
             '</br>Seq:',query_seq),
         textposition="bottom left",
         opacity=0.75,
@@ -326,7 +326,7 @@ if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
             '</br>Coverage:',g_coverages, '(SD from contig mean:',g_covdeviations,')',
             '</br>Terminal:',g_terminal,'(Genes on contig:',c_num_of_genes,')',
             '</br>LCA:',lca,
-            '</br>Best hit:',best_hit,'(e-value:',bh_evalue,')',
+            '</br>Best hit:',best_hit,'(e-value:',bh_evalue,', pident: ',bh_pident,')',
             '</br>Seq:',query_seq),
         textposition="bottom left",
         opacity=0.5,
@@ -342,7 +342,7 @@ if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
             '</br>Coverage:',g_coverages, '(SD from contig mean:',g_covdeviations,')',
             '</br>Terminal:',g_terminal,'(Genes on contig:',c_num_of_genes,')',
             '</br>LCA:',lca,
-            '</br>Best hit:',best_hit,'(e-value:',bh_evalue,')',
+            '</br>Best hit:',best_hit,'(e-value:',bh_evalue,', pident: ',bh_pident,')',
             '</br>Seq:',query_seq),
         textposition="bottom left",
         size=~I(50),
@@ -350,12 +350,6 @@ if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
         name=~plot_label_freq
     )
     fig <- fig %>% layout(title = query_name)
-
-    # json<-plotly_json(fig,FALSE)
-    # write(json,paste0(cfg$output_path, "tmp/3d_1.json"))
-    #
-    # json <- plotly:::to_JSON(plotly_build(fig))
-    # write(json,paste0(cfg$output_path, "tmp/3d_2.json"))
 
     # different angles of 3D plot as pdf
     orca_static_3d(fig, "2D_plot_1_2", 0, 0, 2.25)

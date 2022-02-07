@@ -70,6 +70,7 @@ class Gene:
         self.best_hit = None
         self.best_hitID = None
         self.bh_evalue = None
+        self.bh_pident = None
         self.lca = None
         self.lcaID = None
         self.corrected_lca = None
@@ -735,10 +736,12 @@ def read_tax_assignments(tax_assignment_path, prots, queryID):
                             gene.best_hit = spline[-1]
                             gene.best_hitID = int(spline[-2])
                         gene.bh_evalue = spline[10]
+                        gene.bh_pident = spline[2]
                     else: # ncbiID for match could not be found
                         gene.best_hit = 'NA'
                         gene.best_hitID = 'NA'
                         gene.bh_evalue = 'NA'
+                        gene.bh_pident = 'NA'
 
                 if closest_hit:
                     gene.tax_assignments.append(spline[1:-2]+[str(closest_hit.taxid),closest_hit.name])
@@ -1221,7 +1224,7 @@ def write_output(output_path, genes, header):
 
     with open(out_path, 'w') as out_file:
 
-        csv_columns = header.strip().split(',') + ['protID', 'lcaID', 'lca', 'best_hitID', 'best_hit', 'bh_evalue', 'corrected_lca', 'taxon_assignment', 'plot_label']
+        csv_columns = header.strip().split(',') + ['protID', 'lcaID', 'lca', 'best_hitID', 'best_hit', 'bh_evalue', 'bh_pident', 'corrected_lca', 'taxon_assignment', 'plot_label']
         #TODO: remove coverage related columns from output when not required (include_coverage=FALSE)
         writer = csv.DictWriter(out_file, fieldnames=csv_columns, extrasaction='ignore')
         writer.writeheader()
@@ -1229,7 +1232,7 @@ def write_output(output_path, genes, header):
         for gene in genes.values():
             gene_dict = gene.__dict__
             to_delete = []
-            for attr, value in list(gene_dict.items()):
+            for attr, value in gene_dict.items():
                 if type(value) == tuple:
                     if attr == "coords":
                         name = "Dim."
@@ -1238,8 +1241,13 @@ def write_output(output_path, genes, header):
                         name = attr + "_"
                         add = 0
                     for index, sub_val in enumerate(value):
-                        gene_dict[name + str(index+add)] = sub_val
+                        gene_dict[name + str(index+add)] = round(float(sub_val),2)
                     to_delete.append(attr)
+                else:
+                    try:
+                        gene_dict[attr] = round(float(value),2)
+                    except:
+                        pass
 
             for key in to_delete:
                 del gene_dict[key]
