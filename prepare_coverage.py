@@ -41,7 +41,7 @@ def bam2pbc(bam, pbc):
         # sys.exit()
 
 
-def mapping(mapping_dir, fasta_path, read_paths, insert_size, bam_path, threads):
+def mapping(mapping_dir, fasta_path, read_paths, min_insert_set, max_insert_set, read_orientation_set, bam_path, threads):
     """Mapping reads to assembly using Bowtie2.
 
     Uses Bowtie2 to map reads to reference assembly. Options used:
@@ -69,7 +69,7 @@ def mapping(mapping_dir, fasta_path, read_paths, insert_size, bam_path, threads)
     # depending on number of paths in list read_paths different cmd
     # for mapping of paired end or single end data is used
     if len(read_paths) == 2:
-        cmd_mapping =  'bowtie2 --sensitive -I {} -X {} -a -p {} -x {}assembly -1 {} -2 {} -S {}mapping.sam'.format(str(insert_size-200), str(insert_size+200), threads, mapping_dir, read_paths[0], read_paths[1], mapping_dir)
+        cmd_mapping =  'bowtie2 --sensitive -I {} -X {} --{} -a -p {} -x {}assembly -1 {} -2 {} -S {}mapping.sam'.format(min_insert_set, max_insert_set, read_orientation_set, threads, mapping_dir, read_paths[0], read_paths[1], mapping_dir)
     elif len(read_paths) == 1:
         cmd_mapping =  'bowtie2 --sensitive -a -p {} -x {}assembly -U {} -S {}mapping.sam'.format(threads, mapping_dir, read_paths[0], mapping_dir)
     else:
@@ -128,7 +128,9 @@ def process_coverage(cfg):
                 pathlib.Path(mapping_dir).mkdir(parents=True, exist_ok=True)
 
                 read_paths_set = cfg.read_paths.get(cov_set)
-                insert_size_set = int(cfg.insert_size.get(cov_set))
+                min_insert_set = int(cfg.min_insert.get(cov_set))
+                max_insert_set = cfg.max_insert.get(cov_set)
+                read_orientation_set = cfg.read_orientation.get(cov_set)
                 bam_path = cfg.bam_paths.get(cov_set)
                 pbc_path = cfg.pbc_paths.get(cov_set)
 
@@ -136,7 +138,7 @@ def process_coverage(cfg):
 
 
                 mapping(mapping_dir, cfg.fasta_path, read_paths_set,
-                        insert_size_set, bam_path, num_threads)
+                        min_insert_set, max_insert_set, read_orientation_set, bam_path, num_threads)
                 bam2pbc(bam_path, pbc_path)
 
             else:

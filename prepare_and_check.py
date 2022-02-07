@@ -340,7 +340,13 @@ def set_config_defaults(config_obj):
         config_vars['compute_coverage'] = set_variable_default(config_obj, 'compute_coverage', 'FALSE')
     else:
         config_vars['compute_coverage'] = set_variable_default(config_obj, 'compute_coverage', 'TRUE')
-    config_vars['insert_size'] = enumerated_key(config_obj, 'insert_size', list(config_vars.get('read_paths').keys()), '200')
+    config_vars['min_insert'] = enumerated_key(config_obj, 'min_insert', list(config_vars.get('read_paths').keys()), '0')
+    config_vars['max_insert'] = enumerated_key(config_obj, 'max_insert', list(config_vars.get('read_paths').keys()), '500')
+    config_vars['read_orientation'] = enumerated_key(config_obj, 'read_orientation', list(config_vars.get('read_paths').keys()), 'fr')
+
+
+#Also, this protocol yields pairs where the expected genomic distance from end to end is about 200-500 base pairs.
+
 
     ## Taxonomic assignment
     config_vars['proteins_path'] = set_variable_default(config_obj, 'proteins_path', config_vars.get('output_path')+'proteins.faa')
