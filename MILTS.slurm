@@ -4,8 +4,7 @@
 #SBATCH --cpus-per-task=24
 #SBATCH --mem-per-cpu=8gb
 #SBATCH --job-name="milts"
-#SBATCH --output=./%A_%a.o.out     # Standard output
-#SBATCH --error=./%A_%a.e.out      # and error log
+#SBATCH --output=./%A_%a.log     # log output
 #SBATCH --array=1
 
 # path to tools if conda installation wasn't used
