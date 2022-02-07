@@ -410,67 +410,67 @@ def write_run_overview(config_path, config_vars):
       config_vars(dict): processed config {parameter name : value}
     """
 
-    print('')
-    print("Config:\t{}".format(config_path))
-    print("FASTA:\t{}".format(config_vars.get('fasta_path')))
-    print("GFF:\t{}".format(config_vars.get('gff_path')))
-    print("Taxon ID:\t{}".format(config_vars.get('taxon_id')))
-    print("Output:\t{}\n".format(config_vars.get('output_path')))
+    logging.info('')
+    logging.info("Config:\t{}".format(config_path))
+    logging.info("FASTA:\t{}".format(config_vars.get('fasta_path')))
+    logging.info("GFF:\t{}".format(config_vars.get('gff_path')))
+    logging.info("Taxon ID:\t{}".format(config_vars.get('taxon_id')))
+    logging.info("Output:\t{}\n".format(config_vars.get('output_path')))
 
     if config_vars.get('include_coverage') == 'TRUE':
         for cov_set, pbc_path in config_vars.get('pbc_paths').items():
             if config_vars.get('cov_set_exists').get(cov_set) == 'pbc_paths':
-                print("PBC {}:\t{} [exists]".format(cov_set, pbc_path))
+                logging.info("PBC {}:\t{} [exists]".format(cov_set, pbc_path))
             else:
                 if config_vars.get('cov_set_exists').get(cov_set) == 'bam_paths':
                     basis = 'BAM'
                 else:
                     basis = 'read mapping'
-                print("PBC {}:\t{}".format(cov_set, pbc_path))
-                print("  computation based on:\t{} [{}]".format( config_vars.get(config_vars.get('cov_set_exists').get(cov_set)).get(cov_set), basis))
-        print('')
+                logging.info("PBC {}:\t{}".format(cov_set, pbc_path))
+                logging.info("  computation based on:\t{} [{}]".format( config_vars.get(config_vars.get('cov_set_exists').get(cov_set)).get(cov_set), basis))
+        logging.info('')
     else:
-        print("no valid coverage information provided\n")
+        logging.info("no valid coverage information provided\n")
 
     if config_vars.get('extract_proteins') == 'FALSE':
-        print("Proteins:\t{} [exists]".format(config_vars.get('proteins_path')))
+        logging.info("Proteins:\t{} [exists]".format(config_vars.get('proteins_path')))
     else:
-        print("Proteins:\t{}".format(config_vars.get('proteins_path')))
+        logging.info("Proteins:\t{}".format(config_vars.get('proteins_path')))
     if config_vars.get('assignment_mode') == 'quick':
-        print("Quick assignment mode selected")
-        print("Filtering search performed on level {}".format(config_vars.get('quick_mode_search_rank')))
-        print("Hits accepted on level {}".format(config_vars.get('quick_mode_match_rank')))
+        logging.info("Quick assignment mode selected")
+        logging.info("Filtering search performed on level {}".format(config_vars.get('quick_mode_search_rank')))
+        logging.info("Hits accepted on level {}".format(config_vars.get('quick_mode_match_rank')))
         if config_vars.get('compute_tax_assignment') == 'FALSE':
-            print("Taxonomic hits files [exist]:\n{}{}".format(config_vars.get('tax_assignment_path')[0],config_vars.get('tax_assignment_path')[1]))
+            logging.info("Taxonomic hits files [exist]:\n{}{}".format(config_vars.get('tax_assignment_path')[0],config_vars.get('tax_assignment_path')[1]))
         else:
-            print("Taxonomic hits files:\n{}{}".format(config_vars.get('tax_assignment_path')[0],config_vars.get('tax_assignment_path')[1]))
+            logging.info("Taxonomic hits files:\n{}{}".format(config_vars.get('tax_assignment_path')[0],config_vars.get('tax_assignment_path')[1]))
 
 
     else:
-        print("Exhaustive assignment mode selected")
+        logging.info("Exhaustive assignment mode selected")
         if config_vars.get('compute_tax_assignment') == 'FALSE':
-            print("Taxonomic hits file:{} [exists]".format(config_vars.get('tax_assignment_path')))
+            logging.info("Taxonomic hits file:{} [exists]".format(config_vars.get('tax_assignment_path')))
         else:
-            print("Taxonomic hits file:{}".format(config_vars.get('tax_assignment_path')))
+            logging.info("Taxonomic hits file:{}".format(config_vars.get('tax_assignment_path')))
 
-    print("Query taxon excluded:\t{}\n".format(config_vars.get('taxon_exclude')))
+    logging.info("Query taxon excluded:\t{}\n".format(config_vars.get('taxon_exclude')))
 
-    print("Pseudogenes included:\t{}".format(config_vars.get('include_pseudogenes')))
+    logging.info("Pseudogenes included:\t{}".format(config_vars.get('include_pseudogenes')))
     if config_vars.get('gff_source') != 'default':
-        print("Rule for GFF parsing:\t{}".format(config_vars.get('gff_source')))
-    print('\n')
+        logging.info("Rule for GFF parsing:\t{}".format(config_vars.get('gff_source')))
+    logging.info('\n')
 
-    print("PCA variables:\t{}".format(config_vars.get('input_variables')))
-    print("Parallel analysis performed:\t{}".format(config_vars.get('perform_parallel_analysis')))
+    logging.info("PCA variables:\t{}".format(config_vars.get('input_variables')))
+    logging.info("Parallel analysis performed:\t{}".format(config_vars.get('perform_parallel_analysis')))
     if config_vars.get('coverage_cutoff_mode') != 'default':
-        print("Coverage cutoff:\t{}".format(config_vars.get('coverage_cutoff_mode')))
+        logging.info("Coverage cutoff:\t{}".format(config_vars.get('coverage_cutoff_mode')))
 
     for clustering in ['kmeans', 'hclust', 'mclust']:
         if config_vars.get('perform_'+clustering) == 'TRUE':
-            print("{} clustering performed with number of groups:\t{}".format(clustering, config_vars.get(clustering+'k')))
+            logging.info("{} clustering performed with number of groups:\t{}".format(clustering, config_vars.get(clustering+'k')))
     if config_vars.get('perform_dbscan') == 'TRUE':
-        print("DBSCAN clustering performed with settings:\t{}".format(config_vars.get('dbscan_groups')))
-    print('')
+        logging.info("DBSCAN clustering performed with settings:\t{}".format(config_vars.get('dbscan_groups')))
+    logging.info('')
 
 
 def process_config(config_path, script_dir):
