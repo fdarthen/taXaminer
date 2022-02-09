@@ -172,7 +172,7 @@ prot_fasta <- Biostrings::readAAStringSet(cfg$proteins_path)
 protID <- names(prot_fasta)
 query_seq <- paste(prot_fasta)
 prot_sequences <- data.frame(protID, query_seq)
-# delete whitespace from sequence
+# delete everything after first whitespace in fasta header
 prot_sequences$protID <- gsub('\\s.*', '' , prot_sequences$protID)
 # add html line breaks to sequence so hover windows stay narrrow
 prot_sequences$query_seq <- gsub("(.{70}?)", "\\1</br>", prot_sequences$query_seq)
@@ -299,71 +299,110 @@ if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
         plot_pdf_andor_png(plot_z, paste(c(cfg$output_path, "taxonomic_assignment/density_z"), collapse=""), TRUE, label_1d_ncols)
     }
 
-    # creation of 3D scatter plot with plotly
-    # data is added in three steps to put 'background' information like genes assigned to
-    # query species and unassigned ones into background and put interesting matches in front
-    fig <- plot_ly(type="scatter3d", mode="markers", symbols=c('circle'))
-    fig <- fig %>% add_markers(fig, data=genes_coords_taxon_query, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
-        hoverinfo="text",
-        text = ~paste('</br>ID:',g_name, '| Scaffold:',c_name,
-            '</br>Taxonomic assignment:',taxon_assignment,'| Label:',plot_label,
-            '</br>Coverage:',g_coverages, '(SD from contig mean:',g_covdeviations,')',
-            '</br>Terminal:',g_terminal,'(Genes on contig:',c_num_of_genes,')',
-            '</br>LCA:',lca,
-            '</br>Best hit:',best_hit,'(e-value:',bh_evalue,')',
-            '</br>Seq:',query_seq),
-        textposition="bottom left",
-        opacity=0.75,
-        size=~I(50),
-        color=~I(label_color),
-        name=~plot_label_freq
-    )
+    if (cfg$include_coverage == 'TRUE') {
+        # creation of 3D scatter plot with plotly
+        # data is added in three steps to put 'background' information like genes assigned to
+        # query species and unassigned ones into background and put interesting matches in front
+        fig <- plot_ly(type="scatter3d", mode="markers", symbols=c('circle'))
+        fig <- fig %>% add_markers(fig, data=genes_coords_taxon_query, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
+            hoverinfo="text",
+            text = ~paste('</br>ID:',g_name, '| Scaffold:',c_name,
+                '</br>Taxonomic assignment:',taxon_assignment,'| Label:',plot_label,
+                '</br>Coverage:',g_coverages, '(SD from contig mean:',g_covdeviations,')',
+                '</br>Terminal:',g_terminal,'(Genes on contig:',c_num_of_genes,')',
+                '</br>LCA:',lca,
+                '</br>Best hit:',best_hit,'(e-value:',bh_evalue,', pident: ',bh_pident,')',
+                '</br>Seq:',query_seq),
+            textposition="bottom left",
+            opacity=0.75,
+            size=~I(50),
+            color=~I(label_color),
+            name=~plot_label_freq
+        )
 
-    fig <- fig %>% add_markers(fig, data=genes_coords_taxon_unassigned, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
-        hoverinfo="text",
-        text = ~paste('</br>ID:',g_name, '| Scaffold:',c_name,
-            '</br>Taxonomic assignment:',taxon_assignment,'| Label:',plot_label,
-            '</br>Coverage:',g_coverages, '(SD from contig mean:',g_covdeviations,')',
-            '</br>Terminal:',g_terminal,'(Genes on contig:',c_num_of_genes,')',
-            '</br>LCA:',lca,
-            '</br>Best hit:',best_hit,'(e-value:',bh_evalue,')',
-            '</br>Seq:',query_seq),
-        textposition="bottom left",
-        opacity=0.5,
-        size=~I(50),
-        color=~I(label_color),
-        name=~plot_label_freq
-    )
+        fig <- fig %>% add_markers(fig, data=genes_coords_taxon_unassigned, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
+            hoverinfo="text",
+            text = ~paste('</br>ID:',g_name, '| Scaffold:',c_name,
+                '</br>Taxonomic assignment:',taxon_assignment,'| Label:',plot_label,
+                '</br>Coverage:',g_coverages, '(SD from contig mean:',g_covdeviations,')',
+                '</br>Terminal:',g_terminal,'(Genes on contig:',c_num_of_genes,')',
+                '</br>LCA:',lca,
+                '</br>Best hit:',best_hit,'(e-value:',bh_evalue,', pident: ',bh_pident,')',
+                '</br>Seq:',query_seq),
+            textposition="bottom left",
+            opacity=0.5,
+            size=~I(50),
+            color=~I(label_color),
+            name=~plot_label_freq
+        )
 
-    fig <- fig %>% add_markers(fig, data=genes_coords_taxon_rest, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
-        hoverinfo="text",
-        text = ~paste('</br>ID:',g_name, '| Scaffold:',c_name,
-            '</br>Taxonomic assignment:',taxon_assignment,'| Label:',plot_label,
-            '</br>Coverage:',g_coverages, '(SD from contig mean:',g_covdeviations,')',
-            '</br>Terminal:',g_terminal,'(Genes on contig:',c_num_of_genes,')',
-            '</br>LCA:',lca,
-            '</br>Best hit:',best_hit,'(e-value:',bh_evalue,')',
-            '</br>Seq:',query_seq),
-        textposition="bottom left",
-        size=~I(50),
-        color=~I(label_color),
-        name=~plot_label_freq
-    )
+        fig <- fig %>% add_markers(fig, data=genes_coords_taxon_rest, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
+            hoverinfo="text",
+            text = ~paste('</br>ID:',g_name, '| Scaffold:',c_name,
+                '</br>Taxonomic assignment:',taxon_assignment,'| Label:',plot_label,
+                '</br>Coverage:',g_coverages, '(SD from contig mean:',g_covdeviations,')',
+                '</br>Terminal:',g_terminal,'(Genes on contig:',c_num_of_genes,')',
+                '</br>LCA:',lca,
+                '</br>Best hit:',best_hit,'(e-value:',bh_evalue,', pident: ',bh_pident,')',
+                '</br>Seq:',query_seq),
+            textposition="bottom left",
+            size=~I(50),
+            color=~I(label_color),
+            name=~plot_label_freq
+        )
+    }else{
+        # creation of 3D scatter plot with plotly
+        # data is added in three steps to put 'background' information like genes assigned to
+        # query species and unassigned ones into background and put interesting matches in front
+        fig <- plot_ly(type="scatter3d", mode="markers", symbols=c('circle'))
+        fig <- fig %>% add_markers(fig, data=genes_coords_taxon_query, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
+            hoverinfo="text",
+            text = ~paste('</br>ID:',g_name, '| Scaffold:',c_name,
+                '</br>Taxonomic assignment:',taxon_assignment,'| Label:',plot_label,
+                '</br>Terminal:',g_terminal,'(Genes on contig:',c_num_of_genes,')',
+                '</br>LCA:',lca,
+                '</br>Best hit:',best_hit,'(e-value:',bh_evalue,', pident: ',bh_pident,')',
+                '</br>Seq:',query_seq),
+            textposition="bottom left",
+            opacity=0.75,
+            size=~I(50),
+            color=~I(label_color),
+            name=~plot_label_freq
+        )
 
+        fig <- fig %>% add_markers(fig, data=genes_coords_taxon_unassigned, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
+            hoverinfo="text",
+            text = ~paste('</br>ID:',g_name, '| Scaffold:',c_name,
+                '</br>Taxonomic assignment:',taxon_assignment,'| Label:',plot_label,
+                '</br>Terminal:',g_terminal,'(Genes on contig:',c_num_of_genes,')',
+                '</br>LCA:',lca,
+                '</br>Best hit:',best_hit,'(e-value:',bh_evalue,', pident: ',bh_pident,')',
+                '</br>Seq:',query_seq),
+            textposition="bottom left",
+            opacity=0.5,
+            size=~I(50),
+            color=~I(label_color),
+            name=~plot_label_freq
+        )
+
+        fig <- fig %>% add_markers(fig, data=genes_coords_taxon_rest, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
+            hoverinfo="text",
+            text = ~paste('</br>ID:',g_name, '| Scaffold:',c_name,
+                '</br>Taxonomic assignment:',taxon_assignment,'| Label:',plot_label,
+                '</br>Terminal:',g_terminal,'(Genes on contig:',c_num_of_genes,')',
+                '</br>LCA:',lca,
+                '</br>Best hit:',best_hit,'(e-value:',bh_evalue,', pident: ',bh_pident,')',
+                '</br>Seq:',query_seq),
+            textposition="bottom left",
+            size=~I(50),
+            color=~I(label_color),
+            name=~plot_label_freq
+        )
+    }
     fig <- fig %>% layout(title = query_name)
 
-    json<-plotly_json(fig,FALSE)
-    write(json,paste0(cfg$output_path, "tmp/3d_1.json"))
 
-
-    json <- plotly:::to_JSON(plotly_build(fig))
-    write(json,paste0(cfg$output_path, "tmp/3d_2.json"))
-
-
-
-
-
-    # prepare json to save 4 different angles of 3D plot as pdf
+    # different angles of 3D plot as pdf
     orca_static_3d(fig, "2D_plot_1_2", 0, 0, 2.25)
     orca_static_3d(fig, "2D_plot_1_3", 0, 2.25, 0)
     orca_static_3d(fig, "2D_plot_2_3", 2.25, 0, 0)

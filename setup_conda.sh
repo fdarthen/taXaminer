@@ -13,7 +13,7 @@ echo "install mamba"
 conda install -c conda-forge mamba -y
 
 echo "python packages"
-mamba install biopython scipy pyyaml beautifulsoup4 jsmin taxopy=0.8.0 -y
+mamba install biopython scipy pyyaml beautifulsoup4 jsmin taxopy=0.8.0 dash -y
 
 echo "R & R packages"
 mamba install r-ggplot2 r-factoextra r-htmlwidgets r-mclust r-dbscan r-plotly bioconductor-biostrings r-viridis orca -y
@@ -23,7 +23,7 @@ mamba install -c hcc r-paran -y
 
 # other tools
 echo "additional software"
-mamba install samtools bedtools bowtie2 diamond gffread=0.12.1 -y
+mamba install samtools bedtools bowtie2 diamond -y
 
 # setting MILTS.sh as an executable
 chmod +x MILTS.sh
