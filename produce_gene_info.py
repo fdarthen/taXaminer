@@ -179,15 +179,15 @@ def impute_array(a, data_array, include_coverage):
     # we're going to loop over all genes and store all of the
     # variables to be imputed
     # --> initialise these arrays
-    c_genecovsds = [[] for pbc_index in range(a.get_num_pbc())]
+    c_genecovsds = {pbc_index: [] for pbc_index in a.get_pbc_paths().keys()}
     c_genelensds = []
-    g_covdev_cs = [[] for pbc_index in range(a.get_num_pbc())]
+    g_covdev_cs = {pbc_index: [] for pbc_index in a.get_pbc_paths().keys()}
     g_lendev_cs = []
     g_gcdev_cs = []
 
     # for each gene array in the given matrix:
     for gene_array in data_array:
-        for pbc_index in range(a.get_num_pbc()):
+        for pbc_index in a.get_pbc_paths().keys():
             # get all gene coverage SDs which are not NaNs
             if not np.isnan(gene_array[index_of["c_genecovsd"]][pbc_index]):          # (expl.: index_of["c_genecovsd"] returns 11
                 # and add them to the respective array                              # gene_array[11] will give the c_genecovsd value
@@ -210,14 +210,14 @@ def impute_array(a, data_array, include_coverage):
 
     # for each "variable"
     # get minimum and maximum of all values (needed for inversion and rescaling (see below))
-    min_c_genecovsds = [min(coverages, default=np.nan) for coverages in c_genecovsds]
-    max_c_genecovsds = [max(coverages, default=np.nan) for coverages in c_genecovsds]
+    min_c_genecovsds = {pbc_index: min(coverages, default=np.nan) for pbc_index, coverages in c_genecovsds.items()}
+    max_c_genecovsds = {pbc_index: max(coverages, default=np.nan) for pbc_index, coverages in c_genecovsds.items()}
 
     min_c_genelensds = min(c_genelensds, default=np.nan)
     max_c_genelensds = max(c_genelensds, default=np.nan)
 
-    min_g_covdev_cs = [min(coverages, default=np.nan) for coverages in g_covdev_cs]
-    max_g_covdev_cs = [max(coverages, default=np.nan) for coverages in g_covdev_cs]
+    min_g_covdev_cs = {pbc_index: min(coverages, default=np.nan) for pbc_index, coverages in g_covdev_cs.items()}
+    max_g_covdev_cs = {pbc_index: max(coverages, default=np.nan) for pbc_index, coverages in g_covdev_cs.items()}
 
     min_g_lendev_cs = min(g_lendev_cs, default=np.nan)
     max_g_lendev_cs = max(g_lendev_cs, default=np.nan)
@@ -226,16 +226,16 @@ def impute_array(a, data_array, include_coverage):
     max_g_gcdev_cs = max(g_gcdev_cs, default=np.nan)
 
     # get the respective mean of each variable (ignoring NaNs and checking for empty lists)
-    my_mean1 = [np.nanmean(coverages) if coverages else np.nan for coverages in c_genecovsds]
+    my_mean1 = {pbc_index: (np.nanmean(coverages) if coverages else np.nan) for pbc_index, coverages in c_genecovsds.items()}
     my_mean2 = np.nanmean(c_genelensds) if g_lendev_cs else np.nan
-    my_mean3 = [np.nanmean(coverages) if coverages else np.nan for coverages in g_covdev_cs]
+    my_mean3 = {pbc_index: (np.nanmean(coverages) if coverages else np.nan) for pbc_index, coverages in g_covdev_cs.items()}
     my_mean4 = np.nanmean(g_gcdev_cs) if g_lendev_cs else np.nan
     my_mean5 = np.nanmean(g_lendev_cs) if g_lendev_cs else np.nan
 
     # loop over all genes, impute NaNs with mean of variable and rescale to given range (here: [0,1])
     for gene_array in data_array:
         if include_coverage:
-            for pbc_index in range(a.get_num_pbc()):
+            for pbc_index in a.get_pbc_paths().keys():
                 gene_array[index_of["c_genecovsd"]][pbc_index] = rescale(gene_array[index_of["c_genecovsd"]][pbc_index], \
                                 min_c_genecovsds[pbc_index], max_c_genecovsds[pbc_index], 0, 1, my_mean1[pbc_index]) #1.0, 10.0
                 gene_array[index_of["g_covdev_c"]][pbc_index] = rescale(gene_array[index_of["g_covdev_c"]][pbc_index], \
@@ -416,8 +416,8 @@ def compute_coverage_and_positional_info(a):
         # set its gene coverage mean & SD to np.nan
         if contig.geneless_info() == 1:
             contig.set_gene_coverage_mean_and_sd(
-                            [np.nan for coverages in range(a.get_num_pbc())],
-                            [np.nan for coverages in range(a.get_num_pbc())])
+                            {pbc_index: np.nan for pbc_index in a.get_pbc_paths().keys()},
+                            {pbc_index: np.nan for pbc_index in a.get_pbc_paths().keys()})
             contig.set_gene_lengths_mean_and_sd(np.nan, np.nan)
 
         else:
@@ -430,30 +430,33 @@ def compute_coverage_and_positional_info(a):
             # to store all ACTUAL gene lengths on this contig
             contig_gene_lengths = []
             # to store how many bases are covered in each gene on this contig
-            contig_gene_covered_base_lengths = []
+            contig_gene_covered_base_lengths = {pbc_index: [] for pbc_index in a.get_pbc_paths().keys()}
             # to store each gene's mean GC value
             contig_gene_gcs = []
             # to store each gene's mean coverage
-            contig_gene_covs = []
+            contig_gene_covs = {pbc_index: [] for pbc_index in a.get_pbc_paths().keys()}
 
             for gene_name in contig.get_genes():
                 gene = a.get_gene(gene_name)
 
                 contig_gene_lengths.append(gene.get_length())
-                contig_gene_covered_base_lengths.append(gene.get_length_of_covered_bases())
                 contig_gene_gcs.append(gene.get_gc_content())
-                contig_gene_covs.append(gene.get_coverage())
+                for pbc_index in a.get_pbc_paths().keys():
+                    contig_gene_covered_base_lengths[pbc_index].append(gene.get_length_of_covered_bases(pbc_index))
+                    contig_gene_covs[pbc_index].append(gene.get_coverage(pbc_index))
+
 
             # lengths do not have to be length corrected
 
             # compute length corrected gene coverage mean and SD for this contig
-            contig_weighted_gene_cov_mean, contig_weighted_gene_cov_sd = [], []
-            for pbc_index in range(a.get_num_pbc()): #for each coverage file
+            contig_weighted_gene_cov_mean = {}
+            contig_weighted_gene_cov_sd = {}
+            for pbc_index in a.get_pbc_paths().keys(): #for each coverage file
                 cov_mean, cov_sd = get_lgth_corr_stats( \
-                [coverages[pbc_index] for coverages in contig_gene_covs], \
-                [coverages[pbc_index] for coverages in contig_gene_covered_base_lengths])
-                contig_weighted_gene_cov_mean.append(cov_mean)
-                contig_weighted_gene_cov_sd.append(cov_sd)
+                    contig_gene_covs[pbc_index], \
+                    contig_gene_covered_base_lengths[pbc_index])
+                contig_weighted_gene_cov_mean[pbc_index] = cov_mean
+                contig_weighted_gene_cov_sd[pbc_index] = cov_sd
 
             # compute length corrected gene GC mean and SD for this contig
             contig_weighted_gene_gc_mean, contig_weighted_gene_gc_sd \
@@ -465,7 +468,7 @@ def compute_coverage_and_positional_info(a):
                 contig.set_gene_lengths_mean_and_sd(np.mean(contig_gene_lengths),
                                 np.nan) # set standard deviation to NaN
                 contig.set_gene_coverage_mean_and_sd(contig_weighted_gene_cov_mean,
-                                [np.nan for pbc_index in range(a.get_num_pbc())])
+                                {pbc_index: np.nan for pbc_index in a.get_pbc_paths().keys()})
                                 # set standard deviation to NaN
                 contig.set_gene_gc_mean_and_sd(contig_weighted_gene_gc_mean,
                                               np.nan)
@@ -780,10 +783,10 @@ def compute_stats(a, lgth_corr_function):
     """
 
     contig_gcs = [] # gather mean GC value for each contig
-    contig_coverages = [] # gather mean coverage for each contig
+    contig_coverages = {pbc_index: [] for pbc_index in a.get_pbc_paths().keys()} # gather mean coverage for each contig
     contig_lengths = [] # gather all ACTUAL contig lengths
     # gather how many bases are COVERED for each contig
-    contig_covered_bases_lengths = []
+    contig_covered_bases_lengths = {pbc_index: [] for pbc_index in a.get_pbc_paths().keys()}
 
     # in the considered assembly part, initialise all possible
     # tetranucleotides, trinucleotides, dinucleotides with frequency 0
@@ -792,10 +795,10 @@ def compute_stats(a, lgth_corr_function):
     considered_dinuc_freqs = {nuc : 0 for nuc in DINUCLEOTIDES}
 
     gene_gcs = [] # gather mean GC value for each gene
-    gene_coverages = [] # gather mean coverage for each gene
+    gene_coverages = {pbc_index: [] for pbc_index in a.get_pbc_paths().keys()} # gather mean coverage for each gene
     gene_lengths = [] # gather all ACTUAL gene lengths
     # gather how many bases are COVERED for each gene
-    gene_covered_bases_lengths = []
+    gene_covered_bases_lengths = {pbc_index: [] for pbc_index in a.get_pbc_paths().keys()}
 
     for contig_name, contig in a.get_contigs().items():
 
@@ -806,12 +809,13 @@ def compute_stats(a, lgth_corr_function):
         # get contig length + add it to list of all contig lengths
         contig_length = contig.get_length()
         contig_lengths.append(contig_length)
-        # get number of covered bases for this contig + add it to the list
-        contig_covered_bases_length = contig.get_length_of_covered_bases()
-        contig_covered_bases_lengths.append(contig_covered_bases_length)
-        # get contig cov + add it to list of all contig covs
-        contig_cov = contig.get_coverage()
-        contig_coverages.append(contig_cov)
+        for pbc_index in a.get_pbc_paths().keys():
+            # get number of covered bases for this contig + add it to the list
+            contig_covered_bases_length = contig.get_length_of_covered_bases(pbc_index)
+            contig_covered_bases_lengths[pbc_index].append(contig_covered_bases_length)
+            # get contig cov + add it to list of all contig covs
+            contig_cov = contig.get_coverage(pbc_index)
+            contig_coverages[pbc_index].append(contig_cov)
         # get contig GC + add it to list of all contig GC contents
         contig_gc = contig.get_gc_content()
         contig_gcs.append(contig_gc)
@@ -833,12 +837,13 @@ def compute_stats(a, lgth_corr_function):
             # add lengths of genes on this contig to all gene lengths
             gene_length = gene.get_length()
             gene_lengths.append(gene_length)
-            # get number of covered bases for this gene + add it to the list
-            gene_covered_bases_length = gene.get_length_of_covered_bases()
-            gene_covered_bases_lengths.append(gene_covered_bases_length)
-            # add covs of genes on this contig to all gene covs
-            gene_cov = gene.get_coverage()
-            gene_coverages.append(gene_cov)
+            for pbc_index in a.get_pbc_paths().keys():
+                # get number of covered bases for this gene + add it to the list
+                gene_covered_bases_length = gene.get_length_of_covered_bases(pbc_index)
+                gene_covered_bases_lengths[pbc_index].append(gene_covered_bases_length)
+                # add covs of genes on this contig to all gene covs
+                gene_cov = gene.get_coverage(pbc_index)
+                gene_coverages[pbc_index].append(gene_cov)
             # add GCs of genes on this contig to all gene GCs
             gene_gc = gene.get_gc_content()
             gene_gcs.append(gene_gc)
@@ -866,18 +871,19 @@ def compute_stats(a, lgth_corr_function):
     all_contigs_max_length = max(a.get_all_contig_lengths())
 
     # compute min and max, weighted mean and SD over all contig covs
-    contig_min_cov = [min([cov[i] for cov in contig_coverages])
-                        for i in range(len(contig_coverages[0]))]
-    contig_max_cov = [max([cov[i] for cov in contig_coverages])
-                        for i in range(len(contig_coverages[0]))]
+    contig_min_cov = {pbc_index: min(coverages)
+                        for pbc_index, coverages in contig_coverages.items()}
+    contig_max_cov = {pbc_index: max(coverages)
+                        for pbc_index, coverages in contig_coverages.items()}
     # WEIGHTING
-    all_contigs_mean_cov, all_contigs_cov_sd = [], []
-    for pbc_index in range(a.get_num_pbc()):
+    all_contigs_mean_cov = {}
+    all_contigs_cov_sd = {}
+    for pbc_index in a.get_pbc_paths().keys():
         mean_cov, cov_sd = lgth_corr_function( \
-                            [cov[pbc_index] for cov in contig_coverages], \
-                            [cov[pbc_index] for cov in contig_covered_bases_lengths])
-        all_contigs_mean_cov.append(mean_cov)
-        all_contigs_cov_sd.append(cov_sd)
+                            contig_coverages[pbc_index], \
+                            contig_covered_bases_lengths[pbc_index])
+        all_contigs_mean_cov[pbc_index] = mean_cov
+        all_contigs_cov_sd[pbc_index] = cov_sd
 
     # compute min and max, weighted mean and SD over all contig GCs
     contig_min_gc = min(contig_gcs)
@@ -894,25 +900,28 @@ def compute_stats(a, lgth_corr_function):
     gene_max_length = max(gene_lengths)
 
     # compute min and max, weighted mean and SD over all gene covs
-    gene_min_cov = [min([cov[i] for cov in gene_coverages])
-                        for i in range(len(gene_coverages[0]))]
-    gene_max_cov = [max([cov[i] for cov in gene_coverages])
-                        for i in range(len(gene_coverages[0]))]
+
+    gene_min_cov = {pbc_index: min(coverages)
+                        for pbc_index, coverages in gene_coverages.items()}
+    gene_max_cov = {pbc_index: max(coverages)
+                        for pbc_index, coverages in gene_coverages.items()}
     # WEIGHTING
-    all_genes_mean_cov, all_genes_cov_sd = [], []
-    for pbc_index in range(a.get_num_pbc()):
+    all_genes_mean_cov = {}
+    all_genes_cov_sd = {}
+    for pbc_index in a.get_pbc_paths().keys():
         mean_cov, cov_sd = lgth_corr_function( \
-                            [cov[pbc_index] for cov in gene_coverages], \
-                            [cov[pbc_index] for cov in gene_covered_bases_lengths])
-        all_genes_mean_cov.append(mean_cov)
-        all_genes_cov_sd.append(cov_sd)
+                            gene_coverages[pbc_index], \
+                            gene_covered_bases_lengths[pbc_index])
+        all_genes_mean_cov[pbc_index] = mean_cov
+        all_genes_cov_sd[pbc_index] = cov_sd
     # UNWEIGHTED COV MEAN AND SD
-    all_genes_mean_cov_unweighted, all_genes_cov_sd_unweighted = [], []
-    for pbc_index in range(a.get_num_pbc()):
-        mean_cov = np.mean([cov[pbc_index] for cov in gene_coverages])
-        cov_sd = np.std([cov[pbc_index] for cov in gene_coverages])
-        all_genes_mean_cov_unweighted.append(mean_cov)
-        all_genes_cov_sd_unweighted.append(cov_sd)
+    all_genes_mean_cov_unweighted = {}
+    all_genes_cov_sd_unweighted = {}
+    for pbc_index in a.get_pbc_paths().keys():
+        mean_cov = np.mean(gene_coverages[pbc_index])
+        cov_sd = np.std(gene_coverages[pbc_index])
+        all_genes_mean_cov_unweighted[pbc_index] = mean_cov
+        all_genes_cov_sd_unweighted[pbc_index] = cov_sd
 
     # compute min and max, weighted man and SD over all gene GCs
     gene_min_gc = min(gene_gcs)
@@ -1059,13 +1068,13 @@ def get_raw_array(a, stats_ref):
             c_gcdev = contig.gcdev_from_overall(stats_ref["contig gc mean"],
                                                    stats_ref["contig gc sd"])
 
-            c_cov = contig.get_coverage()
-            c_covsd = contig.get_coverage_sd()
-            c_covdev = [contig.covdev_from_overall(stats_ref["contig cov mean"][pbc_index],
+            c_cov = {pbc_index: contig.get_coverage(pbc_index) for pbc_index in a.get_pbc_paths().keys()}
+            c_covsd = {pbc_index: contig.get_coverage_sd(pbc_index) for pbc_index in a.get_pbc_paths().keys()}
+            c_covdev = {pbc_index: contig.covdev_from_overall(stats_ref["contig cov mean"][pbc_index],
                             stats_ref["contig cov sd"][pbc_index], pbc_index)
-                            for pbc_index in range(a.get_num_pbc())]
-            c_genecovm = contig.get_gene_coverage_mean()
-            c_genecovsd = contig.get_gene_coverage_sd()
+                            for pbc_index in a.get_pbc_paths().keys()}
+            c_genecovm = {pbc_index: contig.get_gene_coverage_mean(pbc_index) for pbc_index in a.get_pbc_paths().keys()}
+            c_genecovsd = {pbc_index: contig.get_gene_coverage_sd(pbc_index) for pbc_index in a.get_pbc_paths().keys()}
             c_genelenm = contig.get_gene_lengths_mean()
             c_genelensd = contig.get_gene_lengths_sd()
 
@@ -1121,11 +1130,11 @@ def get_raw_array(a, stats_ref):
                     gene.get_single_gene_info(), # index 21
 
                     # coverage-related gene variables:
-                    gene.get_coverage(), # index 22
-                    gene.get_coverage_sd(), # index 23
-                    gene.covdev_from_contig(a), # index 24
-                    [gene.covdev_from_overall(stats_ref["gene cov mean"][pbc_index], stats_ref["gene cov sd"][pbc_index], pbc_index) \
-                        for pbc_index in range(a.get_num_pbc())], # index 25
+                    {pbc_index: gene.get_coverage(pbc_index) for pbc_index in a.get_pbc_paths().keys()}, # index 22
+                    {pbc_index: gene.get_coverage_sd(pbc_index) for pbc_index in a.get_pbc_paths().keys()}, # index 23
+                    {pbc_index: gene.covdev_from_contig(a, pbc_index) for pbc_index in a.get_pbc_paths().keys()}, # index 24
+                    {pbc_index: gene.covdev_from_overall(stats_ref["gene cov mean"][pbc_index], stats_ref["gene cov sd"][pbc_index], pbc_index) \
+                        for pbc_index in a.get_pbc_paths().keys()}, # index 25
 
                     # compositional gene variables:
                     g_pearson_r_o, # index 26
@@ -1165,10 +1174,10 @@ def output_table(a, raw_array, filename):
     c_cov_header = []
     g_cov_header = []
     for elem in ["c_cov", "c_covsd", "c_covdev", "c_genecovm", "c_genecovsd"]:
-        for pbc_index in range(a.get_num_pbc()):
+        for pbc_index in sorted(a.get_pbc_paths().keys()):
             c_cov_header.append(elem+"_"+str(pbc_index))
     for elem in (["g_cov", "g_covsd", "g_covdev_c", "g_covdev_o"]):
-        for pbc_index in range(a.get_num_pbc()):
+        for pbc_index in sorted(a.get_pbc_paths().keys()):
                 g_cov_header.append(elem+"_"+str(pbc_index))
 
     header = [
@@ -1188,9 +1197,9 @@ def output_table(a, raw_array, filename):
     for gene_array in raw_array:
         flat_gene_array = []
         for item in gene_array:
-            if type(item) == list:
-                for subitem in item:
-                    flat_gene_array.append(subitem)
+            if type(item) == dict:
+                for subitem in sorted(item.keys()):
+                    flat_gene_array.append(item.get(subitem))
             else:
                 flat_gene_array.append(item)
         if len(header) != len(flat_gene_array):
@@ -1283,14 +1292,14 @@ def output_summary_file(a, stats_ref, filename, include_coverage):
     contig_cov_summary = ""
     gene_cov_summary = ""
     if include_coverage:
-        for pbc_index in range(a.get_num_pbc()):
+        for pbc_index in a.get_pbc_paths().keys():
             contig_cov_summary += "contig cov mean\t" + str(round(stats_ref["contig cov mean"][pbc_index], 2)) + "\n" + \
              "contig cov sd\t" + str(round(stats_ref["contig cov sd"][pbc_index], 2)) + "\n" + \
              "contig cov min\t" + str(round(stats_ref["contig cov min"][pbc_index], 2)) + "\n" + \
              "contig cov max\t" + str(round(stats_ref["contig cov max"][pbc_index], 2)) + "\n"
         contig_cov_summary += "\n"
 
-        for pbc_index in range(a.get_num_pbc()):
+        for pbc_index in a.get_pbc_paths().keys():
             gene_cov_summary += "gene cov mean\t" + str(round(stats_ref["gene cov mean"][pbc_index], 2))  + "\n" + \
               "gene cov sd\t" + str(round(stats_ref["gene cov sd"][pbc_index], 2)) + "\n" + \
               "gene cov min\t" + str(round(stats_ref["gene cov min"][pbc_index], 2))  + "\n" + \
@@ -1645,14 +1654,14 @@ def read_pbc(a, include_coverage):
                     if current_contig: # only add to contigs which exist in GFF file
                         base = int(pbc_info_array[1])
                         coverage = int(float(pbc_info_array[2]))
-                        current_contig.add_base_coverage(pbc_index-1, base, coverage)
+                        current_contig.add_base_coverage(pbc_index, base, coverage)
     else: # if user does not want to include coverage information or it is not available
         mock_coverage = 1 # coverage that is set for all bases
         for contig in a.get_contigs().values():
             if contig.geneless_info() == 0: # only store "info" if contig has genes
                 for base in range(1, contig.get_length()+1): # set coverage for every base to mock coverage
-                    for pbc_index in range(a.get_num_pbc()):
-                        contig.add_base_coverage(pbc_index-1, base, mock_coverage)
+                    for pbc_index in a.get_pbc_paths().keys():
+                        contig.add_base_coverage(pbc_index, base, mock_coverage)
 
 
 

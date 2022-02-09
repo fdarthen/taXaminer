@@ -145,9 +145,7 @@ clustering_mclust <- function(coords, num_cluster) {
 # ::::::::::::::::: DATA PROCESSING ::::::::::::::::::::
 rawdata <- read.table(paste0(cfg$output_path,'gene_info/imputed_gene_table.txt'), row.names=1, header=TRUE)
 # WITHOUT GC AND ONLY WITH PEARSON R NUCLEOTIDE FREQS
-
 myvars <- unlist(strsplit(cfg$input_variables,",")) # variable to be used for PCA specified by user in config file
-# print(myvars)
 # select only the subset of variables
 subsetted_data <- subset(rawdata, select=myvars)
 
@@ -160,7 +158,6 @@ data_columnfiltered1 <- subsetted_data[, !(names(subsetted_data) %in% contig_col
 } else {
 data_columnfiltered1 <- subsetted_data
 }
-
 
 # delete directory for PCA and clustering results and create new empty one (avoids warning messages)
 unlink(paste0(cfg$output_path, "PCA_and_clustering/PCA_results"), recursive=TRUE)
@@ -194,32 +191,22 @@ complete_data <- data_columnfiltered2[complete.cases(data_columnfiltered2),]
 # output which genes have been used as an input for the PCA
 # write.csv(mydata, file=paste0(cfg$output_path, "PCA_and_clustering/genes_used_for_PCA_and_clustering.csv"), row.names=TRUE, quote=FALSE)
 
-
+#TODO: adjust for multiple coverage sets
 # FILTER GENES BASED ON COVERAGE
 if (cfg$include_coverage){
   if (cfg$coverage_cutoff_mode=="transposons") {
-    g_cov_median <- mean(complete_data[,"g_cov_0"])
-    mydata <- complete_data[complete_data$g_cov_0 >= (g_cov_median),]
+    g_cov_median <- median(complete_data[,"g_cov_1"])
+    mydata <- complete_data[complete_data$g_cov_1 >= (g_cov_median),]
     #c_cov_median <- median(complete_data[,"c_cov"])
     #mydata <- g_filtered_data[g_filtered_data$c_cov >= (c_cov_median),]
   } else if (cfg$coverage_cutoff_mode=="contamination") {
-    g_cov_median <- mean(complete_data[,"g_cov_0"])
-    mydata <- complete_data[complete_data$g_cov_0 <= (g_cov_median),]
+    g_cov_median <- median(complete_data[,"g_cov_1"])
+    mydata <- complete_data[complete_data$g_cov_1 <= (g_cov_median),]
     #c_cov_median <- median(complete_data[,"c_cov"])
     #mydata <- g_filtered_data[g_filtered_data$c_cov <= (c_cov_median),]
   } else {
     mydata <- complete_data
   }
-  # if only one value in "g_cov_z_bool", drop the column
-  if("g_cov_z_bool" %in% colnames(mydata)){
-    if (dim(table(mydata["g_cov_z_bool"])) == 1) {
-        #cat("\nexcluded due to a variance of 0 (no genes with conspicuos coverage profile):\n", file=paste0(cfg$output_path, "PCA_and_clustering/variables_excluded_from_PCA_and_clustering.txt"), append=TRUE)
-        #write.table(colnames(subsetted_data[, (names(subsetted_data) %in% contig_columns)]), file=paste0(cfg$output_path, "PCA_and_clustering/variables_excluded_from_PCA_and_clustering.txt"), col.names=FALSE, row.names=FALSE, quote=FALSE, append=TRUE)
-        mydata <- subset(mydata, select = -g_cov_z_bool)
-    }
-  }
-}else{
-  mydata <- complete_data
 }
 
 

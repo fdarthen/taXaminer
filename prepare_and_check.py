@@ -150,9 +150,13 @@ def enumerated_key(config_obj, key_name, pre_keys, *default):
     dict = {}
     for match in matches:
         if config_obj.get(match):
-            if match.split('_')[2].isdigit():
+            # catch user stating e.g. 'pbc_path' as config parameter
+            if len(match.split('_')) >= 3 and match.split('_')[2].isdigit():
                 match_num = int(match.split('_')[2])
                 dict[match_num] = set_variable_default(config_obj, match, default)
+            else:
+                dict[0] = set_variable_default(config_obj, match, default)
+
 
     for pre_key in pre_keys:
         # if there are more values required than given,
@@ -240,7 +244,7 @@ def set_variable_default(config_obj, key_name, *default):
                Please state specifically.'.format(key_name))
 
 
-def pca_cov_variables(vars, include, cov_set_num):
+def pca_cov_variables(vars, include, pbc_indicies):
     """Define coverage variables to be used in PCA.
 
     Remove coverage variables from the variables used in the PCA if
@@ -250,12 +254,11 @@ def pca_cov_variables(vars, include, cov_set_num):
     Args:
       vars(str): comma-separated list of variables to be used in PCA
       include(bool): bool if coverage data is included or not
-      cov_set_num: number of coverage sets
+      pbc_indicies: indicies for coverage sets
 
     Returns:
         (str) modified list of variables to be used in PCA
     """
-    # TODO: same indicies used for cov sets by user and in output
 
     cov_vars = "c_cov,c_covsd,g_cov,g_covsd,g_covdev_c"
     out_vars = ""
@@ -269,7 +272,7 @@ def pca_cov_variables(vars, include, cov_set_num):
             if var in cov_vars:
                 # add coverage variable with numbered suffix for each
                 # coverage data set
-                for i in range(cov_set_num):
+                for i in pbc_indicies:
                     out_vars = out_vars + ',' + var + '_' + str(i)
             else:
                 out_vars = out_vars + ',' + var
@@ -308,6 +311,8 @@ def set_config_defaults(config_obj):
     config_vars['output_path'] = check_dir_slash(set_variable_default(config_obj, 'output_path'))
     config_vars['taxon_id'] = set_variable_default(config_obj, 'taxon_id')
 
+    gff_filename = '.'.join(config_vars['gff_path'].split('/')[-1].split('.')[:-1])
+    config_vars['gff_ta_path'] = set_variable_default(config_obj, 'gff_ta_path', config_vars.get('output_path')+gff_filename+'_w_assigned_taxa.gff')
     config_vars['threads'] = set_variable_default(config_obj, 'threads', 'auto')
 
     ## Coverage
@@ -343,10 +348,6 @@ def set_config_defaults(config_obj):
     config_vars['min_insert'] = enumerated_key(config_obj, 'min_insert', list(config_vars.get('read_paths').keys()), '0')
     config_vars['max_insert'] = enumerated_key(config_obj, 'max_insert', list(config_vars.get('read_paths').keys()), '500')
     config_vars['read_orientation'] = enumerated_key(config_obj, 'read_orientation', list(config_vars.get('read_paths').keys()), 'fr')
-
-
-#Also, this protocol yields pairs where the expected genomic distance from end to end is about 200-500 base pairs.
-
 
     ## Taxonomic assignment
     config_vars['proteins_path'] = set_variable_default(config_obj, 'proteins_path', config_vars.get('output_path')+'proteins.faa')
@@ -384,7 +385,7 @@ def set_config_defaults(config_obj):
     config_vars['gff_dict'] = set_gff_parsing_rules(config_vars.get('gff_source'))
 
     ## PCA
-    config_vars['input_variables'] = pca_cov_variables(set_variable_default(config_obj, 'input_variables', default_pca_vars), config_vars.get('include_coverage'), len(config_vars.get('cov_set_exists')))
+    config_vars['input_variables'] = pca_cov_variables(set_variable_default(config_obj, 'input_variables', default_pca_vars), config_vars.get('include_coverage'), config_vars.get('pbc_paths').keys())
     config_vars['perform_parallel_analysis'] = set_variable_default(config_obj, 'perform_parallel_analysis', 'FALSE')
     config_vars['num_pcs'] = set_variable_default(config_obj, 'num_pcs', '3')
     config_vars['coverage_cutoff_mode'] = set_variable_default(config_obj, 'coverage_cutoff_mode', 'default')
@@ -459,7 +460,6 @@ def write_run_overview(config_path, config_vars):
         else:
             logging.info("Taxonomic hits files:\n{}{}".format(config_vars.get('tax_assignment_path')[0],config_vars.get('tax_assignment_path')[1]))
 
-
     else:
         logging.info("Exhaustive assignment mode selected")
         if config_vars.get('compute_tax_assignment') == 'FALSE':
@@ -504,7 +504,6 @@ def process_config(config_path, script_dir):
     config_vars["script_dir"] = script_dir
     config_vars["usr_cfg_path"] = config_path
     config_vars["cfg_path"] = config_obj.get('output_path')+'tmp/tmp.cfg.yml'
-
 
     # write config to file and to console
     write_cfg2file(config_vars)

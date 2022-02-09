@@ -21,16 +21,11 @@ class Gene:
         self.c_genelenm = line_array[header_index.get('c_genelenm')]
         self.c_genelensd = line_array[header_index.get('c_genelensd')]
 
-        self.c_cov = tuple([line_array[index] for index in
-                            header_index.get('c_cov')])
-        self.c_covsd = tuple([line_array[index] for index in
-                            header_index.get('c_covsd')])
-        self.c_covdev = tuple([line_array[index] for index in
-                            header_index.get('c_covdev')])
-        self.c_genecovm = tuple([line_array[index] for index in
-                            header_index.get('c_genecovm')])
-        self.c_genecovsd = tuple([line_array[index] for index in
-                            header_index.get('c_genecovsd')])
+        self.c_cov = {item_index:line_array[index] for item_index, index in header_index.get('c_cov').items()}
+        self.c_covsd = {item_index:line_array[index] for item_index, index in header_index.get('c_covsd').items()}
+        self.c_covdev = {item_index:line_array[index] for item_index, index in header_index.get('c_covdev').items()}
+        self.c_genecovm = {item_index:line_array[index] for item_index, index in header_index.get('c_genecovm').items()}
+        self.c_genecovsd = {item_index:line_array[index] for item_index, index in header_index.get('c_genecovsd').items()}
 
         self.c_pearson_r = line_array[header_index.get('c_pearson_r')]
         self.c_pearson_p = line_array[header_index.get('c_pearson_p')]
@@ -44,14 +39,10 @@ class Gene:
         self.g_terminal = line_array[header_index.get('g_terminal')]
         self.g_single = line_array[header_index.get('g_single')]
 
-        self.g_cov = tuple([line_array[index] for index in
-                            header_index.get('g_cov')])
-        self.g_covsd = tuple([line_array[index] for index in
-                            header_index.get('g_covsd')])
-        self.g_covdev_c = tuple([line_array[index] for index in
-                            header_index.get('g_covdev_c')])
-        self.g_covdev_o = tuple([line_array[index] for index in
-                            header_index.get('g_covdev_o')])
+        self.g_cov = {item_index:line_array[index] for item_index, index in header_index.get('g_cov').items()}
+        self.g_covsd = {item_index:line_array[index] for item_index, index in header_index.get('g_covsd').items()}
+        self.g_covdev_c = {item_index:line_array[index] for item_index, index in header_index.get('g_covdev_c').items()}
+        self.g_covdev_o = {item_index:line_array[index] for item_index, index in header_index.get('g_covdev_o').items()}
 
         self.g_pearson_r_o = line_array[header_index.get('g_pearson_r_o')]
         self.g_pearson_p_o = line_array[header_index.get('g_pearson_p_o')]
@@ -61,7 +52,7 @@ class Gene:
         self.g_gcdev_c = line_array[header_index.get('g_gcdev_c')]
         self.g_gcdev_o = line_array[header_index.get('g_gcdev_o')]
 
-        self.coords = tuple([line_array[i] for i in header_index.get('Dim.')])
+        self.coords = {item_index:line_array[index] for item_index, index in header_index.get('Dim.').items()}
 
         self.protID = None # ID of transcript with longest CDS
         self.lencds = 0 # lenght of self.protID
@@ -993,9 +984,11 @@ def parse_header(header):
     for index, item in enumerate(header.split(',')):
         raw_item = item.strip().rstrip('_0123456789')
         if raw_item in indexing.keys(): # for coverage variables
-            indexing[raw_item] = indexing.get(raw_item) + (index,)
-        elif raw_item == 'Dim.' or ('cov' in raw_item and 'bool' not in raw_item):
-            indexing[raw_item] = (index,)
+            item_index = item.strip().split('_')[-1].split('.')[-1]
+            indexing[raw_item][item_index] = index
+        elif raw_item == 'Dim.' or 'cov' in raw_item:
+            item_index = item.strip().split('_')[-1].split('.')[-1]
+            indexing[raw_item] = {item_index: index}
         else:
             indexing[raw_item] = index
     return indexing
@@ -1023,7 +1016,7 @@ def read_genes_coords(output_path):
             gene = Gene(line.strip().split(','), header_index)
 
             # filter genes without PCA coordinates
-            if gene.coords[0] != "NA":
+            if list(gene.coords.values())[0] != "NA":
                 genes[gene.g_name] = gene
 
     return genes, header
@@ -1204,13 +1197,23 @@ def taxonomy_summary(cfg, genes):
             for taxon, count in taxa.items():
                 summary_file.write('{}:\t{}\n'.format(taxon, count))
 
+def str2float_or_int(string, digits):
 
-def write_output(output_path, genes, header):
+    try:
+        return int(string)
+    except:
+        try:
+            return round(float(string), digits)
+        except:
+            return string
+
+
+def write_output(cfg, genes, header):
     """
     Write information in gene objects to gene_table_taxon_assignment.csv.
 
     Args:
-      output_path:
+      cfg:
       genes:
       header:
 
@@ -1218,36 +1221,39 @@ def write_output(output_path, genes, header):
 
     """
 
-    out_path = output_path + 'taxonomic_assignment/gene_table_taxon_assignment.csv'
+    out_path = cfg.output_path + 'taxonomic_assignment/gene_table_taxon_assignment.csv'
 
-    cov_columns = ['c_cov', 'c_covsd', 'c_covdev', 'c_genecovm', 'c_genecovsd', 'g_cov', 'g_covsd', 'g_covdev_c', 'g_covdev_o']
+    cov_columns = ['c_cov_', 'c_covsd_', 'c_covdev_', 'c_genecovm_', 'c_genecovsd_', 'g_cov_', 'g_covsd_', 'g_covdev_c_', 'g_covdev_o_']
 
     with open(out_path, 'w') as out_file:
 
         csv_columns = header.strip().split(',') + ['protID', 'lcaID', 'lca', 'best_hitID', 'best_hit', 'bh_evalue', 'bh_pident', 'corrected_lca', 'taxon_assignment', 'plot_label']
-        #TODO: remove coverage related columns from output when not required (include_coverage=FALSE)
+        if not cfg.include_coverage:
+            csv_columns = [col for col in csv_columns if col.rstrip('0123456789') not in cov_columns]
+
         writer = csv.DictWriter(out_file, fieldnames=csv_columns, extrasaction='ignore')
         writer.writeheader()
 
         for gene in genes.values():
             gene_dict = gene.__dict__
             to_delete = []
-            for attr, value in gene_dict.items():
-                if type(value) == tuple:
+            for attr, value in list(gene_dict.items()):
+                if not cfg.include_coverage and attr+'_' in cov_columns:
+                    to_delete.append(attr)
+                    continue
+                if type(value) == dict:
                     if attr == "coords":
                         name = "Dim."
-                        add = 1
                     else:
                         name = attr + "_"
-                        add = 0
-                    for index, sub_val in enumerate(value):
-                        gene_dict[name + str(index+add)] = round(float(sub_val),2)
+                    for index, sub_val in value.items():
+                        gene_dict[name + str(index)] = str2float_or_int(sub_val, 2)
                     to_delete.append(attr)
+                elif attr == 'bh_evalue' or attr == 'c_pct_assemby_len':
+                    # don't round e-value and assembly length percentage (ratio)
+                    pass
                 else:
-                    try:
-                        gene_dict[attr] = round(float(value),2)
-                    except:
-                        pass
+                    gene_dict[attr] = str2float_or_int(value, 2)
 
             for key in to_delete:
                 del gene_dict[key]
@@ -1363,7 +1369,7 @@ def run_assignment(cfg):
     pathlib.Path(cfg.output_path+'taxonomic_assignment/').mkdir(parents=True, exist_ok=True)
 
     taxonomy_summary(cfg, genes)
-    write_output(cfg.output_path, genes, header)
+    write_output(cfg, genes, header)
 
 def main():
     """ """
