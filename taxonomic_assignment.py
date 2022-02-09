@@ -7,6 +7,7 @@ import pathlib
 import subprocess
 import logging
 
+
 import prepare_and_check
 
 
@@ -426,6 +427,7 @@ def ident_query_label(genes, queryID):
     Returns:
 
     """
+
 
     query_taxon = taxopy.Taxon(queryID, TAX_DB)
     query_lineage = query_taxon.taxid_lineage
@@ -908,6 +910,7 @@ def prot_gene_matching(output_path, gff_path, genes, cfg):
             elif "#FASTA" in line: # if FASTA block has been reached
                 break
 
+
     prot_index_path = output_path + 'tmp/tmp.proteins.fa.fai'
 
     # print(child_parent_dict)
@@ -919,6 +922,7 @@ def prot_gene_matching(output_path, gff_path, genes, cfg):
         for line in prot_index:
             id, length = line.split()[0], ((int(line.split()[1])*3)+3)
             parent = child_parent_dict.get(strip_ID(id))
+
             if parent: # id in proteins fasta index matches the IDs in the GFF
                 parent = traverse_dict(parent, child_parent_dict)
             elif child_parent_dict.get(strip_ID(id.split('|')[0])): # header might contain pipes
