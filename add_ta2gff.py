@@ -64,8 +64,7 @@ def write2gff(gff_in_path, gff_out_path, genes_taxon_dict):
                 # if anntations have been reached:
                 if not line.startswith("#"):
                     # split GFF line to access the individual column entries
-                    gff_array = line.split()
-
+                    gff_array = line.split('\t')
                     # get gene name from attributes entry in 9th column
                     id = strip_ID(gff_array[8].split('ID=')[1].split(';')[0])
 
@@ -103,12 +102,12 @@ def main():
 
     parser.add_argument('--config-file', '-c', type=str, action='store',
                        help='path to config file')
-    parser.add_argument('--gff-in', '-g', dest='clustering', action='store',
+    parser.add_argument('--gff-in', '-g', action='store',
                         help='path of GFF input file')
     parser.add_argument('--gff-out', '-o', action='store',
                         help='path to save modified GFF to')
-    parser.add_argument('--milts-csv', '-m', action='store',
-                        help='path to milts taxonomic assignment tabluar output')
+    parser.add_argument('--milts', '-m', action='store',
+                        help='path to either milts report or milts taxonomic assignment tabluar output')
     args = parser.parse_args()
 
     if args.config_file:
@@ -118,7 +117,10 @@ def main():
         add2gff(cfg.output_path+'taxonomic_assignment/gene_table_taxon_assignment.csv',
                 cfg.gff_path, cfg.gff_ta_path)
     else:
-        add2gff(args.milts_csv,args.gff_in,args.gff_out)
+        if args.milts.endswith('.csv'):
+            add2gff(args.milts,args.gff_in,args.gff_out)
+        else:
+            add2gff(args.milts+'taxonomic_assignment/gene_table_taxon_assignment.csv',args.gff_in,args.gff_out)
 
 
 if __name__ == '__main__':
