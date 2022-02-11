@@ -50,7 +50,7 @@ def main():
     if len(sys.argv) > 2:
         if sys.argv[2] == '--quiet':
             log_level = logging.WARNING
-        elif sys.argv[2] == '--verbose':
+        elif sys.argv[2] == '--verbose' or sys.argv[2] == '--debug':
             log_level = logging.DEBUG
     # initiate the logger
     logger = logging.getLogger()
@@ -60,9 +60,9 @@ def main():
     logger.addHandler(handler)
 
     # read config file and retrieve output path
-    try:
+    if pathlib.Path(sys.argv[1]).is_file():
         user_config_dict = yaml.safe_load(open(sys.argv[1], 'r'))
-    except:
+    else:
         logging.error('config file not found:   {}'.format(sys.argv[1]))
         sys.exit()
     output_path = user_config_dict.get('output_path') # location for results
@@ -94,7 +94,7 @@ def main():
 
         ## make data integrity checks
         # check GFF and assembly FASTA for ID compatibility
-        prepare_and_check.make_checks(cfg)
+        prepare_and_check.check_assembly_ids(cfg)
 
         if cfg.compute_coverage:
             pre_time = time.time()
@@ -102,13 +102,12 @@ def main():
             prepare_coverage.process_coverage(cfg)
             logging.debug('finished [{}s]\n'.format(int(time.time()-pre_time)))
 
+        if cfg.include_coverage:
+            prepare_and_check.check_pbc_ids(cfg)
+
         pre_time = time.time()
         logging.info('>>> computing gene descriptors')
-        # try:
         produce_gene_info.process_gene_info(cfg)
-        # except:
-        #     logging.error('computing gene descriptors failed')
-        #     sys.exit()
         logging.debug('finished [{}s]\n'.format(int(time.time()-pre_time)))
 
         pre_time = time.time()
@@ -129,7 +128,6 @@ def main():
         if cfg.extract_proteins:
             pre_time = time.time()
             logging.info('>>> extracting protein sequences')
-            # TODO: finish checking this
             extract_prot_seq.generate_fasta(cfg)
             logging.debug('finished [{}s]\n'.format(int(time.time()-pre_time)))
         else:
@@ -191,7 +189,7 @@ def main():
                     pass
             elif 'Gtk-WARNING' in line and 'cannot open display' in line:
                 logging.warning('Creation of static versions of 3D plot unavailable on cluster environment. \
-                                Rerun with setting option "update_plots" to TRUE on a workstation to create plots.')
+                                Rerun with setting option "update_plots" to TRUE on a computer with a graphics unit to create plots.')
             elif 'done with code' in line:
                     pass
             else:

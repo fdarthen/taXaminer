@@ -15,6 +15,52 @@ import logging
 from classes import Config
 
 
+def check_pbc_ids(config_obj):
+    """Check if contig IDs in PBC match IDs in GFF.
+
+    Args:
+      config_obj(obj): Config class object of config parameters
+    """
+
+    rm_pbcs = []
+
+    pbc_ids = set()
+    gff_ids = set()
+
+    for pbc_index, pbc_path in config_obj.pbc_paths.items():
+        with open(pbc_path, 'r') as pbc:
+            # collect IDs of scaffolds from FASTA
+            for line in pbc:
+                pbc_ids.add(line.split()[0])
+
+        with open(config_obj.gff_path, 'r') as gff:
+            # collect IDs of scaffolds from GFF
+            for line in gff:
+                if not line.startswith('#'):
+                    gff_ids.add(line.split()[0])
+
+        # match the two sets of IDs and save which could not be matched
+        missing = set()
+        for p_id in pbc_ids:
+            if not p_id in gff_ids:
+                missing.add(p_id)
+
+        # geneless scaffolds may not be annotated in GFF
+        # thus check if sets of IDs in FASTA and missing are unequal
+        if len(pbc_ids) == len(missing):
+            # if the sets are equally long, the IDs could not be matched at all
+            logging.warning('PBC headers and scaffold IDs in GFF do not match for PBC file {}. \
+            Removing from further computations'.format(pbc_index))
+            rm_pbcs.append(pbc_index)
+
+    for pbc_index in rm_pbcs:
+        del config_obj.pbc_paths[pbc_index]
+    if not config_obj.pbc_paths.keys():
+        logging.error('No PBC headers and scaffold IDs in GFF match. Please recheck your files, restart without stating coverage information or set "include_coverage" to "FALSE".'.format(pbc_index))
+        sys.exit()
+
+
+
 def check_assembly_ids(config_obj):
     """Check if headers in FASTA of assembly match IDs in GFF.
 
@@ -149,11 +195,20 @@ def enumerated_key(config_obj, key_name, pre_keys, *default):
     # to identify the index of the coverage set
     dict = {}
     for match in matches:
+        mod_default = None
         if config_obj.get(match):
             # catch user stating e.g. 'pbc_path' as config parameter
             if len(match.split('_')) >= 3 and match.split('_')[2].isdigit():
                 match_num = int(match.split('_')[2])
-                dict[match_num] = set_variable_default(config_obj, match, default)
+                if type(config_obj[match]) == list and any(path.startswith('path/to/') for path in config_obj[match]):
+                    logging.warning('{}: path can not start with "path/to/". Trying to use default instead'.format(match))
+                    if default and  '/' in default[0]:
+                        mod_default = '.'.join(default[0].split('.')[:-1])+'_'+str(match_num)+'.'+default[0].split('.')[-1]
+                elif type(config_obj[match]) == str and config_obj[match].startswith('path/to/'):
+                    logging.warning('{}: path can not start with "path/to/". Trying to use default instead'.format(match))
+                    if default and '/' in default[0]:
+                        mod_default = '.'.join(default[0].split('.')[:-1])+'_'+str(match_num)+'.'+default[0].split('.')[-1]
+                dict[match_num] = set_variable_default(config_obj, match, default if not mod_default else mod_default)
             else:
                 dict[0] = set_variable_default(config_obj, match, default)
 
@@ -236,12 +291,21 @@ def set_variable_default(config_obj, key_name, *default):
     """
 
     if config_obj.get(key_name):
-        return config_obj[key_name]
-    elif default: # if default value is given this is evaluated to True
+        # don't use default paths given in example config file
+        if type(config_obj[key_name]) == list and any(path.startswith('path/to/') for path in config_obj[key_name]):
+            logging.warning('{}: path can not start with "path/to/". Trying to use default instead'.format(key_name))
+            pass
+        elif type(config_obj[key_name]) == str and config_obj[key_name].startswith('path/to/'):
+            logging.warning('{}: path can not start with "path/to/". Trying to use default instead'.format(key_name))
+            pass
+        else:
+            return config_obj[key_name]
+    if default: # if default value is given this is evaluated to True
         return default[0]
     else: # key not given in config file and no given default value
-        print('Error: no default value available for "{}".\
+        logging.error('Error: no default value available for "{}".\
                Please state specifically.'.format(key_name))
+
 
 
 def pca_cov_variables(vars, include, pbc_indicies):
@@ -263,11 +327,7 @@ def pca_cov_variables(vars, include, pbc_indicies):
     cov_vars = "c_cov,c_covsd,g_cov,g_covsd,g_covdev_c"
     out_vars = ""
 
-    #TODO: test string or bool?
-    # print(include)
-    # print(bool(include))
-
-    if include:
+    if include == 'TRUE':
         for var in vars.split(','):
             if var in cov_vars:
                 # add coverage variable with numbered suffix for each
@@ -503,7 +563,7 @@ def process_config(config_path, script_dir):
     config_vars = set_config_defaults(config_obj)
     config_vars["script_dir"] = script_dir
     config_vars["usr_cfg_path"] = config_path
-    config_vars["cfg_path"] = config_obj.get('output_path')+'tmp/tmp.cfg.yml'
+    config_vars["cfg_path"] = config_vars.get('output_path')+'tmp/tmp.cfg.yml'
 
     # write config to file and to console
     write_cfg2file(config_vars)
@@ -519,6 +579,7 @@ def make_checks(config_obj):
       config_obj(obj): Config class object of config parameters
     """
     check_assembly_ids(config_obj)
+    check_pbc_ids(config_obj)
 
 
 def cfg2obj(config_path):

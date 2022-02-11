@@ -118,8 +118,7 @@ def get_cds_coordinates(cfg):
                                 # print(feature.id)
                                 # print(cfg.gff_parent_child_attr)
                                 #print(getattr(feature,cfg.gff_parent_child_attr.get('parent').lower()))
-                                parent_attr = getattr(feature,cfg.gff_parent_child_attr.get('parent').lower()) if cfg.gff_parent_child_attr else False
-                                parent_attr = parent_attr if parent_attr else 'parent'
+                                parent_attr = cfg.gff_parent_child_attr.get('parent').lower() if cfg.gff_parent_child_attr else 'parent'
                                 parent = features.get(getattr(feature,parent_attr))
                                 # print(parent)
                             elif cfg.gff_gene_connection == 'inline':
@@ -190,6 +189,9 @@ def get_longest_transcript(contigs, features):
                     length += cds.end-cds.start+1
                 gene.transcripts[transcript_id] = length
             # identify transcript with longest CDS
+            if not gene.transcripts:
+                # no transcript was found for gene
+                continue
             max_len_t = max(gene.transcripts, key=gene.transcripts.get)
             # get coordinates for that CDS
             for cds in gene.cdss.get(max_len_t):
@@ -230,6 +232,10 @@ def set_seqs(proteins_file, contigs, features, current_contig, contig_seq):
     for gene_id in contigs.get(current_contig):
         gene = features.get(gene_id)
 
+        if not gene.transcripts:
+            # no transcript was found for gene
+            continue
+
         # get longest transcript for gene
         max_len_t = max(gene.transcripts, key=gene.transcripts.get)
 
@@ -251,7 +257,9 @@ def set_seqs(proteins_file, contigs, features, current_contig, contig_seq):
             # print(str(Seq.Seq(seq).translate(table=int(gene.transl_table))))
         # taking only the part to the first stop codon resulted in better matches
         # for using the augustus_masked features from GFF
-        protein = protein_w_stop.split('*')[0]
+        #TODO: use only sequence until first stop codon? (better for augustus_masked proteins)
+        #protein = protein_w_stop.split('*')[0]
+        protein = protein_w_stop
         proteins_file.write(protein)
         proteins_file.write("\n")
 

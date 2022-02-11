@@ -32,13 +32,11 @@ def bam2pbc(bam, pbc):
     # FIXME: check this here (add specific output filtering)
     # --> probably error because samtools view command was skipped in mapping()
     cmd = 'bedtools genomecov -ibam "{}" -d > "{}"'.format(bam, pbc)
-    # try:
-    #     out = subprocess.run([cmd], shell=True, capture_output=True, check=True)
-    # except:
     out = subprocess.run([cmd], shell=True, capture_output=True)
-    logging.error('Error running\n{}'.format(cmd))
-    logging.info(cmd.stderr.decode())
-        # sys.exit()
+    if out.returncode != 0:
+        logging.error('converting BAM to PBC failed:\n{}'.format(cmd))
+        logging.error('Error message:\n'+out.stderr.decode())
+        sys.exit()
 
 
 def mapping(mapping_dir, fasta_path, read_paths, min_insert_set, max_insert_set, read_orientation_set, bam_path, threads):
@@ -78,21 +76,23 @@ def mapping(mapping_dir, fasta_path, read_paths, min_insert_set, max_insert_set,
 
     ## run commands
     # build index
-    try:
-        out = subprocess.run([cmd_build], shell=True, capture_output=True, check=True)
-    except:
-        sys.exit('Error running\n{}'.format(cmd_build))
+    out = subprocess.run([cmd_build], shell=True, capture_output=True, check=True)
+    if out.returncode != 0:
+        logging.error('failed building index for mapping:\n{}'.format(cmd_build))
+        logging.error('Error message:\n'+out.stderr.decode())
+        sys.exit()
     # mapping
-    try:
-        out = subprocess.run([cmd_mapping], shell=True, capture_output=True, check=True)
-    except:
-        sys.exit('Error running\n{}'.format(cmd_mapping))
+    out = subprocess.run([cmd_mapping], shell=True, capture_output=True, check=True)
+    if out.returncode != 0:
+        logging.error('failed aligning reads to assembly:\n{}'.format(cmd_mapping))
+        logging.error('Error message:\n'+out.stderr.decode())
+        sys.exit()
     # convert SAM to BAM
-    try:
-        out = subprocess.run([cmd_view], shell=True, capture_output=True, check=True)
-    except:
-        sys.exit('Error running\n{}'.format(cmd_view))
-
+    out = subprocess.run([cmd_view], shell=True, capture_output=True, check=True)
+    if out.returncode != 0:
+        logging.error('sorting and converting SAM to BAM failed:\n{}'.format(cmd_view))
+        logging.error('Error message:\n'+out.stderr.decode())
+        sys.exit()
 
 def process_coverage(cfg):
     """Prepare coverage information for further analysis

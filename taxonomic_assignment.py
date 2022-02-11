@@ -13,7 +13,7 @@ import prepare_and_check
 
 class Gene:
     """ """
-    def __init__(self, line_array, header_index):
+    def __init__(self, line_array, header_index, cov):
         self.g_name = line_array[header_index.get('g_name')]
         self.c_name = line_array[header_index.get('c_name')]
         self.c_num_of_genes = line_array[header_index.get('c_num_of_genes')]
@@ -22,11 +22,12 @@ class Gene:
         self.c_genelenm = line_array[header_index.get('c_genelenm')]
         self.c_genelensd = line_array[header_index.get('c_genelensd')]
 
-        self.c_cov = {item_index:line_array[index] for item_index, index in header_index.get('c_cov').items()}
-        self.c_covsd = {item_index:line_array[index] for item_index, index in header_index.get('c_covsd').items()}
-        self.c_covdev = {item_index:line_array[index] for item_index, index in header_index.get('c_covdev').items()}
-        self.c_genecovm = {item_index:line_array[index] for item_index, index in header_index.get('c_genecovm').items()}
-        self.c_genecovsd = {item_index:line_array[index] for item_index, index in header_index.get('c_genecovsd').items()}
+        if cov:
+            self.c_cov = {item_index:line_array[index] for item_index, index in header_index.get('c_cov').items()}
+            self.c_covsd = {item_index:line_array[index] for item_index, index in header_index.get('c_covsd').items()}
+            self.c_covdev = {item_index:line_array[index] for item_index, index in header_index.get('c_covdev').items()}
+            self.c_genecovm = {item_index:line_array[index] for item_index, index in header_index.get('c_genecovm').items()}
+            self.c_genecovsd = {item_index:line_array[index] for item_index, index in header_index.get('c_genecovsd').items()}
 
         self.c_pearson_r = line_array[header_index.get('c_pearson_r')]
         self.c_pearson_p = line_array[header_index.get('c_pearson_p')]
@@ -40,10 +41,11 @@ class Gene:
         self.g_terminal = line_array[header_index.get('g_terminal')]
         self.g_single = line_array[header_index.get('g_single')]
 
-        self.g_cov = {item_index:line_array[index] for item_index, index in header_index.get('g_cov').items()}
-        self.g_covsd = {item_index:line_array[index] for item_index, index in header_index.get('g_covsd').items()}
-        self.g_covdev_c = {item_index:line_array[index] for item_index, index in header_index.get('g_covdev_c').items()}
-        self.g_covdev_o = {item_index:line_array[index] for item_index, index in header_index.get('g_covdev_o').items()}
+        if cov:
+            self.g_cov = {item_index:line_array[index] for item_index, index in header_index.get('g_cov').items()}
+            self.g_covsd = {item_index:line_array[index] for item_index, index in header_index.get('g_covsd').items()}
+            self.g_covdev_c = {item_index:line_array[index] for item_index, index in header_index.get('g_covdev_c').items()}
+            self.g_covdev_o = {item_index:line_array[index] for item_index, index in header_index.get('g_covdev_o').items()}
 
         self.g_pearson_r_o = line_array[header_index.get('g_pearson_r_o')]
         self.g_pearson_p_o = line_array[header_index.get('g_pearson_p_o')]
@@ -998,7 +1000,7 @@ def parse_header(header):
     return indexing
 
 
-def read_genes_coords(output_path):
+def read_genes_coords(cfg):
     """
     Read gene_table_coords.csv and save information to Gene objects.
 
@@ -1009,7 +1011,7 @@ def read_genes_coords(output_path):
 
     """
 
-    input_path = output_path + 'PCA_and_clustering/gene_table_coords.csv'
+    input_path = cfg.output_path + 'PCA_and_clustering/gene_table_coords.csv'
 
     with open(input_path, 'r') as input_file:
         header = next(input_file)
@@ -1017,7 +1019,7 @@ def read_genes_coords(output_path):
 
         genes = {}
         for line in input_file:
-            gene = Gene(line.strip().split(','), header_index)
+            gene = Gene(line.strip().split(','), header_index, cfg.include_coverage)
 
             # filter genes without PCA coordinates
             if list(gene.coords.values())[0] != "NA":
@@ -1199,7 +1201,8 @@ def taxonomy_summary(cfg, genes):
         for rank, taxa in tax_sum_dict.items():
             summary_file.write('Following taxa for rank "{}" are present in the assembly:\n'.format(rank))
             for taxon, count in taxa.items():
-                summary_file.write('{}:\t{}\n'.format(taxon, count))
+                if taxon != 'None' and taxon:
+                    summary_file.write('{}:\t{}\n'.format(taxon, count))
 
 def str2float_or_int(string, digits):
 
@@ -1331,7 +1334,7 @@ def run_assignment(cfg):
         sys.exit()
 
     # read file
-    genes, header = read_genes_coords(cfg.output_path)
+    genes, header = read_genes_coords(cfg)
 
     prots = prot_gene_matching(cfg.output_path, cfg.gff_path, genes, cfg)
 

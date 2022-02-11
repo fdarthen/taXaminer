@@ -989,7 +989,7 @@ def compute_stats(a, lgth_corr_function):
 
     return output_dict
 
-def filter_contigs_and_genes(a):
+def filter_contigs_and_genes(a, cfg):
     """
     Stores names of all contigs without genes in a list and returns it.
     Moves all contigs without coverage info to a new dict and returns it.
@@ -1007,8 +1007,9 @@ def filter_contigs_and_genes(a):
         if contig.geneless_info() == 1:
             a.add_geneless_contig(contig_name, contig)
 
+
         # if no per base coverage info is available for this contig
-        if contig.no_coverage_info():
+        if cfg.include_coverage and contig.no_coverage_info():
             # store it to appropriate dict
             a.add_contig_without_cov(contig_name, contig)
 
@@ -1016,12 +1017,13 @@ def filter_contigs_and_genes(a):
             for gene_name in contig.get_genes():
                 a.add_gene_without_cov(gene_name, a.get_gene(gene_name))
 
-    # delete all contigs & genes that have no cov info
-    for gene_name, gene in a.get_genes_without_cov().items():
-        a.remove_gene(gene)
+    if cfg.include_coverage:
+        # delete all contigs & genes that have no cov info
+        for gene_name, gene in a.get_genes_without_cov().items():
+            a.remove_gene(gene_name)
 
-    for contig_name, contig in a.get_contigs_without_cov().items():
-        a.remove_contig(contig)
+        for contig_name, contig in a.get_contigs_without_cov().items():
+            a.remove_contig(contig_name)
 
 
 def get_raw_array(a, stats_ref):
@@ -1191,8 +1193,8 @@ def output_table(a, raw_array, filename):
         "g_gc_cont", "g_gcdev_c", "g_gcdev_o" # , "g_single_exon"
     ]
 
-    out1_raw_array.write(("\t".join(x for x in header)) + "\n")
-    out2_raw_array.write((",".join(x for x in header)) + "\n")
+    out1_raw_array.write(("\t".join(header)) + "\n")
+    out2_raw_array.write((",".join(header)) + "\n")
 
     for gene_array in raw_array:
         flat_gene_array = []
@@ -1695,7 +1697,7 @@ def process_gene_info(cfg):
     # store names of geneless contigs to a list
     # exclude all contigs and genes without coverage from further processing
     # (i.e. remove them from a.contigs and store them to respective own dicts)
-    filter_contigs_and_genes(a)
+    filter_contigs_and_genes(a, cfg)
     # AT THIS POINT, a.contigs WILL ONLY CONTAIN CONTIGS WITH COVERAGE INFO
     # (BUT MAY STILL CONTAIN GENELESS CONTIGS)
 

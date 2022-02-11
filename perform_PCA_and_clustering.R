@@ -141,7 +141,6 @@ clustering_mclust <- function(coords, num_cluster) {
     clustering_output(coords, cluster, cluster_df, "mclust", num_cluster)
 }
 
-
 # ::::::::::::::::: DATA PROCESSING ::::::::::::::::::::
 rawdata <- read.table(paste0(cfg$output_path,'gene_info/imputed_gene_table.txt'), row.names=1, header=TRUE)
 # WITHOUT GC AND ONLY WITH PEARSON R NUCLEOTIDE FREQS
@@ -151,12 +150,12 @@ subsetted_data <- subset(rawdata, select=myvars)
 
 # check if all genes are on one contig
 if (dim(table(subsetted_data["c_name"])) == 1) { # i.e. is there only one dimension (value) in the column specifying the contig name
-contig_columns <- c("c_num_of_genes", "c_len", "c_pct_assemby_len", "c_cov", "c_covsd", "c_covdev", "c_pearson_r", "c_pearson_p", "c_gc_cont",  "c_gcdev",  "c_genecovm",  "c_genecovsd",  "c_genelenm",  "c_genelensd")
+    contig_columns <- c("c_num_of_genes", "c_len", "c_pct_assemby_len", "c_cov", "c_covsd", "c_covdev", "c_pearson_r", "c_pearson_p", "c_gc_cont",  "c_gcdev",  "c_genecovm",  "c_genecovsd",  "c_genelenm",  "c_genelensd")
 data_columnfiltered1 <- subsetted_data[, !(names(subsetted_data) %in% contig_columns)]
 # if so: drop the contig columns
 # (since the contig columns have a variance of 0, i.e. contain no information)
 } else {
-data_columnfiltered1 <- subsetted_data
+    data_columnfiltered1 <- subsetted_data
 }
 
 # delete directory for PCA and clustering results and create new empty one (avoids warning messages)
@@ -174,12 +173,10 @@ write.table(colnames(columns_with_nans), file=paste0(cfg$output_path, "PCA_and_c
 # keep only those columns with less than 30% NaN values
 data_columnfiltered2 <- data_columnfiltered1[colSums(is.na(data_columnfiltered1))/nrow(data_columnfiltered1) < .3]
 
-
 if (dim(table(subsetted_data["c_name"])) == 1) {
     cat("\nexcluded due to a variance of 0 (since only one contig is in the input set):\n", file=paste0(cfg$output_path, "PCA_and_clustering/variables_excluded_from_PCA_and_clustering.txt"), append=TRUE)
     write.table(colnames(subsetted_data[, (names(subsetted_data) %in% contig_columns)]), file=paste0(cfg$output_path, "PCA_and_clustering/variables_excluded_from_PCA_and_clustering.txt"), col.names=FALSE, row.names=FALSE, quote=FALSE, append=TRUE)
 }
-
 
 # CLEAN DATA FROM NaNS -- LISTWISE (i.e. by row, i.e. for gene)
 # save the genes containing NaN values to a specific data frame
@@ -190,6 +187,7 @@ write.csv(mydata_nans, file=paste0(cfg$output_path, "PCA_and_clustering/genes_ex
 complete_data <- data_columnfiltered2[complete.cases(data_columnfiltered2),]
 # output which genes have been used as an input for the PCA
 # write.csv(mydata, file=paste0(cfg$output_path, "PCA_and_clustering/genes_used_for_PCA_and_clustering.csv"), row.names=TRUE, quote=FALSE)
+mydata <- complete_data
 
 #TODO: adjust for multiple coverage sets
 # FILTER GENES BASED ON COVERAGE
@@ -204,11 +202,8 @@ if (cfg$include_coverage){
     mydata <- complete_data[complete_data$g_cov_1 <= (g_cov_median),]
     #c_cov_median <- median(complete_data[,"c_cov"])
     #mydata <- g_filtered_data[g_filtered_data$c_cov <= (c_cov_median),]
-  } else {
-    mydata <- complete_data
   }
 }
-
 
 # :::::::::::::::::::: PCA ::::::::::::::::::::::::::::::
 print("PCA: ")
