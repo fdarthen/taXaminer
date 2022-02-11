@@ -1,8 +1,8 @@
 #!/bin/bash
 
-conda create -n test_milts python=3.8 r-base=4.0.5 -y
+conda create -n milts python=3.8 r-base=4.0.5 -y
 source ~/anaconda3/etc/profile.d/conda.sh
-conda activate test_milts
+conda activate milts
 
 conda config --add channels defaults
 conda config --add channels bioconda
