@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Prepare config parameters and check data validity.
 
 Processes the users config file, sets default values for those not
@@ -6,6 +8,8 @@ computed and makes sanity checks for input data
 
 Expects path to config file
 """
+__author__ = "Freya Arthen"
+__version__ = "0.6.0"
 
 import pathlib # to create directories
 import yaml # read config file

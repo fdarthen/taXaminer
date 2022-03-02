@@ -1,4 +1,13 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+
+"""Perform taxonomic assignment
+
+Expects processed config file
+"""
+__author__ = "Freya Arthen"
+__version__ = "0.6.0"
+
+import prepare_and_check
 
 import taxopy
 import sys
@@ -6,9 +15,6 @@ import csv
 import pathlib
 import subprocess
 import logging
-
-
-import prepare_and_check
 
 
 class Gene:

@@ -1,9 +1,9 @@
 #!/usr/bin/env Rscript
 
-# reads output from gene_info and produces PCA_and_clustering
-# author: Simonida Zehr
-# date: 18 June 2019
-
+#' reads output from gene_info and produces PCA_and_clustering
+#' @usage Rscript perform_PCA_and_clustering.R config.yml
+#' @param config.yml path to preprocessed config file
+#' @author Simonida Zehr, Freya Arthen
 
 library(factoextra) # for pca
 library(ggplot2) # for plotting
@@ -17,6 +17,10 @@ config_path <- args[1]
 
 cfg <- yaml.load_file(config_path)
 
+#' save ggplots to pdf or png
+#' @param theplot ggplot plot object
+#' @param thepath path for plot file
+#' @param spec bool whether dimensions and resolution of should be specified
 plot_pdf_andor_png <- function(theplot, thepath, spec) {
     # spec: if dimensions and resolution should be specified
     if (spec) {
@@ -49,7 +53,13 @@ plot_pdf_andor_png <- function(theplot, thepath, spec) {
     }
 }
 
-#' create output for clustering algorithms
+#' create output for clustering algorithm
+#' @param coords pca coordinates
+#' @param cluster cluster assignment for data points as factor
+#' @param cluster_df cluster assignment for data points as data.frame
+#' @param clustering_algo which clustering algorithm was performed
+#' @param num_cluster number of clusters (eps for DBSCAN)
+#' @param num_cluster2 (minPts for DBSCAN)
 clustering_output <- function(coords, cluster, cluster_df, clustering_algo, num_cluster, num_cluster2=NULL) {
     if (clustering_algo == "kmeans"){
         plot_title <- paste0("k-means clustering, k=",num_cluster)
@@ -101,7 +111,9 @@ clustering_output <- function(coords, cluster, cluster_df, clustering_algo, num_
     lapply(names(cluster_lists), function(x){write.table(cluster_lists[[x]], file=paste0(cfg$output_path, "PCA_and_clustering/",dir_name,"/genes_by_cluster/",sub_name,"/cluster_", x, ".txt"),col.names=FALSE, row.names=FALSE, quote=FALSE)})
 }
 
-
+#' perform kmeans clustering
+#' @param coords pca coordinates
+#' @param num_cluster number of clusters
 clustering_kmeans <- function(coords, num_cluster) {
     kmeans_clusters <- kmeans(coords, num_cluster)
     cluster <- as.factor(kmeans_clusters$cluster)
@@ -111,7 +123,9 @@ clustering_kmeans <- function(coords, num_cluster) {
     clustering_output(coords, cluster, cluster_df, "kmeans", num_cluster)
 }
 
-
+#' perform hierarchical clustering
+#' @param coords pca coordinates
+#' @param num_cluster number of clusters
 clustering_hclust <- function(coords, num_cluster) {
     cluster <- as.factor(cutree(hclust_clustering, k=num_cluster))
     # store cluster assignments in data frame for text output
@@ -120,7 +134,10 @@ clustering_hclust <- function(coords, num_cluster) {
     clustering_output(coords, cluster, cluster_df, "hclust", num_cluster)
 }
 
-
+#' perform kmeans clustering
+#' @param coords pca coordinates
+#' @param eps_val value for eps
+#' @param minPts_val value for minPts
 clustering_dbscan <- function(coords, eps_val, minPts_val) {
     run <- dbscan(coords, eps=eps_val, minPts=minPts_val)
     cluster <- as.factor(run$cluster+1L)
@@ -131,7 +148,9 @@ clustering_dbscan <- function(coords, eps_val, minPts_val) {
     clustering_output(coords, cluster, cluster_df, "dbscan", eps_val, minPts_val)
 }
 
-
+#' perform model based clustering
+#' @param coords pca coordinates
+#' @param num_cluster number of clusters
 clustering_mclust <- function(coords, num_cluster) {
     model <- Mclust(coords, G=num_cluster)
     cluster <- as.factor(model$classification)
@@ -211,7 +230,6 @@ ptm <- proc.time()
 mypca <- prcomp(mydata[2:length(mydata)], scale = TRUE)
 print(proc.time() - ptm)
 # get new coordinates of genes on ALL principal components
-#explor(mypca) #FH
 genecoords <- get_pca_ind(mypca)$coord
 genecoordsDf <- data.frame(genecoords)
 

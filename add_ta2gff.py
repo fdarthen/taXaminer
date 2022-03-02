@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Add taxonomic assignment of genes to GFF
 
 Adds the taxonomic assignment of each genes as attribute to GFF
@@ -5,6 +7,8 @@ Adds the taxonomic assignment of each genes as attribute to GFF
 Expects prepared config file
 (preparation of config by prepare_and_check.py)
 """
+__author__ = "Freya Arthen"
+__version__ = "0.6.0"
 
 import logging
 import sys

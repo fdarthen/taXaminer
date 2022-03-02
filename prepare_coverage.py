@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Prepare coverage
 
 Prepares coverage data for further processing. Raw reads are mappend
@@ -7,6 +9,8 @@ Expects prepared config file with information regarding available
 coverage information and corresponding paths to find the files
 (preparation of config by prepare_and_check.py)
 """
+__author__ = "Freya Arthen"
+__version__ = "0.6.0"
 
 import logging
 import sys

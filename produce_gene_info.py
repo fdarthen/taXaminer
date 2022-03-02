@@ -1,8 +1,16 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
 
-# reads FASTA, GFF3 and per_base_coverage.txt file and produces gene_info directory
-# author: Simonida Zehr and Freya Arthen
-# date: 18 June 2019
+"""reads FASTA, GFF3 and per_base_coverage.txt file and produces gene_info directory
+
+
+
+Expects path to config file
+"""
+__author__ = "Simonida Zehr, Freya Arthen"
+__version__ = "0.6.0"
+
+from classes import Assembly, Contig, Gene
+import prepare_and_check
 
 import numpy as np
 import pathlib # to create directories
@@ -13,8 +21,7 @@ from Bio.Seq import Seq as BioPython_Seq # to count oligonucleotides (also overl
 import sys # parse command line arguments
 import logging
 
-from classes import Assembly, Contig, Gene
-import prepare_and_check
+
 
 # ====================== CONSTANTS ======================
 # define nucleotide alphabet

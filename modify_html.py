@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Modify HTML
 
 Modifies the HTML 3D plot file to make is self-contained and
@@ -6,6 +8,8 @@ the text in the hoverwindow selectable.
 Expects prepared config file to find path to HTML file
 (preparation of config by prepare_and_check.py)
 """
+__author__ = "Freya Arthen"
+__version__ = "0.6.0"
 
 import logging
 from bs4 import BeautifulSoup as bs

@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """MILTS main script
 
 Runs the pipeline by subsequently calling the submodules. Reads
@@ -6,6 +8,18 @@ basis and calls necessary processing steps.
 
 Expects path to raw config file
 """
+
+__author__ = "Freya Arthen"
+__version__ = "0.6.0"
+
+# package specific modules
+import prepare_and_check
+import prepare_coverage
+import produce_gene_info
+import taxonomic_assignment
+import modify_html
+import extract_prot_seq
+
 import os
 import sys
 import yaml
@@ -15,13 +29,7 @@ import shutil
 import logging
 import time
 
-# package specific modules
-import prepare_and_check
-import prepare_coverage
-import produce_gene_info
-import taxonomic_assignment
-import modify_html
-import extract_prot_seq
+
 
 # custom logging format per level
 class MyFormatter(logging.Formatter):

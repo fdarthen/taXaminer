@@ -1,5 +1,10 @@
 #!/usr/bin/env Rscript
 
+#' Create plots of PCA results and taxonomic assignment
+#' @usage Rscript plotting.R config.yml
+#' @param config.yml path to preprocessed config file
+#' @author Freya Arthen
+
 library(ggplot2) # for plotting
 library(viridis) # for colours
 library(data.table)
@@ -12,6 +17,12 @@ args <- commandArgs(trailingOnly = TRUE)
 config_path <- args[1]
 
 cfg <- yaml.load_file(config_path)
+
+#' save ggplots to pdf or png
+#' @param plot ggplot plot object
+#' @param plot_path path for plot file
+#' @param spec bool whether dimensions and resolution of should be specified
+#' @param cols number of legend columns in plot (broadens plot)
 
 plot_pdf_andor_png <- function(plot, plot_path, spec, cols) {
     # spec: if dimensions and resolution should be specified
@@ -44,10 +55,16 @@ plot_pdf_andor_png <- function(plot, plot_path, spec, cols) {
     }
   }
 
+#' create json file of 3D plot with specified camera angle
+#' enables later saving of 3D plot as pdf
+#' Note: currently only possible when running on a workstation
+#' @param plot plotly 3D scatter plot object
+#' @param plot_filename filename for json file
+#' @param eye_x x value for camera view
+#' @param eye_y y value for camera view
+#' @param eye_z z value for camera view
+
 orca_static_3d <- function(plot, plot_filename, eye_x, eye_y, eye_z) {
-    # create json file of 3D plot with specified camera angle
-    # enables later saving of 3D plot as pdf
-    # Note: this is currently only possible when running on a workstation
     m <- list(l = 0, r = 0, b = 0)
     s <- list(camera = list(eye = list(x = eye_x, y = eye_y, z = eye_z)),
         xaxis=list(title="PC 1"),yaxis=list(title="PC 2"),zaxis=list(title="PC 3"),
@@ -211,7 +228,7 @@ genes_coords_taxon$label_color[genes_coords_taxon$plot_label != query_label_name
 
 
 # subset data into three groups
-# this enables to stack the data point in the desired order in the plot
+# this enables to stack the data points in the desired order in the plot
 # i.e. putting the less interesting (background) data points with query assignment in the background
 genes_coords_taxon_query <- genes_coords_taxon[genes_coords_taxon$plot_label == query_label_name,]
 genes_coords_taxon_unassigned <- genes_coords_taxon[genes_coords_taxon$plot_label == "Unassigned",]
@@ -299,10 +316,11 @@ if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
         plot_pdf_andor_png(plot_z, paste(c(cfg$output_path, "taxonomic_assignment/density_z"), collapse=""), TRUE, label_1d_ncols)
     }
 
+    # creation of 3D scatter plot with plotly
+    # data is added in three steps to put 'background' information like genes assigned to
+    # query species and unassigned ones into background and put interesting matches in front
     if (cfg$include_coverage == 'TRUE') {
-        # creation of 3D scatter plot with plotly
-        # data is added in three steps to put 'background' information like genes assigned to
-        # query species and unassigned ones into background and put interesting matches in front
+        # display coverage information in the hover window
         fig <- plot_ly(type="scatter3d", mode="markers", symbols=c('circle'))
         fig <- fig %>% add_markers(fig, data=genes_coords_taxon_query, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
             hoverinfo="text",
@@ -351,9 +369,7 @@ if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
             name=~plot_label_freq
         )
     }else{
-        # creation of 3D scatter plot with plotly
-        # data is added in three steps to put 'background' information like genes assigned to
-        # query species and unassigned ones into background and put interesting matches in front
+        # no coverage information to display in hover window
         fig <- plot_ly(type="scatter3d", mode="markers", symbols=c('circle'))
         fig <- fig %>% add_markers(fig, data=genes_coords_taxon_query, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,
             hoverinfo="text",
@@ -402,7 +418,7 @@ if (length(grep("Dim.",colnames(genes_coords_taxon),value=TRUE)) >= 3){
     fig <- fig %>% layout(title = query_name)
 
 
-    # different angles of 3D plot as pdf
+    # save different angles of 3D plot as pdf
     orca_static_3d(fig, "2D_plot_1_2", 0, 0, 2.25)
     orca_static_3d(fig, "2D_plot_1_3", 0, 2.25, 0)
     orca_static_3d(fig, "2D_plot_2_3", 2.25, 0, 0)

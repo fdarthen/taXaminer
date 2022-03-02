@@ -1,3 +1,10 @@
+#!/usr/bin/env python
+
+"""Classes for taXamine
+"""
+__author__ = "Simonida Zehr, Freya Arthen"
+__version__ = "0.6.0"
+
 
 import numpy as np
 from operator import itemgetter
