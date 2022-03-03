@@ -5,7 +5,7 @@ wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
 tar -zxf 'taxdump.tar.gz' nodes.dmp names.dmp
 rm -rf taxdump.tar.gz
 
-# make MILTS script executable
+# make taXaminer script executable
 [[ ! -d tools ]] && mkdir -p tools
 cd tools
 

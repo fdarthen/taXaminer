@@ -3,7 +3,7 @@
 #SBATCH --account=user
 #SBATCH --cpus-per-task=24
 #SBATCH --mem-per-cpu=8gb
-#SBATCH --job-name="milts"
+#SBATCH --job-name="taXaminer"
 #SBATCH --output=./%A_%a.log     # log output
 #SBATCH --array=1
 
@@ -11,7 +11,7 @@
 PATH=$PWD/tools:$PATH
 
 ## get path where script is located
-# to enable call from outside of MILTS directory
+# to enable call from outside of taXaminer directory
 CMD=$(scontrol show job $SLURM_JOBID | awk -F= '/Command=/{print $2}')
 SCRIPT_DIR=$(dirname $(realpath $(echo $CMD | cut -d' ' -f1)))
 
@@ -30,5 +30,5 @@ fi
 # print Task ID and path to config file
 echo $SLURM_ARRAY_TASK_ID $config_path
 
-# call MILTS
-python3 $SCRIPT_DIR/milts.py "$config_path"
+# call taXaminer
+python3 $SCRIPT_DIR/taXaminer.py "$config_path"

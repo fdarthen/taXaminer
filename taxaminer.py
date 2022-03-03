@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""MILTS main script
+"""taXaminer main script
 
 Runs the pipeline by subsequently calling the submodules. Reads
 path to raw config file, extracts and prepares information on this
@@ -91,7 +91,7 @@ def main():
 
         pre_time = time.time()
         logging.info('>>> creating genomic FASTA index')
-        cmd_faidx_g = 'samtools faidx "{}" -o "{}tmp/tmp.MILTS.fasta.fai"'.format(
+        cmd_faidx_g = 'samtools faidx "{}" -o "{}tmp/tmp.taxaminer.fasta.fai"'.format(
                             cfg.fasta_path, cfg.output_path)
         out_faidx_g = subprocess.run([cmd_faidx_g], shell=True, capture_output=True)
         if out_faidx_g.returncode != 0:
@@ -139,7 +139,7 @@ def main():
             extract_prot_seq.generate_fasta(cfg)
             logging.debug('finished [{}s]\n'.format(int(time.time()-pre_time)))
         else:
-            # create symlink if proteins.faa file does not exist in milts
+            # create symlink if proteins.faa file does not exist in taxaminer
             # report (for GUI)
             if not pathlib.Path(cfg.output_path+'proteins.faa').exists():
                 pathlib.Path(cfg.output_path+'proteins.faa').symlink_to(pathlib.Path(cfg.proteins_path).resolve())

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Classes for taXamine
+"""Classes for taXaminer
 """
 __author__ = "Simonida Zehr, Freya Arthen"
 __version__ = "0.6.0"

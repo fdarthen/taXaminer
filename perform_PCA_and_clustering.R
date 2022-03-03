@@ -98,7 +98,7 @@ clustering_output <- function(coords, cluster, cluster_df, clustering_algo, num_
     # store g_names as an individual column (for output)
     raw_gene_table_cluster_with_g_names <- cbind(g_name = rownames(raw_gene_table_cluster), raw_gene_table_cluster)
     # and write this info to a .csv file
-    write.csv(raw_gene_table_cluster_with_g_names, file=paste0(cfg$output_path, "PCA_and_clustering/",dir_name,"/",sub_name,".MILTS.csv"), row.names=FALSE, quote=FALSE)
+    write.csv(raw_gene_table_cluster_with_g_names, file=paste0(cfg$output_path, "PCA_and_clustering/",dir_name,"/",sub_name,".taXaminer.csv"), row.names=FALSE, quote=FALSE)
 
     # output 2:
     # create separate directory to store the files holding all genes by cluster assignment

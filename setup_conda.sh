@@ -1,8 +1,8 @@
 #!/bin/bash
 
-conda create -n milts python=3.8 r-base=4.0.5 -y
+conda create -n taxaminer python=3.8 r-base=4.0.5 -y
 source ~/anaconda3/etc/profile.d/conda.sh
-conda activate milts
+conda activate taxaminer
 
 conda config --add channels defaults
 conda config --add channels bioconda
@@ -30,4 +30,4 @@ wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
 tar -zxf 'taxdump.tar.gz' nodes.dmp names.dmp
 rm -rf taxdump.tar.gz
 
-echo "Done installing dependencies for MILTS"
+echo "Done installing dependencies for taXaminer"

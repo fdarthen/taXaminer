@@ -75,7 +75,7 @@ def check_assembly_ids(config_obj):
     fasta_ids = set()
     gff_ids = set()
 
-    with open(config_obj.output_path+'tmp/tmp.MILTS.fasta.fai', 'r') as gfai:
+    with open(config_obj.output_path+'tmp/tmp.taxaminer.fasta.fai', 'r') as gfai:
         # collect IDs of scaffolds from FASTA
         for line in gfai:
             fasta_ids.add(line.split()[0])

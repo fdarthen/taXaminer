@@ -1399,7 +1399,7 @@ def read_faidx(a):
       a:
     """
 
-    with open(a.get_output_path()+"tmp/tmp.MILTS.fasta.fai", 'r') as faidx: # open FAIDX file
+    with open(a.get_output_path()+"tmp/tmp.taxaminer.fasta.fai", 'r') as faidx: # open FAIDX file
         for line in faidx:
             line_array = line.split()
             contig_name = line_array[0]

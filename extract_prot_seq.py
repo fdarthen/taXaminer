@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Extract protein sequence for genes based on GFF and FASTA file
 
 Compute protein FASTA by parsing gene sequences baed on coordinates from
@@ -6,6 +8,8 @@ it to amino acid sequence
 
 Expects processed config file
 """
+__author__ = "Freya Arthen"
+__version__ = "0.6.0"
 
 import sys
 from Bio import Seq
@@ -70,15 +74,23 @@ class Feature:
         self.coordinates = [] # coordinates of CDS of currently longest transcript
 
 def get_cds_coordinates(cfg):
-    """
-    Parse GFF
+    """ Parse GFF to find gene and their corresponding mRNA and/or CDS
+
+    Parses the GFF and, while considering the special parsing options of
+    taXamine, gathers information on genes, mRNA and CDS. Saves for each
+    contig the list of genes IDs that are annotated on it. CDS and transcripts
+    features are connected to genes. Transcript Feature object are stored
+    together with genes in features dictionary; CDS features are saved in
+    gene object.
 
     Args:
-      cfg:
+      cfg(obj): Config class object of config parameters
 
     Returns:
-
+        contigs(dict): {scaffold ID : [gene IDs]}
+        features(dict): {GFF feature ID : Feature object}
     """
+
     contigs = {} #key = contig, value = [gene ID]
     features = {} #key = feature ID, value = feature object
 
@@ -87,81 +99,67 @@ def get_cds_coordinates(cfg):
         parent = None
         for line in gff_file:
             if not line.startswith("#"):
-                spline = line.split("\t")
+                spline = line.strip().split("\t")
+                # only read lines that should be considered based on cfg.gff_source
+                # if default is selected, read all lines
                 if cfg.gff_source == "default"  or spline[1] == cfg.gff_source:
                     if spline[2] in [cfg.gff_gene_tag, cfg.gff_transcript_tag,
                                     cfg.gff_cds_tag]:
-                        # print(line)
                         #gather information for GFF entries of type gene, mRNA and CDS
-                        if 'HiC_scaffold_1162:hit:8641:4.5.0.0' in line:
-                            print(line)
                         contig = spline[0]
                         info_dict={"start": int(spline[3]), "end": int(spline[4]), "strand": spline[6], "phase": spline[7]}
-                        for elem in spline[8].strip().split(";"):
-                            if len(elem.split("=")) == 2: # handle if attributes are empty/faulty
+                        # save each attribute separately in dict
+                        for elem in spline[8].split(";"):
+                            # check if attributes are empty/faulty
+                            if len(elem.split("=")) == 2:
                                 key, value = elem.split("=")
                                 info_dict[key] = value
                         feature = Feature(contig, info_dict)
-                        if spline[2] == cfg.gff_gene_tag:
-                            #NOTE: remove non-protein coding genes?
+                        if spline[2] == cfg.gff_gene_tag: # gene
                             # if biotype tag is available, use only genes with protein_coding tag
                             if (feature.biotype and feature.biotype == "protein_coding") or not feature.biotype:
-                                # print(feature.__dict__)
                                 features[feature.id] = feature
                                 if contig in contigs.keys():
                                     contigs[contig].append(feature.id)
                                 else:
                                     contigs[contig] = [feature.id]
                         else: # mRNA or CDS
-                            # get parent for feature
+                            # get Feature object of parent for current feature
                             if cfg.gff_gene_connection == 'parent/child' or cfg.gff_source in ['default', 'maker', 'augustus_masked']:
-                                # print(feature.id)
-                                # print(cfg.gff_parent_child_attr)
-                                #print(getattr(feature,cfg.gff_parent_child_attr.get('parent').lower()))
                                 parent_attr = cfg.gff_parent_child_attr.get('parent').lower() if cfg.gff_parent_child_attr else 'parent'
                                 parent = features.get(getattr(feature,parent_attr))
-                                # print(parent)
                             elif cfg.gff_gene_connection == 'inline':
-                                # print(feature.id)
-                                # print(getattr(feature,cfg.gff_gene_attr.lower()))
                                 parent = features.get(getattr(feature,cfg.gff_gene_attr.lower()))
-                                # print(parent)
                             else:
                                 logging.error('Please check GFF parsing rule. Unclear how to connect gene and transcript')
                             if parent:
-                                # not required to store features in feature dict
-                                # if features.get(feature.id):
-                                #     features[feature.id].append(feature)
-                                # else:
-                                #     features[feature.id] = [feature]
+                                # which type is parent feature: gene or transcript?
                                 feature.parsed_parent = parent.id
-                                # print(spline[2])
                                 if spline[2] == cfg.gff_transcript_tag:
-                                    # transcript -> parent = gene
-                                    # feature = transcript
+                                    # current feature -> transcript
+                                    # parent -> gene
                                     features[feature.id] = feature
                                     parent.transcripts[feature.id] = 0
                                     parent.cdss[feature.id] = []
                                 else:
-                                    # CDS -> parent = gene or transcript
-                                    # print(parent.parsed_parent)
+                                    # current feature -> CDS
+                                    # parent -> gene or transcript
                                     if parent.parsed_parent:
-                                        # parent = transcript
-                                        # feature = CDS
+                                        # parsed_parent of parent is already assigned
+                                        # parent -> transcript
                                         gene = features.get(parent.parsed_parent)
                                         transcript_id = parent.id
                                     else:
-                                        # parent = gene thus transcripts are not specified
+                                        # parent -> gene
+                                        # thus transcripts are not specified and
                                         # no transcripts are available
-                                        # feature = transcript and CDS
+                                        # current feature -> transcript and CDS
                                         gene = parent
                                         transcript_id = gene.id
                                         parent.transcripts[transcript_id] = 0
                                         if not parent.cdss.get(transcript_id):
                                             parent.cdss[transcript_id] = []
                                     gene.cdss[transcript_id].append(feature)
-                                    if gene.id == 'HiC_scaffold_1162:hit:8641:4.5.0.0':
-                                        print(gene.__dict__)
             elif "#FASTA" in line: # if FASTA block has been reached
                 break
     return contigs, features
@@ -171,34 +169,32 @@ def get_longest_transcript(contigs, features):
 
     Computes length of each transcript associated with gene Features
     and stores the coordinates for the respective CDS. Also corrects
-    for phase, add strand information and translational table info
+    for phase, adds strand and translational table information
 
     Args:
-      contigs:
-      features:
+      contigs(dict): {scaffold ID : [gene IDs]}
+      features(dict): {GFF feature ID : Feature object}
     """
+
     for contig, c_genes in contigs.items():
         cds = None
         for gene_id in c_genes:
             gene = features.get(gene_id)
             for transcript_id, cdss in gene.cdss.items():
                 length = 0
-                # print(transcript_id)
                 for cds in cdss:
-                    # print(cds.end, cds.start)
                     length += cds.end-cds.start+1
                 gene.transcripts[transcript_id] = length
-            # identify transcript with longest CDS
             if not gene.transcripts:
                 # no transcript was found for gene
                 continue
+            # identify transcript with longest CDS
             max_len_t = max(gene.transcripts, key=gene.transcripts.get)
             # get coordinates for that CDS
             for cds in gene.cdss.get(max_len_t):
                 gene.coordinates.append((cds.start-1,cds.end,cds.phase))
 
             if not cds:
-                # print(gene.id)
                 continue
 
             if cds.strand == '+':
@@ -206,10 +202,13 @@ def get_longest_transcript(contigs, features):
             else:
                 gene.strand = True
             phase = int(gene.coordinates[0][2]) if gene.coordinates[0][2] != '.' else 0
+            # sort coordinates
             gene.coordinates = sorted(gene.coordinates, key=lambda k: k[0], reverse=gene.strand)
+            # correct first coordinate for phase
             gene.coordinates[0] = (gene.coordinates[0][0]+phase,
                                 gene.coordinates[0][1], gene.coordinates[0][2])
 
+            # add translational table information if available
             gene.transl_table = cds.transl_table
             if not gene.transl_table:
                 gene.transl_table = '1'
@@ -236,9 +235,6 @@ def set_seqs(proteins_file, contigs, features, current_contig, contig_seq):
             # no transcript was found for gene
             continue
 
-        # get longest transcript for gene
-        max_len_t = max(gene.transcripts, key=gene.transcripts.get)
-
         proteins_file.write(">"+gene_id+"\n")
         seq = ''
         for coordinate in gene.coordinates:
@@ -248,18 +244,18 @@ def set_seqs(proteins_file, contigs, features, current_contig, contig_seq):
             else:
                 seq += str(Seq.Seq(contig_seq[coordinate[0]:coordinate[1]]))
 
+        protein = str(Seq.Seq(seq).translate(table=int(gene.transl_table)))
+
         # if len(seq)%3 != 0:
         #     # prepend N to make sequence length a multiple of three
         #     seq = ("N"*(3-(len(seq)%3)))+seq
-        protein_w_stop = str(Seq.Seq(seq).translate(table=int(gene.transl_table)))
         # if "*" in protein_w_stop[:-1]:
             # print(gene.__dict__)
             # print(str(Seq.Seq(seq).translate(table=int(gene.transl_table))))
         # taking only the part to the first stop codon resulted in better matches
-        # for using the augustus_masked features from GFF
-        #TODO: use only sequence until first stop codon? (better for augustus_masked proteins)
-        #protein = protein_w_stop.split('*')[0]
-        protein = protein_w_stop
+        # when using the augustus_masked features from GFF
+        # protein = protein.split('*')[0]
+
         proteins_file.write(protein)
         proteins_file.write("\n")
 

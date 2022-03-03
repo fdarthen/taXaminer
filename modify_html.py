@@ -133,7 +133,7 @@ def change_title(output_path, html_out_path):
     taxonomic_assignment.py and replaces old title with species name
 
     Args:
-      output_path: path to directory of MILTS report
+      output_path: path to directory of taXaminer report
       html_out_path: path to HTML plot file
     """
 
