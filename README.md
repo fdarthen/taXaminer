@@ -46,11 +46,12 @@ read_paths_1: ["path/to/read_file_1.fa","path/to/read_file_2.fa"] # path to read
 ```
 * Note: When using multiple coverage sets, duplicate the parameter you need and increase the number in the suffix
 
-To run *taXaminer* on a SLURM cluster environment (recommended), run:
+
+Make sure to activate the conda environment before running *taXaminer*. To run *taXaminer* on a SLURM cluster environment (recommended), enter:
 ```
 sbatch taxaminer.slurm <config.yml>
 ```
-To run it locally, run:
+To run it locally, use:
 ```
 python taxaminer.py <config.yml>
 ```

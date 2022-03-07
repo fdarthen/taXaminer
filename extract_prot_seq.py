@@ -83,6 +83,8 @@ def get_cds_coordinates(cfg):
     together with genes in features dictionary; CDS features are saved in
     gene object.
 
+    Can not handle unsorted GFFs!
+
     Args:
       cfg(obj): Config class object of config parameters
 
@@ -94,6 +96,7 @@ def get_cds_coordinates(cfg):
     contigs = {} #key = contig, value = [gene ID]
     features = {} #key = feature ID, value = feature object
 
+    unmatched_lines = {} # key = parent_id, value = line
 
     with open(cfg.gff_path, "r") as gff_file:
         parent = None
@@ -127,9 +130,11 @@ def get_cds_coordinates(cfg):
                             # get Feature object of parent for current feature
                             if cfg.gff_gene_connection == 'parent/child' or cfg.gff_source in ['default', 'maker', 'augustus_masked']:
                                 parent_attr = cfg.gff_parent_child_attr.get('parent').lower() if cfg.gff_parent_child_attr else 'parent'
-                                parent = features.get(getattr(feature,parent_attr))
+                                parent_id = getattr(feature,parent_attr)
+                                parent = features.get(parent_id)
                             elif cfg.gff_gene_connection == 'inline':
-                                parent = features.get(getattr(feature,cfg.gff_gene_attr.lower()))
+                                parent_id = getattr(feature,cfg.gff_gene_attr.lower())
+                                parent = features.get(parent_id)
                             else:
                                 logging.error('Please check GFF parsing rule. Unclear how to connect gene and transcript')
                             if parent:
@@ -160,8 +165,68 @@ def get_cds_coordinates(cfg):
                                         if not parent.cdss.get(transcript_id):
                                             parent.cdss[transcript_id] = []
                                     gene.cdss[transcript_id].append(feature)
+                            else:
+                                if parent_id in unmatched_lines.keys():
+                                    unmatched_lines[parent_id].append(spline)
+                                else:
+                                    unmatched_lines[parent_id] = [spline]
             elif "#FASTA" in line: # if FASTA block has been reached
                 break
+
+    # GFF3 was unsorted
+    count_it = 0
+    while unmatched_lines or count_it <= 2:
+        # make at max two iterations:
+        # genes are already added to features because they need no parent
+        # mRNA features can be added in first iteration as their parent (gene)
+        # will definetly be there
+        # CDS features will be at last added in second one (if not first)
+        count_it += 1
+        unmatched_lines_copy = {key: value for key, value in unmatched_lines.items()}
+        for parent_id, lines in unmatched_lines_copy.items():
+            if parent_id in features.keys():
+                del unmatched_lines[parent_id]
+                for spline in lines:
+                    #TODO: move this redundant code block to a function
+                    #gather information for GFF entries of type gene, mRNA and CDS
+                    contig = spline[0]
+                    info_dict={"start": int(spline[3]), "end": int(spline[4]), "strand": spline[6], "phase": spline[7]}
+                    # save each attribute separately in dict
+                    for elem in spline[8].split(";"):
+                        # check if attributes are empty/faulty
+                        if len(elem.split("=")) == 2:
+                            key, value = elem.split("=")
+                            info_dict[key] = value
+                    feature = Feature(contig, info_dict)
+                    parent = features.get(parent_id)
+                    # which type is parent feature: gene or transcript?
+                    feature.parsed_parent = parent.id
+                    if spline[2] == cfg.gff_transcript_tag:
+                        # current feature -> transcript
+                        # parent -> gene
+                        features[feature.id] = feature
+                        parent.transcripts[feature.id] = 0
+                        parent.cdss[feature.id] = []
+                    else:
+                        # current feature -> CDS
+                        # parent -> gene or transcript
+                        if parent.parsed_parent:
+                            # parsed_parent of parent is already assigned
+                            # parent -> transcript
+                            gene = features.get(parent.parsed_parent)
+                            transcript_id = parent.id
+                        else:
+                            # parent -> gene
+                            # thus transcripts are not specified and
+                            # no transcripts are available
+                            # current feature -> transcript and CDS
+                            gene = parent
+                            transcript_id = gene.id
+                            parent.transcripts[transcript_id] = 0
+                            if not parent.cdss.get(transcript_id):
+                                parent.cdss[transcript_id] = []
+                        gene.cdss[transcript_id].append(feature)
+
     return contigs, features
 
 def get_longest_transcript(contigs, features):
@@ -180,33 +245,35 @@ def get_longest_transcript(contigs, features):
         cds = None
         for gene_id in c_genes:
             gene = features.get(gene_id)
+
+            if not gene.transcripts or not gene.cdss:
+                # no transcript was found for gene
+                continue
+
             for transcript_id, cdss in gene.cdss.items():
                 length = 0
                 for cds in cdss:
                     length += cds.end-cds.start+1
                 gene.transcripts[transcript_id] = length
-            if not gene.transcripts:
-                # no transcript was found for gene
-                continue
             # identify transcript with longest CDS
             max_len_t = max(gene.transcripts, key=gene.transcripts.get)
             # get coordinates for that CDS
             for cds in gene.cdss.get(max_len_t):
                 gene.coordinates.append((cds.start-1,cds.end,cds.phase))
 
-            if not cds:
+            if not cds or not gene.coordinates:
                 continue
 
             if cds.strand == '+':
                 gene.strand = False # CDS is on forward strand
             else:
                 gene.strand = True
-            phase = int(gene.coordinates[0][2]) if gene.coordinates[0][2] != '.' else 0
+
+            # correct coordinates for phase
+            gene.coordinates = [((coordinate[0]+(int(coordinate[2]) if coordinate[2] != '.' else 0)),
+                                coordinate[1], coordinate[2]) for coordinate in gene.coordinates]
             # sort coordinates
             gene.coordinates = sorted(gene.coordinates, key=lambda k: k[0], reverse=gene.strand)
-            # correct first coordinate for phase
-            gene.coordinates[0] = (gene.coordinates[0][0]+phase,
-                                gene.coordinates[0][1], gene.coordinates[0][2])
 
             # add translational table information if available
             gene.transl_table = cds.transl_table
@@ -231,7 +298,7 @@ def set_seqs(proteins_file, contigs, features, current_contig, contig_seq):
     for gene_id in contigs.get(current_contig):
         gene = features.get(gene_id)
 
-        if not gene.transcripts:
+        if not gene.transcripts or not gene.cdss or not gene.coordinates:
             # no transcript was found for gene
             continue
 

@@ -1300,68 +1300,82 @@ def output_summary_file(a, stats_ref, filename, include_coverage):
 
     contig_cov_summary = ""
     gene_cov_summary = ""
+    num_contigs_cov = ""
+    num_genes_cov = ""
     if include_coverage:
         for pbc_index in a.get_pbc_paths().keys():
-            contig_cov_summary += "contig cov mean\t" + str(round(stats_ref["contig cov mean"][pbc_index], 2)) + "\n" + \
-             "contig cov sd\t" + str(round(stats_ref["contig cov sd"][pbc_index], 2)) + "\n" + \
-             "contig cov min\t" + str(round(stats_ref["contig cov min"][pbc_index], 2)) + "\n" + \
-             "contig cov max\t" + str(round(stats_ref["contig cov max"][pbc_index], 2)) + "\n"
-        contig_cov_summary += "\n"
+            contig_cov_summary += ">Contig coverage set {}\n".format(pbc_index) + \
+              "\tmean\t{}\n".format(round(stats_ref["contig cov mean"][pbc_index], 2)) + \
+              "\tsd\t{}\n".format(round(stats_ref["contig cov sd"][pbc_index], 2)) + \
+              "\tmin\t{}\n".format(round(stats_ref["contig cov min"][pbc_index], 2)) + \
+              "\tmax\t{}\n\n".format(round(stats_ref["contig cov max"][pbc_index], 2))
 
         for pbc_index in a.get_pbc_paths().keys():
-            gene_cov_summary += "gene cov mean\t" + str(round(stats_ref["gene cov mean"][pbc_index], 2))  + "\n" + \
-              "gene cov sd\t" + str(round(stats_ref["gene cov sd"][pbc_index], 2)) + "\n" + \
-              "gene cov min\t" + str(round(stats_ref["gene cov min"][pbc_index], 2))  + "\n" + \
-              "gene cov max\t" + str(round(stats_ref["gene cov max"][pbc_index], 2)) + "\n"
-        gene_cov_summary += "\n"
+            gene_cov_summary += ">Gene coverage set {}\n".format(pbc_index) +  \
+              "\tmean\t{}\n".format(round(stats_ref["gene cov mean"][pbc_index], 2)) + \
+              "\tsd\t{}\n".format(round(stats_ref["gene cov sd"][pbc_index], 2)) + \
+              "\tmin\t{}\n".format(round(stats_ref["gene cov min"][pbc_index], 2)) + \
+              "\tmax\t{}\n\n".format(round(stats_ref["gene cov max"][pbc_index], 2))
 
-    summaryfile.write("total # of contigs:\t" + str(len(a.get_contigs()) + len(a.get_contigs_without_cov())) + "\n" +
-                      "\t# geneless contigs:\t" + str(len(a.get_geneless_contigs()))  + "\n" +
-                      "\t# contigs w/ genes:\t"
-                          + str(len(a.get_contigs()) + len(a.get_contigs_without_cov()) - len(a.get_geneless_contigs())) + "\n" +
+        num_genes_cov = "\t# genes w/ cov info\t{}\n".format(len(a.get_genes())) + \
+            "\t# genes w/o cov info:\t{}\n".format(len(a.get_genes_without_cov()))
 
-                      "\t# contigs w/o cov info:\t" + str(len(a.get_contigs_without_cov())) + "\n" +
-                      "\t# contigs w/ cov info\t" + str(len(a.get_contigs())) + "\n" +
+        num_contigs_cov = "\t# contigs w/ cov info\t{}\n".format(len(a.get_contigs())) + \
+            "\t# contigs w/o cov info:\t{}\n".format(len(a.get_contigs_without_cov())) + \
+            "\t# contigs w/ genes & cov info:\t{}\n".format(len(a.get_contigs()) - len(a.get_geneless_contigs())) + \
+            "\t# contigs w/o genes & cov info:\t{}\n".format(len(set(a.get_contigs_without_cov()).intersection(a.get_geneless_contigs())))
 
-                    "\t# geneless contigs w/o cov info:\t"
-                                  + str(len(set(a.get_contigs_without_cov()).intersection(a.get_geneless_contigs()))) + "\n" +
-                    "\t# contigs with genes and w/ cov info:\t"
-                              + str(len(a.get_contigs()) - len(a.get_geneless_contigs())) + "\n\n" +
+    num_genes_cov += "\n"
+    num_contigs_cov += "\n"
 
-                "total assembly length\t" + str(stats_ref["total assembly length"]) + "\n" +
-                 "all contigs N50\t" + str(round(stats_ref["all contigs n50"], 2)) + "\n" +
-                  "all contigs N90\t" + str(round(stats_ref["all contigs n90"], 2)) + "\n" +
-                  "all contigs len min\t" + str(stats_ref["all contigs len min"]) + "\n" +
-                  "all contigs len max\t" + str(stats_ref["all contigs len max"]) + "\n\n" +
 
-                "considered assembly length\t" + str(stats_ref["considered assembly length"]) + "\n" +
-                "considered contigs N50\t" + str(round(stats_ref["considered contigs n50"], 2)) + "\n" +
-                "considered contigs N90\t" + str(round(stats_ref["considered contigs n90"], 2)) + "\n" +
-                "considered contigs len min\t" + str(stats_ref["considered contigs len min"]) + "\n" +
-                "considered contigs len max\t" + str(stats_ref["considered contigs len max"]) + "\n\n" +
+    summaryfile.write(">>>ASSEMBLY\n" +
+                "\t# contigs:\t{}\n".format(len(a.get_contigs()) + len(a.get_contigs_without_cov())) +
+                "\t# contigs w/ genes:\t{}\n".format(len(a.get_contigs()) + len(a.get_contigs_without_cov()) - len(a.get_geneless_contigs())) +
+                "\t# contigs w/o genes:\t{}\n".format(len(a.get_geneless_contigs())) +
+                num_contigs_cov +
+
+                ">total assembly\n" +
+                "\tlength\t{}\n".format(stats_ref["total assembly length"]) +
+                "\tN50\t{}\n".format(round(stats_ref["all contigs n50"], 2)) +
+                "\tN90\t{}\n".format(round(stats_ref["all contigs n90"], 2)) +
+                "\tcontigs len min\t{}\n".format(stats_ref["all contigs len min"]) +
+                "\tcontigs len max\t{}\n\n".format(stats_ref["all contigs len max"]) +
+
+                ">filtered assembly\n"
+                "\tlength\t{}\n".format(stats_ref["considered assembly length"]) +
+                "\tN50\t{}\n".format(round(stats_ref["considered contigs n50"], 2)) +
+                "\tN90\t{}\n".format(round(stats_ref["considered contigs n90"], 2)) +
+                "\tcontigs len min\t{}\n".format(stats_ref["considered contigs len min"]) +
+                "\tcontigs len max\t{}\n\n".format(stats_ref["considered contigs len max"]) +
+
+                ">>>CONTIGS\n" +
 
                 contig_cov_summary +
 
-                "contig gc mean\t" + str(round(stats_ref["contig gc mean"], 2)) + "\n" +
-                 "contig gc sd\t" + str(round(stats_ref["contig gc sd"], 2)) + "\n" +
-                 "contig gc min\t" + str(round(stats_ref["contig gc min"], 2)) + "\n" +
-                 "contig gc max\t" + str(round(stats_ref["contig gc max"], 2)) + "\n\n" +
+                ">Contig GC\n"
+                "\tmean\t{}\n".format(round(stats_ref["contig gc mean"], 2)) +
+                "\tsd\t{}\n".format(round(stats_ref["contig gc sd"], 2)) +
+                "\tmin\t{}\n".format(round(stats_ref["contig gc min"], 2)) +
+                "\tmax\t{}\n\n".format(round(stats_ref["contig gc max"], 2)) +
 
-                "total # genes:\t" + str(len(a.get_genes()) + len(a.get_genes_without_cov())) + "\n" +
-                "\t# genes w/o cov info:\t" + str(len(a.get_genes_without_cov())) + "\n" +
-                "\t# genes w/ cov info\t" + str(len(a.get_genes()))  + "\n\n" +
+                ">>>GENES\n" +
+                "\t# genes:\t{}\n".format(len(a.get_genes()) + len(a.get_genes_without_cov())) +
+                num_genes_cov +
 
-                 "gene len mean\t" + str(round(stats_ref["gene len mean"], 2))  + "\n" +
-                  "gene len sd\t" + str(round(stats_ref["gene len sd"], 2)) + "\n" +
-                  "gene len min\t" + str(stats_ref["gene len min"]) + "\n" +
-                  "gene len max\t" + str(stats_ref["gene len max"]) + "\n\n" +
+                ">Gene length\n" +
+                "\tmean\t{}\n".format(round(stats_ref["gene len mean"], 2)) +
+                "\tsd\t{}\n".format(round(stats_ref["gene len sd"], 2)) +
+                "\tmin\t{}\n".format(stats_ref["gene len min"]) +
+                "\tmax\t{}\n\n".format(stats_ref["gene len max"]) +
 
-                  gene_cov_summary +
+                gene_cov_summary +
 
-                  "gene gc mean\t" + str(round(stats_ref["gene gc mean"], 2))  + "\n" +
-                  "gene gc sd\t" + str(round(stats_ref["gene gc sd"], 2)) + "\n" +
-                  "gene gc min\t" + str(round(stats_ref["gene gc min"], 2))  + "\n" +
-                  "gene gc max\t" + str(round(stats_ref["gene gc max"], 2)) + "\n"
+                ">Gene GC\n"
+                "\tmean\t{}\n".format(round(stats_ref["gene gc mean"], 2)) +
+                "\tsd\t{}\n".format(round(stats_ref["gene gc sd"], 2)) +
+                "\tmin\t{}\n".format(round(stats_ref["gene gc min"], 2)) +
+                "\tmax\t{}\n".format(round(stats_ref["gene gc max"], 2))
                 )
 
     summaryfile.close()

@@ -28,6 +28,7 @@ import subprocess
 import shutil
 import logging
 import time
+import argparse
 
 
 
@@ -54,12 +55,20 @@ def main():
     # TODO: add more options to pass config parameters via command line
     # TODO: add levels of cleaning (temporarily) created data
     # process logging level information from command line input
-    log_level = logging.INFO
-    if len(sys.argv) > 2:
-        if sys.argv[2] == '--quiet':
-            log_level = logging.WARNING
-        elif sys.argv[2] == '--verbose' or sys.argv[2] == '--debug':
-            log_level = logging.DEBUG
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("config_path", help="path to config file")
+    parser.add_argument("-q","--quiet", help="print only warnings and error messages",
+                    action="store_true", default=False)
+    parser.add_argument("-v","--verbose", help="print detailed log",
+                    action="store_true", default=False)
+    args = parser.parse_args()
+
+    log_level = logging.INFO # default log level
+    if args.quiet:
+        log_level = logging.WARNING
+    elif args.verbose:
+        log_level = logging.DEBUG
     # initiate the logger
     logger = logging.getLogger()
     handler = logging.StreamHandler()
@@ -68,10 +77,10 @@ def main():
     logger.addHandler(handler)
 
     # read config file and retrieve output path
-    if pathlib.Path(sys.argv[1]).is_file():
-        user_config_dict = yaml.safe_load(open(sys.argv[1], 'r'))
+    if pathlib.Path(args.config_path).is_file():
+        user_config_dict = yaml.safe_load(open(args.config_path, 'r'))
     else:
-        logging.error('config file not found:   {}'.format(sys.argv[1]))
+        logging.error('config file not found:   {}'.format(args.config_path))
         sys.exit()
     output_path = user_config_dict.get('output_path') # location for results
     if not output_path.endswith('/'): # sanity check path to dir
@@ -83,7 +92,7 @@ def main():
     ## create config file to be used by subsequent modules
     # includes default for parameters not given by user and checks
     # file existence of required files and files to be computed in pipeline
-    prepare_and_check.process_config(sys.argv[1], SCRIPT_DIR)
+    prepare_and_check.process_config(args.config_path, SCRIPT_DIR)
     # create class object with configuration parameters
     cfg = prepare_and_check.cfg2obj(output_path+'tmp/tmp.cfg.yml')
 

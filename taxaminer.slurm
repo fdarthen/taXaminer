@@ -21,7 +21,7 @@ SCRIPT_DIR=$(dirname $(realpath $(echo $CMD | cut -d' ' -f1)))
 if [[ "$1" == '-s' || "$1" == '--seed' ]]; then
     config_path=$(awk -v arrayID=$SLURM_ARRAY_TASK_ID 'FNR==arrayID{print $0}' $2)
 elif [[ -f "${1}" ]]; then
-    config_path=$1
+    config_path=$@
 else
     echo "Config specification unclear. Either state path to config file or path to slurm seedfile using the flags -s/--seed"
     [[ "$BASH_SOURCE" == "$0" ]] && exit 1 || return 1
@@ -31,4 +31,4 @@ fi
 echo $SLURM_ARRAY_TASK_ID $config_path
 
 # call taXaminer
-python3 $SCRIPT_DIR/taXaminer.py "$config_path"
+python3 $SCRIPT_DIR/taxaminer.py $config_path
