@@ -20,7 +20,7 @@ conda install -c hcc r-paran -y
 
 # other tools
 echo "additional software"
-conda install samtools -y
+conda install samtools=1.15 -y
 conda install bedtools -y
 conda install bowtie2 -y
 conda install diamond -y
