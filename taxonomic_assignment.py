@@ -63,8 +63,8 @@ class Gene:
 
         self.coords = {item_index:line_array[index] for item_index, index in header_index.get('Dim.').items()}
 
-        self.protID = None # ID of transcript with longest CDS
-        self.lencds = 0 # lenght of self.protID
+        self.fasta_header = None # ID of transcript with longest CDS
+        self.lencds = 0 # length of self.fasta_header
 
         self.tax_assignments = [] # all taxonomic hits for the gene
         self.best_hit = None
@@ -858,15 +858,15 @@ def assign_prot2gene(prots, gene, id, length):
       id:
       length:
     """
-    if gene.protID:
+    if gene.fasta_header:
         if length > gene.lencds:
-            gene.protID = id
+            gene.fasta_header = id
             gene.lencds = length
-            prots[gene.protID] = gene
+            prots[gene.fasta_header] = gene
     else:
-        gene.protID = id
+        gene.fasta_header = id
         gene.lencds = length
-        prots[gene.protID] = gene
+        prots[gene.fasta_header] = gene
 
 def prot_gene_matching(output_path, gff_path, genes, cfg):
     """
@@ -946,7 +946,7 @@ def prot_gene_matching(output_path, gff_path, genes, cfg):
                 patternmatch.append((id, length))
             else:
                 gene = genes.get(parent)
-                # put the ID as the protID, as this will be what is used in DIAMOND results
+                # put the ID as the fasta_header, as this will be what is used in DIAMOND results
                 if gene:
                     assign_prot2gene(prots, gene, id, length)
 
@@ -966,10 +966,10 @@ def prot_gene_matching(output_path, gff_path, genes, cfg):
             unmatched.append(id)
         else:
             gene = genes.get(parent)
-            # put the ID as the protID, as this will be what is used in DIAMOND results
+            # put the ID as the fasta_header, as this will be what is used in DIAMOND results
             # gene has to exist and protein ID is either not assigned yet or new ID is same as old one
             # (prevent overwriting of errorneous IDs)
-            if gene and (not gene.protID or gene.protID == id):
+            if gene and (not gene.fasta_header or gene.fasta_header == id):
                 assign_prot2gene(prots, gene, id, length)
 
     if len(prots) == 0:
@@ -1095,7 +1095,7 @@ def subset_prots_longest_cds(genes,proteins_path, path_out):
     """
 
     # when matching prot ID to gene ID it is already checked for the one with the longest CDS
-    longest_transcripts = [gene.protID for gene in genes.values() if gene.protID]
+    longest_transcripts = [gene.fasta_header for gene in genes.values() if gene.fasta_header]
 
     logging.info("{} proteins written to fasta file for taxonomic assignment (subsetting for longest CDS)".format(len(longest_transcripts)))
     subset_protein_fasta(proteins_path, longest_transcripts, path_out, "include")
@@ -1119,7 +1119,7 @@ def filter_prots_quick_hits(genes, quick_mode_match_id, prot_path_in, prot_path_
     no_match = []
 
     for g_name, gene in genes.items():
-        if gene.protID:
+        if gene.fasta_header:
             if gene.taxon_assignmentID != 'NA':
 
                 tax_lineage = taxopy.Taxon(gene.taxon_assignmentID, TAX_DB).taxid_lineage
@@ -1127,10 +1127,10 @@ def filter_prots_quick_hits(genes, quick_mode_match_id, prot_path_in, prot_path_
                 if quick_mode_match_id not in tax_lineage:                                            # <- option 1: inclusive
                     # inclusive: if match id equals class, assignment must be at least same class as query
                     # exclusive: if match id equals class, assignment must be at least one rank closer to query
-                    no_match.append(gene.protID)
+                    no_match.append(gene.fasta_header)
                     reset_tax_assignment(gene)
             else:
-                no_match.append(gene.protID)
+                no_match.append(gene.fasta_header)
                 reset_tax_assignment(gene)
 
     logging.info("{} proteins written to fasta file for 2nd DIAMOND run".format(len(no_match)))
@@ -1240,7 +1240,7 @@ def write_output(cfg, genes, header):
 
     with open(out_path, 'w') as out_file:
 
-        csv_columns = header.strip().split(',') + ['protID', 'lcaID', 'lca', 'best_hitID', 'best_hit', 'bh_evalue', 'bh_pident', 'corrected_lca', 'taxon_assignment', 'plot_label']
+        csv_columns = header.strip().split(',') + ['fasta_header', 'lcaID', 'lca', 'best_hitID', 'best_hit', 'bh_evalue', 'bh_pident', 'corrected_lca', 'taxon_assignment', 'plot_label']
         if not cfg.include_coverage:
             csv_columns = [col for col in csv_columns if col.rstrip('0123456789') not in cov_columns]
 

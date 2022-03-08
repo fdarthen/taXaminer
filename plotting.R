@@ -186,15 +186,15 @@ genes_coords_taxon <- merge(genes_coords_taxon, label_count_table[,c("Var1","plo
 
 # add sequence information
 prot_fasta <- Biostrings::readAAStringSet(cfg$proteins_path)
-protID <- names(prot_fasta)
+fasta_header <- names(prot_fasta)
 query_seq <- paste(prot_fasta)
-prot_sequences <- data.frame(protID, query_seq)
+prot_sequences <- data.frame(fasta_header, query_seq)
 # delete everything after first whitespace in fasta header
-prot_sequences$protID <- gsub('\\s.*', '' , prot_sequences$protID)
+prot_sequences$fasta_header <- gsub('\\s.*', '' , prot_sequences$fasta_header)
 # add html line breaks to sequence so hover windows stay narrrow
 prot_sequences$query_seq <- gsub("(.{70}?)", "\\1</br>", prot_sequences$query_seq)
 # merge to data table
-genes_coords_taxon <- merge(genes_coords_taxon, prot_sequences, by="protID", all.x=TRUE)
+genes_coords_taxon <- merge(genes_coords_taxon, prot_sequences, by="fasta_header", all.x=TRUE)
 
 
 # prepare data for hover window display
