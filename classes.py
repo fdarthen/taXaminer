@@ -437,8 +437,8 @@ class Contig:
         self.per_base_coverages = {pbc_index: [] for pbc_index in a.get_pbc_paths().keys()} # array that holds the coverage per base in this contig
                                 # note that the element at index i is the coverage at base i+1
                                 # (indexing in python is 0-based but sequences are 1-based)
-        self.coverage = {}
-        self.coverage_sd = {}
+        self.coverage = {pbc_index: np.nan for pbc_index in a.get_pbc_paths().keys()}
+        self.coverage_sd = {pbc_index: np.nan for pbc_index in a.get_pbc_paths().keys()}
 
         # set that will hold all positions of Ns in this contig (1-based)
         self.positions_of_Ns = None # used in --> add_base_coverage() function
@@ -446,8 +446,8 @@ class Contig:
 
         self.genes = [] # fill with gene names in order to be able to access them from all_genes
 
-        self.gene_coverage_mean = {}
-        self.gene_coverage_sd = {}
+        self.gene_coverage_mean = {pbc_index: np.nan for pbc_index in a.get_pbc_paths().keys()}
+        self.gene_coverage_sd = {pbc_index: np.nan for pbc_index in a.get_pbc_paths().keys()}
 
         self.gene_lengths_mean = None
         self.gene_lengths_sd = None
@@ -854,10 +854,10 @@ class Gene:
         # set length
         self.length = self.end_pos - self.start_pos + 1
         self.percentage_of_contig_length = self.compute_percentage_of_contig_length(a)
-        self.length_of_covered_bases = {}
+        self.length_of_covered_bases = {pbc_index: np.nan for pbc_index in a.get_pbc_paths().keys()}
 
         self.coverage = {pbc_index: np.nan for pbc_index in a.get_pbc_paths().keys()} # list of mean coverage for each cov profile
-        self.coverage_sd = {} # dict of coverage SD for each coverage profile
+        self.coverage_sd = {pbc_index: np.nan for pbc_index in a.get_pbc_paths().keys()} # dict of coverage SD for each coverage profile
 
 
         self.absolute_pos = None

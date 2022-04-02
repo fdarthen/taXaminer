@@ -409,6 +409,9 @@ def set_config_defaults(config_obj):
         config_vars['compute_coverage'] = set_variable_default(config_obj, 'compute_coverage', 'FALSE')
     else:
         config_vars['compute_coverage'] = set_variable_default(config_obj, 'compute_coverage', 'TRUE')
+    if config_vars.get('compute_coverage') == 'FALSE':
+        config_vars['pbc_paths'] = {}
+
     config_vars['min_insert'] = enumerated_key(config_obj, 'min_insert', list(config_vars.get('read_paths').keys()), '0')
     config_vars['max_insert'] = enumerated_key(config_obj, 'max_insert', list(config_vars.get('read_paths').keys()), '500')
     config_vars['read_orientation'] = enumerated_key(config_obj, 'read_orientation', list(config_vars.get('read_paths').keys()), 'fr')
@@ -439,7 +442,7 @@ def set_config_defaults(config_obj):
     ## Plotting
     config_vars['update_plots'] = set_variable_default(config_obj, 'update_plots', 'FALSE')
     config_vars['num_groups_plot'] = set_variable_default(config_obj, 'num_groups_plot', '25')
-    config_vars['merging_labels'] = set_variable_default(config_obj, 'merging_labels', 'None')
+    config_vars['merging_labels'] = set_variable_default(config_obj, 'merging_labels', '')
     config_vars['output_pdf'] = set_variable_default(config_obj, 'output_pdf', 'TRUE')
     config_vars['output_png'] = set_variable_default(config_obj, 'output_png', 'FALSE')
 
