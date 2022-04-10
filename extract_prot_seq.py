@@ -330,9 +330,9 @@ def set_seqs(contigs, features, current_contig, contig_seq,stop_codons, outta_fr
 
 def decide_phasing(cfg, stop_codons, outta_frame):
     """Identify if information of phase field should be used"""
-    if cfg.use_phase_info == 'TRUE':
+    if cfg.use_phase_info:
         return True
-    if cfg.use_phase_info == 'FALSE':
+    if not cfg.use_phase_info:
         return False
     if cfg.use_phase_info == 'auto':
         phasing = stop_codons.get('p') + outta_frame.get('p')

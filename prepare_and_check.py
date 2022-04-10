@@ -117,7 +117,7 @@ def set_gff_parsing_rules(config_obj):
     gff_dict = {}
 
     ## presets for parsing of GFF
-    if config_obj.get('gff_preset') == "default" or (config_obj.get('gff_preset') == None and config_obj.get('gff_source') != None):
+    if config_obj.get('gff_preset') == "default" or (config_obj.get('gff_preset') == None and config_obj.get('gff_source') == None):
         gff_dict['gff_source'] = 'default'
         gff_dict['gff_gene_type'] = 'gene'
         gff_dict['gff_transcript_type'] = 'mRNA'
