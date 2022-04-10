@@ -56,7 +56,7 @@ To run it locally, use:
 python taxaminer.py <config.yml>
 ```
 
-For details on additional options see [Configuration parameters](https://github.com/fdhubert/taXaminer/wiki/Configuration-parameters). 
+For details on additional options see [Configuration parameters](https://github.com/BIONF/taXaminer/wiki/Configuration-parameters). 
 
 # Bugs
 Any bug reports, comments or suggestions are highly appreciated. Please [open an issue on GitHub](https://github.com/BIONF/taXaminer/issues/new) or reach out via [email](mailto:freya.hubert@gmail.com).
