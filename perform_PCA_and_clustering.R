@@ -206,23 +206,22 @@ write.csv(mydata_nans, file=paste0(cfg$output_path, "PCA_and_clustering/genes_ex
 complete_data <- data_columnfiltered2[complete.cases(data_columnfiltered2),]
 # output which genes have been used as an input for the PCA
 # write.csv(mydata, file=paste0(cfg$output_path, "PCA_and_clustering/genes_used_for_PCA_and_clustering.csv"), row.names=TRUE, quote=FALSE)
-mydata <- complete_data
 
-#TODO: adjust for multiple coverage sets
 # FILTER GENES BASED ON COVERAGE
 if (cfg$include_coverage){
   if (cfg$coverage_cutoff_mode=="transposons") {
-    g_cov_median <- median(complete_data[,"g_cov_1"])
-    mydata <- complete_data[complete_data$g_cov_1 >= (g_cov_median),]
-    #c_cov_median <- median(complete_data[,"c_cov"])
-    #mydata <- g_filtered_data[g_filtered_data$c_cov >= (c_cov_median),]
+    for (cov in grep('g_cov_[0-9]*',colnames(complete_data),value=TRUE)) {
+      g_cov_median <- median(complete_data[,cov])
+      complete_data <- complete_data[complete_data[,cov] >= (g_cov_median),]
+    }
   } else if (cfg$coverage_cutoff_mode=="contamination") {
-    g_cov_median <- median(complete_data[,"g_cov_1"])
-    mydata <- complete_data[complete_data$g_cov_1 <= (g_cov_median),]
-    #c_cov_median <- median(complete_data[,"c_cov"])
-    #mydata <- g_filtered_data[g_filtered_data$c_cov <= (c_cov_median),]
+    for (cov in grep('g_cov_[0-9]*',colnames(complete_data),value=TRUE)) {
+      g_cov_median <- median(complete_data[,cov])
+      complete_data <- complete_data[complete_data[,cov] <= (g_cov_median),]
+    }
   }
 }
+mydata <- complete_data
 
 # :::::::::::::::::::: PCA ::::::::::::::::::::::::::::::
 print("PCA: ")

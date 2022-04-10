@@ -376,11 +376,17 @@ def merge_labels(genes, queryID, merging_labels):
     all_merger_rank = None
     query_merger_id = None
 
-    if type(merging_labels) != list:
+    if not merging_labels:
+        merging_labels = []
+    elif type(merging_labels) != list:
         merging_labels = [merging_labels]
 
     for merger_label in merging_labels:
-        if merger_label.isalpha():
+
+        if not merger_label:
+            continue
+
+        if type(merger_label) == str:
             # option 1: string end with '-all' -> every taxonomic assignment is merged at that rank
             # option 2: string does not end with '-all' -> only taxonomic assignments with same rank <merger_label> as the query species are merged
             if merger_label.endswith('-all'):
@@ -393,8 +399,6 @@ def merge_labels(genes, queryID, merging_labels):
         else:
             if type(merger_label) == int or merger_label.isdigit():
                 merger_ids.append(int(merger_label)) # ncbiID of <merger_label> to merge at
-
-
 
 
     # if there is an -all merger-label; this overwrites everything
@@ -446,6 +450,7 @@ def ident_query_label(genes, queryID):
         if gene.plot_labelID in query_lineage:
             if query_lineage.index(gene.plot_labelID) < label_candidate[1]:
                 label_candidate = (gene.plot_label, query_lineage.index(gene.plot_labelID))
+
 
     return label_candidate[0]
 
@@ -795,7 +800,7 @@ def reset_tax_assignment(gene):
 ###############################################################################
 
 
-def get_child_parent(attrs, child_parent_dict):
+def get_child_parent(attrs, child_attr, parent_attr):
     """
     Use GFF attributes and retrieve child-parent pairs, given certain attributes.
 
@@ -806,8 +811,6 @@ def get_child_parent(attrs, child_parent_dict):
     Returns:
 
     """
-    child_attr = child_parent_dict.get('child')
-    parent_attr = child_parent_dict.get('parent')
     if child_attr+"=" in attrs and parent_attr+"=" in attrs:
         childID = get_gff_attribute(attrs, child_attr)
         parentID = get_gff_attribute(attrs, parent_attr)
@@ -868,7 +871,7 @@ def assign_prot2gene(prots, gene, id, length):
         gene.lencds = length
         prots[gene.fasta_header] = gene
 
-def prot_gene_matching(output_path, gff_path, genes, cfg):
+def prot_gene_matching(output_path, gff_path, genes, cfg,omitted_genes):
     """
     Match headers in protein FASTA to gene ID.
     Parses the GFF using the given gff parsing rule
@@ -893,25 +896,24 @@ def prot_gene_matching(output_path, gff_path, genes, cfg):
                 # read lines where fasta headers are contained and/or child-parent-relations are to be found
                 if cfg.gff_source == "default" or spline[1] == cfg.gff_source:
                     if spline[2] in cfg.gff_fasta_header_type:
-                        if cfg.gff_gene_connection == "parent/child":
+                        if cfg.gff_connection == "parent/child":
                             # when attribute for child-parent-matching unequals attribute where header can be found,
                             # match attribute of fasta header and child of parent/child matching together
-                            if cfg.gff_parent_child_attr.get('child') not in cfg.gff_fasta_header_attr:
-                                header_child_dict = {'child': cfg.gff_fasta_header_attr, 'parent': cfg.gff_parent_child_attr.get('child')}
-                                childID, parentID = get_child_parent(spline[8], header_child_dict)
+                            if cfg.gff_child_attr not in cfg.gff_fasta_header_attr:
+                                childID, parentID = get_child_parent(spline[8], cfg.gff_fasta_header_attr, cfg.gff_child_attr)
                                 if childID:
                                     add_to_dict(child_parent_dict, strip_ID(childID), strip_ID(parentID))
                             # add the parent child matching if fasta header line (also) contains p/c matching info
                             if spline[2] in cfg.gff_parent_child_types:
-                                childID, parentID = get_child_parent(spline[8], cfg.gff_parent_child_attr)
+                                childID, parentID = get_child_parent(spline[8], cfg.gff_child_attr, cfg.gff_parent_attr)
                                 if childID:
                                     add_to_dict(child_parent_dict, strip_ID(childID), strip_ID(parentID))
-                        elif cfg.gff_gene_connection == "inline":
+                        elif cfg.gff_connection == "inline":
                             headerID = get_gff_attribute(spline[8], cfg.gff_fasta_header_attr)
                             geneID = get_gff_attribute(spline[8], cfg.gff_gene_attr)
                             add_to_dict(child_parent_dict, strip_ID(headerID), strip_ID(geneID))
-                    elif cfg.gff_gene_connection == "parent/child" and spline[2] in cfg.gff_parent_child_types:
-                        childID, parentID = get_child_parent(spline[8], cfg.gff_parent_child_attr)
+                    elif cfg.gff_connection == "parent/child" and spline[2] in cfg.gff_parent_child_types:
+                        childID, parentID = get_child_parent(spline[8], cfg.gff_child_attr, cfg.gff_parent_attr)
                         if childID:
                             add_to_dict(child_parent_dict, strip_ID(childID), strip_ID(parentID))
 
@@ -921,7 +923,7 @@ def prot_gene_matching(output_path, gff_path, genes, cfg):
 
     prot_index_path = output_path + 'tmp/tmp.proteins.fa.fai'
 
-    # print(child_parent_dict)
+    #print(child_parent_dict)
 
     patternmatch = []
     unmatched = [] #list of proteins where gene could not be matched
@@ -962,7 +964,7 @@ def prot_gene_matching(output_path, gff_path, genes, cfg):
                 if g_name in id.split('|'):
                     parent = g_name
 
-        if not parent:
+        if not parent and (not id in omitted_genes):
             unmatched.append(id)
         else:
             gene = genes.get(parent)
@@ -1024,14 +1026,17 @@ def read_genes_coords(cfg):
         header_index = parse_header(header)
 
         genes = {}
+        omitted_genes = []
         for line in input_file:
             gene = Gene(line.strip().split(','), header_index, cfg.include_coverage)
 
             # filter genes without PCA coordinates
             if list(gene.coords.values())[0] != "NA":
                 genes[gene.g_name] = gene
+            else:
+                omitted_genes.append(gene.g_name)
 
-    return genes, header
+    return genes, header, omitted_genes
 
 
 ###############################################################################
@@ -1340,9 +1345,9 @@ def run_assignment(cfg):
         sys.exit()
 
     # read file
-    genes, header = read_genes_coords(cfg)
+    genes, header, omitted_genes = read_genes_coords(cfg)
 
-    prots = prot_gene_matching(cfg.output_path, cfg.gff_path, genes, cfg)
+    prots = prot_gene_matching(cfg.output_path, cfg.gff_path, genes, cfg, omitted_genes)
 
     perform_diamond = cfg.compute_tax_assignment and not cfg.update_plots
 
@@ -1354,7 +1359,7 @@ def run_assignment(cfg):
                                 taxon_exclude, cfg.taxon_id)
         taxonomic_assignment(tax_assignment_path_1, genes, prots, cfg.taxon_id)
         perform_quick_search_2(perform_diamond, diamond_cmd,
-                                tax_assignment_path_2, quick_mode_match_rank,
+                                tax_assignment_path_2, cfg.quick_mode_match_rank,
                                 genes, tmp_prot_path, taxon_exclude, cfg.taxon_id)
         taxonomic_assignment(tax_assignment_path_2, genes, prots, cfg.taxon_id)
     elif cfg.assignment_mode == 'exhaustive':

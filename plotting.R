@@ -175,6 +175,7 @@ query_name <- tmp_query_info$V1[2]
 print(query_label_name)
 print(query_name)
 
+
 # ________________ PLOT PREPARATION _______________ #
 
 # frequency information for labels in plots
@@ -222,9 +223,9 @@ genes_coords_taxon <- genes_coords_taxon[order(match(plot_label_freq,label))]
 label_ncols <- (length(label)%/%26)+1
 
 # assign colors for each label/taxonomic assignment displayed in plot
-genes_coords_taxon$label_color[genes_coords_taxon$plot_label == query_label_name] <- "#404a4a" # predefined: dark grey
+genes_coords_taxon$label_color[genes_coords_taxon$plot_label == query_label_name] <-"#404a4a" # predefined: dark grey
 genes_coords_taxon$label_color[genes_coords_taxon$plot_label == "Unassigned"] <- "#778899" # predefined: light grey
-genes_coords_taxon$label_color[genes_coords_taxon$plot_label != query_label_name & genes_coords_taxon$plot_label != "Unassigned"] <- getQualColForVector(genes_coords_taxon$plot_label_freq[genes_coords_taxon$plot_label != query_label_name & genes_coords_taxon$plot_label != "Unassigned"]) # color palette
+genes_coords_taxon$label_color[genes_coords_taxon$plot_label != query_label_name & genes_coords_taxon$plot_label != "Unassigned"] <-  getQualColForVector(genes_coords_taxon$plot_label_freq[genes_coords_taxon$plot_label != query_label_name & genes_coords_taxon$plot_label != "Unassigned"]) # color palette
 
 
 # subset data into three groups
