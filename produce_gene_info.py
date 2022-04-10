@@ -812,9 +812,12 @@ def compute_stats(a, cfg, lgth_corr_function):
     # gather how many bases are COVERED for each gene
     gene_covered_bases_lengths = {pbc_index: [] for pbc_index in a.get_pbc_paths().keys()}
 
+    #print(a.get_contigs().keys())
+
     for contig_name, contig in a.get_contigs().items():
 
         if contig_name in a.get_geneless_contigs().keys():
+            #print(contig_name)
             continue
 
         #------ Gather Length, Coverage & GC Info Contig ----------------
@@ -1720,7 +1723,7 @@ def process_gene_info(cfg):
     a = Assembly(cfg.gff_path, cfg.fasta_path, cfg.pbc_paths, cfg.output_path)
 
     read_faidx(a) # use faidx to initalize contigs
-    read_gff(a, cfg.gff_gene_tag, cfg.gff_source, cfg.include_pseudogenes)
+    read_gff(a, cfg.gff_gene_type, cfg.gff_source, cfg.include_pseudogenes)
     if a.partial_genes:
         logging.warning('Gene(s) excluded due to partialness:\n{}'.format(list(a.partial_genes.keys())))
     read_fasta(a)
