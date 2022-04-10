@@ -11,121 +11,7 @@ from operator import itemgetter
 
 
 class Config:
-    """
-    Object to hold all configuration options
-
-    Attributes
-    ----------
-    fasta_path : str
-      path to the FASTA file of the assembly
-    gff_path: str
-
-    output_path: str
-
-    taxon_id: str
-
-    read_paths: str
-
-    bam_paths: str
-
-    pbc_paths: str
-
-    cov_set_exists: str
-
-    include_coverage: str
-
-    compute_coverage: str
-
-    insert_size: str
-
-    proteins_path: str
-
-    extract_proteins: str
-
-    assignment_mode: str
-
-    quick_mode_search_rank: str
-
-    quick_mode_match_rank: str
-
-    tax_assignment_path: str
-
-    compute_tax_assignment: str
-
-    database_path: str
-
-    taxon_exclude: str
-
-    exclusion_rank: str
-
-    update_plots: str
-
-    num_groups_plot: str
-
-    merging_labels: str
-
-    output_pdf: str
-
-    output_png: str
-
-    include_pseudogenes: str
-
-    gff_source: str
-
-    input_variables: str
-
-    perform_parallel_analysis: str
-
-    num_pcs: str
-
-    coverage_cutoff_mode: str
-
-    perform_kmeans: str
-
-    kmeans_k: str
-
-    perform_hclust: str
-
-    hclust_k: str
-
-    perform_mclust: str
-
-    mclust_k: str
-
-    perform_dbscan: str
-
-    dbscan_groups: str
-
-    custom_eps: str
-
-    custom_minPts: str
-
-    script_dir: str
-
-    usr_cfg_path: str
-
-    cfg_path: str
-
-    gff_source: str
-
-    gff_gene_tag: str
-
-    gff_fasta_header_type: str
-
-    gff_fasta_header_attr: str
-
-    gff_gene_connection: str
-
-    gff_parent_child_types: str
-
-    gff_parent_child_attr: str
-
-    gff_gene_attr: str
-
-    gff_transcript_tag: str
-
-    gff_cds_tag: str
-
+    """Object to hold all configuration options
     """
 
     def __init__(self, cfg_dict):
@@ -157,6 +43,7 @@ class Config:
 
         self.proteins_path = cfg_dict.get('proteins_path')
         self.extract_proteins = cfg_dict.get('extract_proteins')
+        self.use_phase_info = cfg_dict.get('use_phase_info')
         self.assignment_mode = cfg_dict.get('assignment_mode')
         self.quick_mode_search_rank = cfg_dict.get('quick_mode_search_rank')
         self.quick_mode_match_rank = cfg_dict.get('quick_mode_match_rank')
@@ -173,7 +60,7 @@ class Config:
         self.output_png = cfg_dict.get('output_png')
 
         self.include_pseudogenes = cfg_dict.get('include_pseudogenes')
-        self.gff_source = cfg_dict.get('gff_source')
+        self.gff_preset = cfg_dict.get('gff_preset')
         self.input_variables = cfg_dict.get('input_variables')
         self.perform_parallel_analysis = cfg_dict.get('perform_parallel_analysis')
         self.num_pcs = cfg_dict.get('num_pcs')
@@ -195,56 +82,27 @@ class Config:
         self.cfg_path = cfg_dict.get('cfg_path')
 
         # GFF parsing rule
-        self.gff_source = cfg_dict.get('gff_dict').get('source')
-        self.gff_gene_tag = cfg_dict.get('gff_dict').get('gene_tag')
-        self.gff_fasta_header_type = cfg_dict.get('gff_dict').get('fasta_header_type') \
-                            if 'fasta_header_type' in cfg_dict.get('gff_dict').keys() \
-                            else cfg_dict.get('gff_dict').get('transcript_tag')
-        self.gff_fasta_header_attr = cfg_dict.get('gff_dict').get('fasta_header_attr')
-        self.gff_gene_connection = cfg_dict.get('gff_dict').get('gene_connection')
-        self.gff_parent_child_types = cfg_dict.get('gff_dict').get('parent_child_types')
-        self.gff_parent_child_attr = cfg_dict.get('gff_dict').get('parent_child_attr')
-        self.gff_gene_attr = cfg_dict.get('gff_dict').get('gene_attr')
-        self.gff_transcript_tag = cfg_dict.get('gff_dict').get('transcript_tag') \
-                            if 'transcript_tag' in cfg_dict.get('gff_dict').keys() \
-                            else cfg_dict.get('gff_dict').get('fasta_header_type')
-        self.gff_cds_tag = cfg_dict.get('gff_dict').get('cds_tag')
+        self.gff_source = cfg_dict.get('gff_source')
+        self.gff_gene_type = cfg_dict.get('gff_gene_type')
+        self.gff_transcript_type = cfg_dict.get('gff_transcript_type') \
+                            if 'gff_transcript_type' in cfg_dict.keys() \
+                            else cfg_dict.get('gff_fasta_header_type')
+        self.gff_cds_type = cfg_dict.get('gff_cds_type')
+        self.gff_fasta_header_type = cfg_dict.get('gff_fasta_header_type') \
+                            if 'gff_fasta_header_type' in cfg_dict.keys() \
+                            else cfg_dict.get('gff_transcript_type')
+        self.gff_fasta_header_attr = cfg_dict.get('gff_fasta_header_attr')
+        self.gff_connection = cfg_dict.get('gff_connection')
+        self.gff_parent_child_types = cfg_dict.get('gff_parent_child_types')
+        self.gff_parent_attr = cfg_dict.get('gff_parent_attr')
+        self.gff_child_attr = cfg_dict.get('gff_child_attr')
+        self.gff_gene_attr = cfg_dict.get('gff_gene_attr')
+
+
 
 
 class Assembly:
-    """
-    Object holding information regarding the assembly
-
-    Attributes
-    ----------
-    gff_path : str
-
-    fasta_path : str
-
-    pbc_paths : dict
-
-    num_pbc : str
-
-    output_path : str
-
-    output_dir : str
-
-    total_z_score_vector : str
-
-    contigs : dict
-
-    all_contig_lengths : list
-
-    genes : dict
-
-    transcripts : dict
-
-    geneless_contigs : dict
-
-    contigs_without_cov : dict
-
-    genes_without_cov : dict
-
+    """Object holding information regarding the assembly
     """
 
     def __init__(self, gff_path, fasta_path, pbc_paths, output_path):
@@ -382,49 +240,7 @@ class Assembly:
 ########################## CONTIG #################################
 
 class Contig:
-    """
-    Object to store information for each contig
-
-    Attributes
-    ----------
-    name : str
-
-    length : str
-
-    centre_corrector : str
-
-    per_base_coverages : list
-
-    coverage : list
-
-    coverage_sd : list
-
-    positions_of_Ns : str
-
-    genes : list
-
-    gene_coverage_mean : list
-
-    gene_coverage_sd : list
-
-    gene_lengths_mean : str
-
-    gene_lengths_sd : str
-
-    gc_content : str
-
-    gene_gc_mean : str
-
-    gene_gc_sd : str
-
-    tetranuc_freqs : str
-
-    trinuc_freqs : str
-
-    dinuc_freqs : str
-
-    z_score_vector : str
-
+    """Object to store information for each contig
     """
 
     def __init__(self, name, length, a):
@@ -472,7 +288,7 @@ class Contig:
         return self.length
 
     def get_length_of_covered_bases(self, pbc_index):
-        '''Return how many bases are covered.'''
+        """Return how many bases are covered."""
         pbc_without_nans = [cov for cov in self.per_base_coverages[pbc_index] if not np.isnan(cov)]
         return len(pbc_without_nans)
 
@@ -482,7 +298,7 @@ class Contig:
 
 
     def set_centre_corrector(self):
-        ''' This method sets self.centre_corrector.
+        """ This method sets self.centre_corrector.
         It is needed for the calculations of the absolute gene positions.
         These are calculated with respect to the central base in the contig.
 
@@ -495,7 +311,7 @@ class Contig:
         The gene positions will be calculated using 1&6 and 7&12.
         That's why we want self-centre_corrector (which by default is set to 0)
         to be set to 0.5 (in order to add / substract it from self.centre)
-        when we have a contig of even length. '''
+        when we have a contig of even length. """
 
         if (self.length % 2 == 0): # if contig is of even length
             self.centre_corrector = 0.5
@@ -512,12 +328,11 @@ class Contig:
 
 
     def set_gene_positions(self, a):
-        '''
-        Computes the absolute positions for all genes of this contig.
+        """Computes the absolute positions for all genes of this contig
         Scaling to 1-----(0.5)-----0-----(0.5)-----1
 
         Also overwrites self.genes array to hold the genes in their order on this contig.
-        '''
+        """
 
         # get the middle base of this contig
         contig_centre = self.get_centre()
@@ -587,9 +402,9 @@ class Contig:
 
 
     def add_base_coverage(self, pbc_index, base, coverage):
-        '''Adds coverage info for the base i to per_base_coverages[i-1].
+        """Adds coverage info for the base i to per_base_coverages[i-1].
         Note: indices of per_base_coverage are 0-based,
-        while coverage file is 1-based.'''
+        while coverage file is 1-based."""
 
         # if bases are skipped in the PBC file (because no coverage is given)
         # add dummy values to the coverage array (as to avoid a shift in positions)
@@ -635,8 +450,8 @@ class Contig:
 
 
     def compute_gene_coverage_info(self, a):
-        '''Compute the coverage mean & SD and set them
-        for each Gene object associated with this contig'''
+        """Compute the coverage mean & SD and set them
+        for each Gene object associated with this contig"""
 
         for gene_name in self.genes:
             gene = a.get_gene(gene_name)
@@ -678,8 +493,8 @@ class Contig:
         return self.gene_coverage_sd[pbc_index]
 
     def get_coverage_array(self, start_pos, end_pos):
-        '''Return the coverage for all bases starting with
-        (including) start_pos and ending with end_pos'''
+        """Return the coverage for all bases starting with
+        (including) start_pos and ending with end_pos"""
         return self.coverages[(start_pos-1), end_pos]
     # A) why "start_pos-1"? Because sequences are 1-based
     # but array indexing is 0-based
@@ -699,8 +514,8 @@ class Contig:
         return self.gene_gc_sd
 
     def compute_gene_positional_info(self, a):
-        '''Compute and set all positional information for this gene
-        i.e. absolute position, no right/left neighbour info, single-gene contig info'''
+        """Compute and set all positional information for this gene
+        i.e. absolute position, no right/left neighbour info, single-gene contig info"""
         # set absolute positions of genes
         if self.genes: # check for emtpy list
             self.set_gene_positions(a)
@@ -720,8 +535,8 @@ class Contig:
                 a.get_gene(self.genes[0]).set_single_gene_info(1)
 
     def single_gene_info(self):
-        '''Returns pseudobool 1 if this contig has only one gene
-        (0 otherwise).'''
+        """Returns pseudobool 1 if this contig has only one gene
+        (0 otherwise)."""
 
         if len(self.genes) == 1:
             return 1
@@ -729,8 +544,8 @@ class Contig:
             return 0
 
     def geneless_info(self):
-        '''Returns pseudobool 1 if this contig has no genes
-        (0 otherwise).'''
+        """Returns pseudobool 1 if this contig has no genes
+        (0 otherwise)."""
 
         if len(self.genes) == 0:
             return 1
@@ -748,8 +563,8 @@ class Contig:
         return self.gene_lengths_sd
 
     def covdev_from_overall(self, mean_ref, sd_ref, pbc_index):
-        '''Indicates how much the contig cov deviates from mean contig cov,
-        in units of contig cov SD (overall).'''
+        """Indicates how much the contig cov deviates from mean contig cov,
+        in units of contig cov SD (overall)."""
 
         # if coverage is uniform (e.g. because of mock coverage)
         # there is no SD in coverage; thus deviation in SD can not be computed
@@ -772,8 +587,8 @@ class Contig:
         return self.gc_content
 
     def gcdev_from_overall(self, mean_ref, sd_ref):
-        '''Indicates how much the contig GC deviates from mean contig GC,
-        in units of contig GC SD (overall).'''
+        """Indicates how much the contig GC deviates from mean contig GC,
+        in units of contig GC SD (overall)."""
 
         # deviation in units of 1 SD (overall)
         dev_in_sd = abs(mean_ref - self.gc_content) / sd_ref
@@ -838,7 +653,6 @@ class Gene:
     dinuc_freqs : str
 
     z_score_vector : str
-
     """
 
     def __init__(self, name, start_pos, end_pos, contig, source, score, strand, attributes, a):
@@ -974,8 +788,8 @@ class Gene:
 
 
     def lendev_from_contig(self, a):
-        '''Indicates how much the gene length deviates from the mean gene length
-        on the contig, in units of gene length SD (contig).'''
+        """Indicates how much the gene length deviates from the mean gene length
+        on the contig, in units of gene length SD (contig)."""
 
         # if this is the only gene on the contig
         if self.single_gene == 1:
@@ -1003,8 +817,8 @@ class Gene:
 
 
     def lendev_from_overall(self, mean_ref, sd_ref):
-        '''Indicates how much the gene length deviates from overall mean gene length,
-        in units of gene length SD (overall).'''
+        """Indicates how much the gene length deviates from overall mean gene length,
+        in units of gene length SD (overall)."""
         # deviation in units of 1 SD (overall)
         dev_in_sd = abs(mean_ref - self.length) / sd_ref
 
@@ -1017,8 +831,8 @@ class Gene:
 
 
     def covdev_from_contig(self, a, pbc_index):
-        '''Indicates how much the gene cov deviates from the mean gene coverage
-        on the contig, in units of gene cov SD (contig).'''
+        """Indicates how much the gene cov deviates from the mean gene coverage
+        on the contig, in units of gene cov SD (contig)."""
 
         # if this is the only gene on the contig
         if self.single_gene == 1:
@@ -1044,8 +858,8 @@ class Gene:
 
 
     def covdev_from_overall(self, mean_ref, sd_ref, pbc_index):
-        '''Indicates how much the gene cov deviates from overall mean gene cov,
-        in units of gene cov SD (overall).'''
+        """Indicates how much the gene cov deviates from overall mean gene cov,
+        in units of gene cov SD (overall)."""
 
         # if coverage is uniform (e.g. because of mock coverage)
         # there is no SD in coverage; thus deviation in SD can not be computed
@@ -1063,8 +877,8 @@ class Gene:
 
 
     def gcdev_from_contig(self, a):
-        '''Indicates how much the gene GC deviates from the mean gene GC content
-        on the contig, in units of gene GC SD (contig).'''
+        """Indicates how much the gene GC deviates from the mean gene GC content
+        on the contig, in units of gene GC SD (contig)."""
         # if this is the only gene on the contig
         if self.single_gene == 1:
             # no comparisons possible
@@ -1090,8 +904,8 @@ class Gene:
             return dev_in_sd
 
     def gcdev_from_overall(self, mean_ref, sd_ref):
-        '''Indicates how much the gene GC content deviates from overall mean gene GC,
-        in units of gene GC SD (overall).'''
+        """Indicates how much the gene GC content deviates from overall mean gene GC,
+        in units of gene GC SD (overall)."""
 
         # deviation in units of 1 SD (overall)
         dev_in_sd = abs(mean_ref - self.gc_content) / sd_ref

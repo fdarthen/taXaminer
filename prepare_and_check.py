@@ -60,7 +60,7 @@ def check_pbc_ids(config_obj):
     for pbc_index in rm_pbcs:
         del config_obj.pbc_paths[pbc_index]
     if not config_obj.pbc_paths.keys():
-        logging.error('No PBC headers and scaffold IDs in GFF match. Please recheck your files, restart without stating coverage information or set "include_coverage" to "FALSE".'.format(pbc_index))
+        logging.error('No PBC headers and scaffold IDs in GFF match. Please recheck your files, restart without stating coverage information or set "include_coverage" to "FALSE".')
         sys.exit()
 
 
@@ -99,7 +99,7 @@ def check_assembly_ids(config_obj):
         sys.exit('Error: FASTA headers and scaffold IDs in GFF do not match')
 
 
-def set_gff_parsing_rules(gff_source):
+def set_gff_parsing_rules(config_obj):
     """Parsing which features in GFF to read.
 
     Set parsing information based on default presets or user input.
@@ -114,57 +114,55 @@ def set_gff_parsing_rules(gff_source):
       (dict) dictionary with parameters for parsing the GFF
     """
 
-    # TODO: switch path with parsing to additional parameters in config file
-    ## presets for parsing of GFF
-    if gff_source == "default":
-        rule_dict = {'source': 'default',
-            'gene_tag': 'gene',
-            'fasta_header_type': 'mRNA,CDS',
-            'fasta_header_attr': 'ID',
-            'gene_connection': 'parent/child',
-            'parent_child_types': 'mRNA,CDS',
-            'parent_child_attr': {'parent': 'Parent', 'child': 'ID'},
-            'transcript_tag': 'mRNA',
-            'cds_tag': 'CDS'}
-    elif gff_source == "maker":
-        rule_dict = {'source': 'maker',
-            'gene_tag': 'gene',
-            'fasta_header_type': 'mRNA',
-            'fasta_header_attr': 'ID',
-            'gene_connection': 'parent/child',
-            'parent_child_types': 'mRNA',
-            'parent_child_attr': {'parent': 'Parent', 'child': 'ID'},
-            'transcript_tag': 'mRNA',
-            'cds_tag': 'CDS'}
-    elif gff_source == "augustus_masked":
-        rule_dict = {'source': 'augustus_masked',
-            'gene_tag': 'match',
-            'fasta_header_type': 'match',
-            'fasta_header_attr': 'Name',
-            'gene_connection': 'inline',
-            'gene_attr': 'ID',
-            'cds_tag': 'match_part'}
+    gff_dict = {}
 
+    ## presets for parsing of GFF
+    if config_obj.get('gff_preset') == "default" or (config_obj.get('gff_preset') == None and config_obj.get('gff_source') != None):
+        gff_dict['gff_source'] = 'default'
+        gff_dict['gff_gene_type'] = 'gene'
+        gff_dict['gff_transcript_type'] = 'mRNA'
+        gff_dict['gff_cds_type'] = 'CDS'
+        gff_dict['gff_fasta_header_type'] = 'mRNA,CDS'
+        gff_dict['gff_fasta_header_attr'] = 'ID'
+        gff_dict['gff_connection'] = 'parent/child'
+        gff_dict['gff_parent_child_types'] = 'mRNA,CDS'
+        gff_dict['gff_parent_attr'] = 'Parent'
+        gff_dict['gff_child_attr'] =  'ID'
+    elif config_obj.get('gff_preset') == "maker":
+        gff_dict['gff_source'] = 'maker'
+        gff_dict['gff_gene_type'] = 'gene'
+        gff_dict['gff_transcript_type'] = 'mRNA'
+        gff_dict['gff_cds_type'] = 'CDS'
+        gff_dict['gff_fasta_header_type'] = 'mRNA'
+        gff_dict['gff_fasta_header_attr'] = 'ID'
+        gff_dict['gff_connection'] = 'parent/child'
+        gff_dict['gff_parent_child_types'] = 'mRNA'
+        gff_dict['gff_parent_attr'] = 'Parent'
+        gff_dict['gff_child_attr'] =  'ID'
+    elif config_obj.get('gff_preset') == "augustus_masked":
+        gff_dict['gff_source'] = 'augustus_masked'
+        gff_dict['gff_gene_type'] = 'match'
+        gff_dict['gff_transcript_type'] = 'mRNA'
+        gff_dict['gff_cds_type'] = 'match_part'
+        gff_dict['gff_fasta_header_type'] = 'match'
+        gff_dict['gff_fasta_header_attr'] = 'Name'
+        gff_dict['gff_connection'] = 'inline'
+        gff_dict['gff_gene_attr'] = 'ID'
     # read file with information on how to parse GFF
     else:
-        rule_file_path = pathlib.Path(gff_source)
-        if rule_file_path.is_file():
-            rule_dict = {}
-            with open(rule_file_path, 'r') as rule_file:
-                # create dict out of lines
-                for line in rule_file:
-                    rule_dict[line.split(":")[0].strip()] = ":".join(line.split(":")[1:]).strip()
-            # parse the dict with child and parent attributes
-            if "parent_child_attr" in rule_dict.keys():
-                pc_dict = {}
-                for kv_pair in rule_dict.get("parent_child_attr").strip("{}").split(","):
-                    pc_dict[kv_pair.split(":")[0].strip()] = kv_pair.split(":")[1].strip()
-                rule_dict["parent_child_attr"] = pc_dict
-        else:
-            logging.error("source type for GFF could not be interpreted. Please check your input.")
-            sys.exit()
+        gff_dict['gff_source'] = config_obj.get('gff_source')
+        gff_dict['gff_gene_type'] = config_obj.get('gff_gene_type')
+        gff_dict['gff_transcript_type'] = config_obj.get('gff_transcript_type')
+        gff_dict['gff_cds_type'] = config_obj.get('gff_cds_type')
+        gff_dict['gff_fasta_header_type'] = config_obj.get('gff_fasta_header_type')
+        gff_dict['gff_fasta_header_attr'] = config_obj.get('gff_fasta_header_attr')
+        gff_dict['gff_connection'] = config_obj.get('gff_connection')
+        gff_dict['gff_parent_child_types'] = config_obj.get('gff_parent_child_types')
+        gff_dict['gff_parent_attr'] = config_obj.get('gff_parent_attr')
+        gff_dict['gff_child_attr'] = config_obj.get('gff_child_attr')
+        gff_dict['gff_gene_attr'] = config_obj.get('gff_gene_attr')
 
-    return rule_dict
+    return gff_dict
 
 
 def enumerated_key(config_obj, key_name, pre_keys, *default):
@@ -409,7 +407,7 @@ def set_config_defaults(config_obj):
         config_vars['compute_coverage'] = set_variable_default(config_obj, 'compute_coverage', 'FALSE')
     else:
         config_vars['compute_coverage'] = set_variable_default(config_obj, 'compute_coverage', 'TRUE')
-    if config_vars.get('compute_coverage') == 'FALSE':
+    if config_vars.get('include_coverage') == 'FALSE':
         config_vars['pbc_paths'] = {}
 
     config_vars['min_insert'] = enumerated_key(config_obj, 'min_insert', list(config_vars.get('read_paths').keys()), '0')
@@ -419,6 +417,7 @@ def set_config_defaults(config_obj):
     ## Taxonomic assignment
     config_vars['proteins_path'] = set_variable_default(config_obj, 'proteins_path', config_vars.get('output_path')+'proteins.faa')
     config_vars['extract_proteins'] = set_variable_default(config_obj, 'extract_proteins', check_file_inexistence(config_vars.get('proteins_path'), 'AND'))
+    config_vars['use_phase_info'] = set_variable_default(config_obj, 'use_phase_info', 'auto')
     config_vars['assignment_mode'] = set_variable_default(config_obj, 'assignment_mode', 'exhaustive')
     # make settings for quick taxonomic assignment mode
     if config_vars.get('assignment_mode') == 'quick':
@@ -448,8 +447,8 @@ def set_config_defaults(config_obj):
 
     ## Gene info
     config_vars['include_pseudogenes'] = set_variable_default(config_obj, 'include_pseudogenes', 'FALSE')
-    config_vars['gff_source'] = set_variable_default(config_obj, 'gff_source', 'default')
-    config_vars['gff_dict'] = set_gff_parsing_rules(config_vars.get('gff_source'))
+    gff_dict = set_gff_parsing_rules(config_obj)
+    config_vars.update(gff_dict)
 
     ## PCA
     config_vars['input_variables'] = pca_cov_variables(set_variable_default(config_obj, 'input_variables', default_pca_vars), config_vars.get('include_coverage'), config_vars.get('pbc_paths').keys())

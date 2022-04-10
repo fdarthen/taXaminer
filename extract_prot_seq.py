@@ -19,39 +19,7 @@ import prepare_and_check
 import taxonomic_assignment
 
 class Feature:
-    """
-    Objetc for GFF feature
-
-    Attributes
-    ----------
-    contig : str
-
-    id : str
-
-    parent : str
-
-    start : str
-
-    end : str
-
-    strand : str
-
-    phase : str
-
-    biotype : str
-
-    transl_table : str
-
-    children : str
-
-    parsed_parent : str
-
-    transcripts : str
-
-    cdss : str
-
-    coordinates : str
-
+    """Object for GFF feature
     """
     def __init__(self, contig, info_dict):
 
@@ -72,6 +40,9 @@ class Feature:
         self.transcripts = {} # key = transcript ID, value = CDS length
         self.cdss = {} # key = transcript ID, value = [CDS IDs]
         self.coordinates = [] # coordinates of CDS of currently longest transcript
+        self.phased_coordinates = []    # coordinates of CDS of currently longest transcript
+                                        # adjusted for the information of phase attribute
+        self.prot_seqs = {'phased':'', 'non-phased': ''} # store both seqs
 
 def get_cds_coordinates(cfg):
     """ Parse GFF to find gene and their corresponding mRNA and/or CDS
@@ -106,8 +77,8 @@ def get_cds_coordinates(cfg):
                 # only read lines that should be considered based on cfg.gff_source
                 # if default is selected, read all lines
                 if cfg.gff_source == "default"  or spline[1] == cfg.gff_source:
-                    if spline[2] in [cfg.gff_gene_tag, cfg.gff_transcript_tag,
-                                    cfg.gff_cds_tag]:
+                    if spline[2] in [cfg.gff_gene_type, cfg.gff_transcript_type,
+                                    cfg.gff_cds_type]:
                         #gather information for GFF entries of type gene, mRNA and CDS
                         contig = spline[0]
                         info_dict={"start": int(spline[3]), "end": int(spline[4]), "strand": spline[6], "phase": spline[7]}
@@ -118,7 +89,7 @@ def get_cds_coordinates(cfg):
                                 key, value = elem.split("=")
                                 info_dict[key] = value
                         feature = Feature(contig, info_dict)
-                        if spline[2] == cfg.gff_gene_tag: # gene
+                        if spline[2] == cfg.gff_gene_type: # gene
                             # if biotype tag is available, use only genes with protein_coding tag
                             if (feature.biotype and feature.biotype == "protein_coding") or not feature.biotype:
                                 features[feature.id] = feature
@@ -128,11 +99,11 @@ def get_cds_coordinates(cfg):
                                     contigs[contig] = [feature.id]
                         else: # mRNA or CDS
                             # get Feature object of parent for current feature
-                            if cfg.gff_gene_connection == 'parent/child' or cfg.gff_source in ['default', 'maker', 'augustus_masked']:
-                                parent_attr = cfg.gff_parent_child_attr.get('parent').lower() if cfg.gff_parent_child_attr else 'parent'
+                            if cfg.gff_connection == 'parent/child' or cfg.gff_source in ['default', 'maker', 'augustus_masked']:
+                                parent_attr = cfg.gff_parent_attr.lower() if cfg.gff_parent_attr else 'parent'
                                 parent_id = getattr(feature,parent_attr)
                                 parent = features.get(parent_id)
-                            elif cfg.gff_gene_connection == 'inline':
+                            elif cfg.gff_connection == 'inline':
                                 parent_id = getattr(feature,cfg.gff_gene_attr.lower())
                                 parent = features.get(parent_id)
                             else:
@@ -140,7 +111,7 @@ def get_cds_coordinates(cfg):
                             if parent:
                                 # which type is parent feature: gene or transcript?
                                 feature.parsed_parent = parent.id
-                                if spline[2] == cfg.gff_transcript_tag:
+                                if spline[2] == cfg.gff_transcript_type:
                                     # current feature -> transcript
                                     # parent -> gene
                                     features[feature.id] = feature
@@ -201,7 +172,7 @@ def get_cds_coordinates(cfg):
                     parent = features.get(parent_id)
                     # which type is parent feature: gene or transcript?
                     feature.parsed_parent = parent.id
-                    if spline[2] == cfg.gff_transcript_tag:
+                    if spline[2] == cfg.gff_transcript_type:
                         # current feature -> transcript
                         # parent -> gene
                         features[feature.id] = feature
@@ -269,19 +240,30 @@ def get_longest_transcript(contigs, features):
             else:
                 gene.strand = True
 
+
+            # gene.coordinates[0] = (gene.coordinates[0][0]+(int(gene.coordinates[0][2]) if gene.coordinates[0][2] != '.' else 0),
+            #        gene.coordinates[0][1], gene.coordinates[0][2])
+
             # correct coordinates for phase
-            gene.coordinates = [((coordinate[0]+(int(coordinate[2]) if coordinate[2] != '.' else 0)),
+            if gene.strand: # minus strand
+                gene.phased_coordinates = [(coordinate[0],
+                                (coordinate[1]-(int(coordinate[2]) if coordinate[2] != '.' else 0)), coordinate[2]) for coordinate in gene.coordinates]
+            if not gene.strand: # plus strand
+                gene.phased_coordinates = [((coordinate[0]+(int(coordinate[2]) if coordinate[2] != '.' else 0)),
                                 coordinate[1], coordinate[2]) for coordinate in gene.coordinates]
             # sort coordinates
             gene.coordinates = sorted(gene.coordinates, key=lambda k: k[0], reverse=gene.strand)
+
 
             # add translational table information if available
             gene.transl_table = cds.transl_table
             if not gene.transl_table:
                 gene.transl_table = '1'
 
+            # print(gene.__dict__)
 
-def set_seqs(proteins_file, contigs, features, current_contig, contig_seq):
+
+def set_seqs(contigs, features, current_contig, contig_seq,stop_codons, outta_frame):
     """Extract nuc sequences and translate to AA for genes on contig.
 
     Use coordinates of longest transcript in gene Feature object
@@ -295,36 +277,112 @@ def set_seqs(proteins_file, contigs, features, current_contig, contig_seq):
       contig_seq(str): sequence for current_contig
     """
 
+
+
     for gene_id in contigs.get(current_contig):
         gene = features.get(gene_id)
+        # print(gene.__dict__)
+
 
         if not gene.transcripts or not gene.cdss or not gene.coordinates:
             # no transcript was found for gene
             continue
 
-        proteins_file.write(">"+gene_id+"\n")
         seq = ''
+        # assess sequence with considering the phase attribute and without it
+        seqs = {'phased': '','non-phased': ''}
         for coordinate in gene.coordinates:
             # on reverse strand CDS needs to be reverse complemented before concatenated
             if gene.strand:
-                seq += str(Seq.Seq(contig_seq[coordinate[0]:coordinate[1]]).reverse_complement())
+                seqs['non-phased'] += str(Seq.Seq(contig_seq[coordinate[0]:coordinate[1]]).reverse_complement())
             else:
-                seq += str(Seq.Seq(contig_seq[coordinate[0]:coordinate[1]]))
+                seqs['non-phased'] += str(Seq.Seq(contig_seq[coordinate[0]:coordinate[1]]))
+        for coordinate in gene.phased_coordinates:
+            # on reverse strand CDS needs to be reverse complemented before concatenated
+            if gene.strand:
+                seqs['phased'] += str(Seq.Seq(contig_seq[coordinate[0]:coordinate[1]]).reverse_complement())
+            else:
+                seqs['phased'] += str(Seq.Seq(contig_seq[coordinate[0]:coordinate[1]]))
 
-        protein = str(Seq.Seq(seq).translate(table=int(gene.transl_table)))
+        if len(seqs['phased'])%3 != 0:
+            outta_frame['p'] += 1
+            seqs['phased'] = seqs['phased']+("N"*(3-(len(seqs['phased'])%3)))
+        if len(seqs['non-phased'])%3 != 0:
+            outta_frame['np'] += 1
+            seqs['non-phased'] = seqs['non-phased']+("N"*(3-(len(seqs['non-phased'])%3)))
 
-        # if len(seq)%3 != 0:
-        #     # prepend N to make sequence length a multiple of three
-        #     seq = ("N"*(3-(len(seq)%3)))+seq
-        # if "*" in protein_w_stop[:-1]:
-            # print(gene.__dict__)
-            # print(str(Seq.Seq(seq).translate(table=int(gene.transl_table))))
-        # taking only the part to the first stop codon resulted in better matches
-        # when using the augustus_masked features from GFF
-        # protein = protein.split('*')[0]
+        protein = str(Seq.Seq(seqs['non-phased']).translate(table=int(gene.transl_table)))
+        phased_protein = str(Seq.Seq(seqs['phased']).translate(table=int(gene.transl_table)))
 
-        proteins_file.write(protein)
-        proteins_file.write("\n")
+        gene.prot_seqs['phased'] = phased_protein
+        gene.prot_seqs['non-phased'] = protein
+
+
+
+        if "*" in phased_protein[-1]:
+            stop_codons['p'] += 1
+        if "*" in protein[:-1]:
+            stop_codons['np'] += 1
+
+
+    return stop_codons, outta_frame
+
+
+def decide_phasing(cfg, stop_codons, outta_frame):
+    """Identify if information of phase field should be used"""
+    if cfg.use_phase_info == 'TRUE':
+        return True
+    if cfg.use_phase_info == 'FALSE':
+        return False
+    if cfg.use_phase_info == 'auto':
+        phasing = stop_codons.get('p') + outta_frame.get('p')
+        non_phasing = stop_codons.get('np') + outta_frame.get('np')
+
+        if phasing > non_phasing:
+            return False
+        if phasing < non_phasing:
+            return True
+        else: # both are equal
+            # weigh internal stop codons stronger
+            if stop_codons.get('p') > stop_codons.get('np'):
+                return False
+            if stop_codons.get('p') < stop_codons.get('np'):
+                return True
+            else:
+                # per default use phase information if both score equally good
+                return True
+
+def write_seqs(cfg, contigs, features, use_phase_info):
+    """Extract nuc sequences and translate to AA for genes on contig.
+
+    Use coordinates of longest transcript in gene Feature object
+    to extract the gene sequence and translate it into AA sequence
+
+    Args:
+      proteins_file(obj): file object for protein FASTA file
+      contigs(dict): {scaffold ID : [gene IDs]}
+      features(dict): {GFF feature ID : Feature object}
+      current_contig(str): ID of currrent contig
+      contig_seq(str): sequence for current_contig
+    """
+
+    with open(cfg.proteins_path, "w") as proteins_file:
+
+        for gene_lists in contigs.values():
+            for gene_id in gene_lists:
+                gene = features.get(gene_id)
+                # print(gene.__dict__)
+
+                proteins_file.write(">"+gene_id+"\n")
+
+                if use_phase_info:
+                    protein = gene.prot_seqs.get('phased')
+                else:
+                    protein = gene.prot_seqs.get('non-phased')
+
+                proteins_file.write(protein)
+                proteins_file.write("\n")
+
 
 def extract_seq(cfg, contigs, features):
     """Retrieve sequence for contig from FASTA and write protein FASTA.
@@ -338,14 +396,17 @@ def extract_seq(cfg, contigs, features):
       features(dict): {GFF feature ID : Feature object}
     """
 
+    stop_codons = {'p': 0, 'np': 0}
+    outta_frame = {'p': 0, 'np': 0}
+
     current_contig = ""
-    with open(cfg.proteins_path, "w") as proteins_file, \
-        open(cfg.fasta_path, "r") as fasta_file:
+
+    with open(cfg.fasta_path, "r") as fasta_file:
         for line in fasta_file:
             if line.startswith(">"):
                 # False if no genes in contig dict (geneless contigs)
                 if contigs.get(current_contig):
-                    set_seqs(proteins_file, contigs, features, current_contig, contig_seq)
+                    stop_codons, outta_frame = set_seqs(contigs, features, current_contig, contig_seq,stop_codons, outta_frame)
                 # retrieve ID from current contig
                 current_contig = line.strip().lstrip(">").split()[0]
                 contig_seq = ''
@@ -353,7 +414,28 @@ def extract_seq(cfg, contigs, features):
                 contig_seq += line.strip()
         # add genes from last contig
         if contigs.get(current_contig):
-            set_seqs(proteins_file, contigs, features, current_contig, contig_seq)
+            stop_codons, outta_frame =  set_seqs(contigs, features, current_contig, contig_seq,stop_codons, outta_frame)
+
+    return stop_codons, outta_frame
+
+def log_seqs_info(use_phase_info, stop_codons, outta_frame):
+
+    if use_phase_info:
+        internal_stops = stop_codons.get('p')
+        outta_frames = outta_frame.get('p')
+    else:
+        internal_stops = stop_codons.get('np')
+        outta_frames = outta_frame.get('np')
+
+    errors = False
+    if internal_stops != 0:
+        logging.warning('{} proteins with internal stop codon(s) identified'.format(internal_stops))
+        errors = True
+    if outta_frames != 0:
+        logging.warning('{} proteins with partial codon(s) identified (length of sequence no multiple of three). Trailing Ns were added'.format(outta_frames))
+        errors = True
+    if errors:
+        logging.warning('This may be a problem with your GFF. If you have a precomputed protein FASTA file available, using this may yield a better taxonomic assignment (especially if the number(s) is/are very high).')
 
 
 def generate_fasta(cfg):
@@ -369,7 +451,11 @@ def generate_fasta(cfg):
 
     contigs, features = get_cds_coordinates(cfg)
     get_longest_transcript(contigs, features)
-    extract_seq(cfg, contigs, features)
+    stop_codons, outta_frame = extract_seq(cfg, contigs, features)
+    use_phase_info = decide_phasing(cfg, stop_codons, outta_frame)
+    write_seqs(cfg, contigs, features, use_phase_info)
+    log_seqs_info(use_phase_info, stop_codons, outta_frame)
+
 
 
 def main():
