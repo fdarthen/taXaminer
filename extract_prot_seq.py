@@ -146,7 +146,7 @@ def get_cds_coordinates(cfg):
 
     # GFF3 was unsorted
     count_it = 0
-    while unmatched_lines or count_it <= 2:
+    while unmatched_lines and count_it <= 2:
         # make at max two iterations:
         # genes are already added to features because they need no parent
         # mRNA features can be added in first iteration as their parent (gene)
@@ -330,11 +330,9 @@ def set_seqs(contigs, features, current_contig, contig_seq,stop_codons, outta_fr
 
 def decide_phasing(cfg, stop_codons, outta_frame):
     """Identify if information of phase field should be used"""
-    if cfg.use_phase_info:
-        return True
-    if not cfg.use_phase_info:
-        return False
     if cfg.use_phase_info == 'auto':
+        logging.debug('Proteins with phase information: \n\tinternal stop codons: {}\n\tproteins out of frame: {}'.format(stop_codons.get('p'),outta_frame.get('p')))
+        logging.debug('Proteins without phase information: \n\tinternal stop codons: {}\n\tproteins out of frame: {}'.format(stop_codons.get('np'),outta_frame.get('np')))
         phasing = stop_codons.get('p') + outta_frame.get('p')
         non_phasing = stop_codons.get('np') + outta_frame.get('np')
 
@@ -351,6 +349,11 @@ def decide_phasing(cfg, stop_codons, outta_frame):
             else:
                 # per default use phase information if both score equally good
                 return True
+
+    if cfg.use_phase_info:
+        return True
+    if not cfg.use_phase_info:
+        return False
 
 def write_seqs(cfg, contigs, features, use_phase_info):
     """Extract nuc sequences and translate to AA for genes on contig.
