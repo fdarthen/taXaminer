@@ -4,5 +4,3 @@ output_path: "./report/"
 taxon_id: "107806"
 bam_path_1: "mapping.bam"
 database_path: "test_db.dmnd"
-target_exclude: "False"
-slim_diamond_results: 'yes'
