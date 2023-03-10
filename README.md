@@ -46,13 +46,11 @@ gff_path: "path/to/assembly.gff" # path to annotation in GFF3 format
 output_path: "path/to/output_directory/" # directory to save results in
 taxon_id: "<NCBI taxon ID>" # NCBI Taxon ID of query species
 ```
-2. To include coverage information, add one of the following parameters according to your data (this is optional).
+2. To include coverage information, add the path to a sorted bam file (this is optional).
 ```
-pbc_path_1: "path/to/pbc.txt" # path to PBC file; omit to use default location in output directory
 bam_path_1: "path/to/mapping.bam" # path to BAM file; omit to use default location in output directory
-read_paths_1: ["path/to/read_file_1.fa","path/to/read_file_2.fa"] # path to read file(s)
 ```
-* Note: When using multiple coverage sets, duplicate the parameter you need and increase the number in the suffix
+* Note: When using multiple coverage sets, duplicate the parameter and increase the number in the suffix
 
 
 To run taXaminer, call it with the path to the config file, like so:
