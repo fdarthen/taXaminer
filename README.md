@@ -19,9 +19,9 @@ To install taXaminer, use the python package installer pip.
 pip install taxaminer
 ```
 
-To install additional dependencies, use the setup function included in taXaminer. You can install the tools either via conda or locally in a specified directory.
+To install the additional dependencies, use the setup function included in taXaminer. You can install the tools either via conda or locally in a specified directory.
 
-Using conda:
+Using conda (installs into the currently active environment):
 ```
 taxaminer.setup --conda
 ```
@@ -46,7 +46,7 @@ gff_path: "path/to/assembly.gff" # path to annotation in GFF3 format
 output_path: "path/to/output_directory/" # directory to save results in
 taxon_id: "<NCBI taxon ID>" # NCBI Taxon ID of query species
 ```
-2. To include coverage information, add the path to a sorted bam file (this is optional).
+2. To include coverage information, add the path to a sorted bam file (this is optional). Otherwise, omit this parameter from the configuration file.
 ```
 bam_path_1: "path/to/mapping.bam" # path to BAM file; omit to use default location in output directory
 ```
