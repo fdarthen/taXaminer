@@ -40,7 +40,7 @@ def check_gff(cfg):
             if line.startswith('#'):
                 continue
             spline = line.strip().split('\t')
-            feature_dict = spline2dict(spline)
+            feature_dict = spline2dict(spline, cfg.include_pseudogenes)
             if feature_dict.get('type') == 'gene':
                 # read only first gene
                 if gene:
@@ -181,13 +181,16 @@ def attrs2dict(attr_list):
             attr_list.split(';')}
 
 
-def spline2dict(spline):
+def spline2dict(spline, include_pseudogenes):
 
     spline_dict = {}
     # direct inference
     spline_dict['scaffold'] = spline[0]
     spline_dict['source'] = spline[1]
-    spline_dict['type'] = spline[2]
+    if include_pseudogenes and spline[2] == 'pseudogene':
+        spline_dict['type'] = 'gene'
+    else:
+        spline_dict['type'] = spline[2]
     spline_dict['start'] = int(spline[3])
     spline_dict['end'] = int(spline[4])
     spline_dict['score'] = spline[5]
@@ -296,18 +299,22 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
                     continue
 
             spline = line.strip().split('\t')
-            if not spline[2] in parent_path:
+
+            if ((not spline[2] in parent_path) and \
+                (spline[2] != 'pseudogene')):
+                gene = None
                 continue
-            feature_dict = spline2dict(spline)
+            feature_dict = spline2dict(spline, cfg.include_pseudogenes)
 
             # feature == gene
-            if feature_dict.get('type') == parent_path[-1]:
-                # process previous gene
-                upstream_gene = save_gene_features(
-                    feature_dict, pandas_row_list, transcript, gene,
-                    transcript_cds_features, transcript_cds_length,
-                    gene_cds_features, max_cds_len, upstream_gene,
-                    transcript_type)
+            if (feature_dict.get('type') == parent_path[-1]):
+                if gene:
+                    # process previous gene
+                    upstream_gene = save_gene_features(
+                        feature_dict, pandas_row_list, transcript, gene,
+                        transcript_cds_features, transcript_cds_length,
+                        gene_cds_features, max_cds_len, upstream_gene,
+                        transcript_type)
 
                 # init new gene
                 gene = feature_dict
@@ -315,8 +322,14 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
                 gene_cds_features = []
                 transcript, cds = None, None
 
+            # no processing if pseudogenes are not included
+            elif not cfg.include_pseudogenes and feature_dict.get('type') == 'pseudogene':
+                gene = None
+
             # feature == coding feature
             elif feature_dict.get('type') == parent_path[0]:
+                if not gene:
+                    continue
                 cds = feature_dict
                 cds['gene_id'] = gene.get('id')
                 if cds.get('gene_id') == cds.get('parent_id'):
@@ -344,6 +357,8 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
 
              # feature between gene and CDS
             else:
+                if not gene:
+                    continue
                 if feature_dict.get('type') == 'mRNA':
                     # process previous transcript
                     if transcript:
@@ -362,10 +377,11 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
                     # is already fulfilled by order of the GFF file
                     continue
 
-    save_gene_features(
-        {}, pandas_row_list, transcript, gene, transcript_cds_features,
-        transcript_cds_length, gene_cds_features, max_cds_len, upstream_gene,
-        transcript_type)
+    if gene:
+        save_gene_features(
+            {}, pandas_row_list, transcript, gene, transcript_cds_features,
+            transcript_cds_length, gene_cds_features, max_cds_len, upstream_gene,
+            transcript_type)
 
     gff_df = pd.DataFrame(pandas_row_list)
     # if features don't have ID attribute, concatenate type and line number
