@@ -45,8 +45,14 @@ def check_gff(cfg):
                 # read only first gene
                 if gene:
                     break
+                else:
+                    transcript, exon, cds = None, None, None
+                    features = {}
                 gene = feature_dict
                 features[gene.get('id')] = gene
+            elif feature_dict.get('type') in ['tRNA', 'rRNA', 'lnc_RNA', 'lncRNA', 'ncRNA']:
+                gene, transcript, exon, cds = None, None, None, None
+                features = {}
             elif feature_dict.get('type') == 'mRNA':
                 transcript = feature_dict
                 features[transcript.get('id')] = transcript
@@ -303,6 +309,9 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
 
             if ((not spline[2] in parent_path) and \
                 (spline[2] != 'pseudogene')):
+                if spline[2] in ['tRNA', 'rRNA', 'lnc_RNA', 'lncRNA', 'ncRNA']:
+                    # only process protein coding genes
+                    gene = None
                 continue
             feature_dict = spline2dict(spline, cfg.include_pseudogenes)
 
@@ -327,7 +336,7 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
                 transcript, cds = None, None
 
             # no processing if pseudogenes are not included
-            elif not cfg.include_pseudogenes and feature_dict.get('type') == 'pseudogene':
+            elif not cfg.include_pseudogenes and spline[2] == 'pseudogene':
                 gene = None
 
             # feature == coding feature
@@ -377,10 +386,6 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
                     transcript_cds_features = []
                     transcript_cds_length = 0
                 else:
-                    if feature_dict.get('type') == 'rRNA' or \
-                            feature_dict.get('type') == 'tRNA':
-                        # only process protein coding genes
-                        gene = None
                     # feature only required for matching to gene ID, which
                     # is already fulfilled by order of the GFF file
                     continue
