@@ -255,7 +255,7 @@ def save_gene_features(feature_dict, pandas_row_list, transcript, gene,
                 gene, transcript, transcript_type, transcript_cds_features)
     if gene:
         # add gene neighbours
-        downstream_gene = feature_dict.get('id')
+        downstream_gene = feature_dict.get('id') if feature_dict.get('scaffold') == gene.get('scaffold') else None
         gene['upstream_gene'] = upstream_gene
         gene['downstream_gene'] = downstream_gene
         upstream_gene = gene.get('id')
@@ -284,6 +284,7 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
 
     gene, transcript, exon, cds = None, None, None, None
     upstream_gene = None
+    current_contig = None
     transcript_cds_features, transcript_cds_length, gene_cds_features = None, None, None
     max_cds_len = None
 
@@ -302,7 +303,6 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
 
             if ((not spline[2] in parent_path) and \
                 (spline[2] != 'pseudogene')):
-                gene = None
                 continue
             feature_dict = spline2dict(spline, cfg.include_pseudogenes)
 
@@ -315,6 +315,10 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
                         transcript_cds_features, transcript_cds_length,
                         gene_cds_features, max_cds_len, upstream_gene,
                         transcript_type)
+
+                if spline[0] != current_contig:
+                    upstream_gene = None
+                    current_contig = spline[0]
 
                 # init new gene
                 gene = feature_dict
@@ -373,6 +377,10 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
                     transcript_cds_features = []
                     transcript_cds_length = 0
                 else:
+                    if feature_dict.get('type') == 'rRNA' or \
+                            feature_dict.get('type') == 'tRNA':
+                        # only process protein coding genes
+                        gene = None
                     # feature only required for matching to gene ID, which
                     # is already fulfilled by order of the GFF file
                     continue
