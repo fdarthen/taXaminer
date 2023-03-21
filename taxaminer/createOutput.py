@@ -379,7 +379,7 @@ def create_krona_plot(cfg, data):
     krona_df = data['taxon_assignmentID']
     krona_df.to_csv(cfg.output_path + 'tmp/krona.tsv', sep='\t', index=True,
                     index_label='#g_name', header=['taxID'])
-    cmd_krona = f'{cfg.krona} {cfg.output_path}/tmp/krona.tsv -o {cfg.output_path}taxonomic_assignment/krona.html'
+    cmd_krona = f'{cfg.krona} {cfg.output_path}tmp/krona.tsv -o {cfg.output_path}taxonomic_assignment/krona.html'
     out_krona = subprocess.run([cmd_krona], shell=True, capture_output=True)
     if out_krona.returncode != 0:
         logging.error(f'creation of krona plot failed:\n{out_krona}')

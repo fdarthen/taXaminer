@@ -161,10 +161,10 @@ def main():
                                             query_label, TAX_DB, gff_df)
     logging.debug(f'finished [{int(time.time() - pre_time)}s]\n')
 
-    # pre_time = time.time()
-    # logging.info('> creating contig summary')
-    # createContigOverview.process_assignments(cfg, gff_df, all_data_df, TAX_DB)
-    # logging.debug(f'finished [{int(time.time() - pre_time)}s]\n')
+    pre_time = time.time()
+    logging.info('> creating contig summary')
+    createContigOverview.process_assignments(cfg, gff_df, all_data_df, TAX_DB)
+    logging.debug(f'finished [{int(time.time() - pre_time)}s]\n')
 
 
     # make HTML file self-contained, text selectable and change title

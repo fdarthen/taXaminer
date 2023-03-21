@@ -370,6 +370,7 @@ def run_diamond(diamond_cmd):
     Returns:
 
     """
+    logging.info('>> running DIAMOND')
     dmdnOut = subprocess.run([diamond_cmd], shell=True, capture_output=True)
     if dmdnOut.returncode != 0:
         logging.error(f'Error running DIAMOND '
@@ -538,6 +539,15 @@ def assess_closest_of_hits(taxIDs, target_taxon):
                 closest_hit = (taxon, lca_index, lca)
 
     return closest_hit[0], closest_hit[2]
+
+def compute_majority_taxon(taxon_ids, fraction):
+    """ compute the LCA of a list of taxon ID """
+
+    taxa_list = [init_taxopyon(taxon_id) for taxon_id in taxon_ids]
+    if len(taxa_list) > 1:
+        return taxopy.find_majority_vote(taxa_list, TAX_DB, fraction=fraction)
+    else:
+        return taxa_list[0]
 
 def compute_lca(taxon_ids):
     """ compute the LCA of a list of taxon ID """
@@ -1064,7 +1074,7 @@ def run_assignment(cfg, gff_df, pca_coordinates, TAX_DB_local):
     pathlib.Path(cfg.output_path + 'taxonomic_assignment/').mkdir(parents=True,
                                                                   exist_ok=True)
 
-    assignment_lineages(assignments_df)
+    #assignment_lineages(assignments_df)
     taxonomy_summary(cfg, assignments_df, target_taxon, query_label)
     return assignments_df, query_label
 
