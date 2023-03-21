@@ -50,11 +50,13 @@ def set_seqs(gff_df, gene, contig_seq, proteins_file):
     for coding_feature in gene.coding_features:
         cds = gff_df.loc[coding_feature]
         # on reverse strand CDS needs to be reverse complemented before concatenated
-        if gene.strand == '-':
-            seq += str(Seq.Seq(contig_seq[cds.start-1:cds.end]).reverse_complement())
-        else:
-            seq += str(Seq.Seq(contig_seq[cds.start-1:cds.end]))
+        # if gene.strand == '-':
+        #     seq += str(Seq.Seq(contig_seq[cds.start-1:cds.end]).reverse_complement())
+        # else:
+        seq += str(Seq.Seq(contig_seq[cds.start-1:cds.end]))
 
+    if gene.strand == '-':
+        seq = str(Seq.Seq(seq).reverse_complement())
 
     if len(seq)%3 != 0:
         seq += ("N"*(3-(len(seq)%3)))
