@@ -337,6 +337,16 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
 
             # no processing if pseudogenes are not included
             elif not cfg.include_pseudogenes and spline[2] == 'pseudogene':
+                if gene:
+                    # process previous gene
+                    upstream_gene = save_gene_features(
+                        feature_dict, pandas_row_list, transcript, gene,
+                        transcript_cds_features, transcript_cds_length,
+                        gene_cds_features, max_cds_len, upstream_gene,
+                        transcript_type)
+                if spline[0] != current_contig:
+                    upstream_gene = None
+                    current_contig = spline[0]
                 gene = None
 
             # feature == coding feature
@@ -346,6 +356,7 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
                 cds = feature_dict
                 cds['gene_id'] = gene.get('id')
                 if cds.get('gene_id') == cds.get('parent_id'):
+                    # no transcript features
                     if cds.get('length') > max_cds_len:
                         max_cds_len = cds.get('length')
                         gene_cds_features = [cds]
@@ -409,10 +420,36 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
 
     return gff_df
 
+def set_gene_neighbours(gff_df):
+
+    cur_gene, cur_contig = None, None
+    upstream_gene = None
+    for row in gff_df.loc[gff_df['type'] == 'gene'].itertuples():
+        if cur_contig == row.scaffold:
+            gff_df.at[cur_gene, 'upstream_gene'] = upstream_gene
+            gff_df.at[cur_gene, 'downstream_gene'] = row.Index
+            upstream_gene = cur_gene
+            cur_gene = row.Index
+        else:
+            if cur_gene:
+                gff_df.at[cur_gene, 'upstream_gene'] = upstream_gene
+                gff_df.at[cur_gene, 'downstream_gene'] = None
+
+            upstream_gene = None
+            cur_contig = row.scaffold
+            cur_gene = row.Index
+
+
+
+    pass
+
+
+
 
 def process(cfg):
     coding_type, transcript_type, parent_path = check_gff(cfg)
     gff_df = parse_file(cfg, coding_type, transcript_type, parent_path)
+    set_gene_neighbours(gff_df)
     match_fasta2id(cfg, gff_df)
 
     return gff_df
