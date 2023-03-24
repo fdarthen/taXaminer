@@ -68,7 +68,7 @@ def main():
     parser.add_argument("-v", "--verbose", help="print detailed log",
                     action="store_true", default=False)
     parser.add_argument("-k", "--keep", help="keep temporary files",
-                    action="store_false", default=False)
+                    action="store_false", default=True)
     args = parser.parse_args()
 
     log_level = logging.INFO # default log level
