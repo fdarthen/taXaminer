@@ -43,6 +43,8 @@ def comp_contig_lca(contig_genes):
     """
 
     gene_assignments = contig_genes['taxon_assignmentID'].dropna().unique()
+    if len(gene_assignments) == 0:
+        return 'Unassigned'
     lca = compTaxonomicAssignment.compute_lca(gene_assignments)
     return lca.name
 
@@ -50,9 +52,21 @@ def comp_majority_assignment(contig_genes, fraction):
 
 
     gene_assignments = contig_genes['taxon_assignmentID'].dropna().unique()
+    if len(gene_assignments) == 0:
+        return 'Unassigned'
     majority = compTaxonomicAssignment.compute_majority_taxon(
         gene_assignments, fraction)
     return majority.name
+
+
+def comp_most_abundant_taxon(contig_genes):
+
+    candidate_taxon = contig_genes['taxon_assignment'].dropna().value_counts().index
+    if candidate_taxon.empty:
+        return None
+    else:
+        return candidate_taxon[0]
+
 
 def monitor_coverage(contig_genes):
 
@@ -103,7 +117,7 @@ def process_assignments(cfg, gff_df, all_data_df, TAX_DB_local):
         # add taxon which represents x% of the data
         #contigs.at[contig.Index, 'majority_75_taxon'] = comp_majority_assignment(contig_genes, 0.75)
         contigs.at[
-            contig.Index, 'most_abundant_taxon'] = contig_genes['taxon_assignment'].dropna().value_counts().index[0]
+            contig.Index, 'most_abundant_taxon'] = comp_most_abundant_taxon(contig_genes)
         #contigs.at[contig.Index, 'all_assignments'] = ';'.join(contig_genes['taxon_assignment'].dropna().unique().tolist())
 
         # if cfg.include_coverage:
