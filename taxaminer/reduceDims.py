@@ -302,7 +302,8 @@ def compute_pca(cfg):
             nan_columns.rename(columns={"new_col": col}, inplace=True)
             # keep only those columns with less than 30% NaN values
             data = data.drop(columns=col)
-    logging.info(f'contig related variables excluded due to more then 30% NaNs:\n'
+    if not nan_columns.empty:
+        logging.info(f'contig related variables excluded due to more then 30% NaNs:\n'
                  f'{",".join(list(nan_columns.columns))}')
 
     # CLEAN DATA FROM NaNS -- ROWWISE
