@@ -582,7 +582,13 @@ def calc_assignment(cfg, assignments_df, gene_id, hit_list, target_taxon):
     """
 
     hit_ids = [id[-2].split(';')[0] for id in hit_list if id[-2] != '']
-    lca = compute_lca(hit_ids)
+    if hit_ids == []:
+        acc_nums = ','.join([elem[0] for elem in hit_list])
+        logging.info(f"Protein(s) with following acession number(s) couldn't "
+                     f"be matched to corresponding taxon: \n {acc_nums}")
+        return
+    else:
+        lca = compute_lca(hit_ids)
 
     # lca is ubiquitous
     assignments_df.at[gene_id,'lcaID'] = lca.taxid
