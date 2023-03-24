@@ -315,7 +315,8 @@ def compute_pca(cfg):
     genes_w_nans = data[data.isna().any(axis=1)]
     # and log their IDs
     if not genes_w_nans.empty:
-        logging.info(f'Following genes with null values are excluded from PCA:\n{genes_w_nans.index.values}')
+        logging.info(f'Following genes with null values are excluded from '
+                     f'PCA:\n{",".join(genes_w_nans.index.values)}')
 
     # keep working only with the genes without NaNs (complete rows / cases)
     data = data.dropna()

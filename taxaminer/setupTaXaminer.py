@@ -73,30 +73,34 @@ def check_executable(cmd_dict):
 
 def setup_db(outPath, cmd_dict):
     pathlib.Path(outPath).mkdir(parents=True, exist_ok=True)
-    print("downloading nr")
+    print("> downloading files")
+    print(">> downloading nr")
     download_file(f"{outPath}/nr.gz", "https://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz")
-    print("downloading taxdmp")
+    print(">> downloading taxdmp")
     download_file(f"{outPath}/taxdump.tar.gz",
                   "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz")
-    print("downloading accession")
+    print(">> downloading accession")
     download_file(f"{outPath}/prot.accession2taxid.FULL.gz",
                   "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/prot.accession2taxid.FULL.gz")
 
-    print("unpack")
+    print("> unpacking files")
     open_tarfile(f"{outPath}/taxdump.tar.gz", outPath, "gz", ["names.dmp", "nodes.dmp", "merged.dmp"])
 
-    print("preparing database")
+    print("> preparing database")
     index_db = (f'{cmd_dict.get("diamond")} makedb --in "{outPath}/nr.gz" -d "{outPath}/nr" \
         --taxonmap "{outPath}/prot.accession2taxid.FULL.gz" \
         --taxonnodes "{outPath}/nodes.dmp" \
         --taxonnames "{outPath}/names.dmp" \
-        && rm -rf nr.gz prot.accession2taxid.gz taxdump.tar.gz')
+        && rm -rf nr.gz prot.accession2taxid.FULL.gz taxdump.tar.gz')
     out_index_db = subprocess.run([index_db], shell=True, capture_output=True)
     if out_index_db.returncode != 0:
         print(
             f"creation of diamond database failed:\n{out_index_db}")
         print("Error message:\n" + out_index_db.stderr.decode())
         sys.exit()
+    else:
+        print(f">> creation of diamond database successful!")
+
 
 def setup_krona_taxonomy(path):
     print("setting up taxonomy db for krona tools")
