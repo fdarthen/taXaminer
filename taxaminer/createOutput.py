@@ -394,7 +394,7 @@ def create_gene_table_taxon_assignment(cfg, gff_df, df):
     columns_renamed = {}
     for col in out_df.columns:
         if 'PC ' in col:
-            columns_renamed[col] = f"Dim.{col.split()[1]}"
+            columns_renamed[col] = f"PC_{col.split()[1]}"
     out_df.rename(columns=columns_renamed, inplace=True)
     out_df.to_csv(f"{cfg.output_path}taxonomic_assignment/gene_table_taxon_assignment.csv", index_label='g_name')
 

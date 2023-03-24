@@ -283,12 +283,9 @@ def compute_pca(cfg):
                            "c_genecovsd"]
         indexed_cov_cols = [f'{col}_{index}' for col in contig_cov_cols for index in cfg.bam_paths.keys()]
 
-        with open(f'{cfg.output_path}PCA/variables_excluded_from_PCA.txt',
-                  'w') as excluded_cols_file:
-            excluded_cols_file.write('contig related variables excluded due to single contig assembly:\n')
-            excluded_cols_file.write(
-                '\n'.join([col for col in (contig_columns + indexed_cov_cols) if col in data_w_nans.columns]))
-            excluded_cols_file.write('\n')
+        logging.info(f'contig related variables excluded due to single contig assembly:\n'
+                     f'{",".join([col for col in (contig_columns + indexed_cov_cols) if col in data_w_nans.columns])}')
+
 
         data = data_w_nans.drop(columns=contig_columns + indexed_cov_cols, errors='ignore')
     else:
@@ -305,10 +302,8 @@ def compute_pca(cfg):
             nan_columns.rename(columns={"new_col": col}, inplace=True)
             # keep only those columns with less than 30% NaN values
             data = data.drop(columns=col)
-    with open(f'{cfg.output_path}PCA/variables_excluded_from_PCA.txt', 'a') as excluded_cols_file:
-        excluded_cols_file.write('contig related variables excluded due to more then 30% NaNs:\n')
-        excluded_cols_file.write('\n'.join(list(nan_columns.columns)))
-        excluded_cols_file.write('\n')
+    logging.info(f'contig related variables excluded due to more then 30% NaNs:\n'
+                 f'{",".join(list(nan_columns.columns))}')
 
     # CLEAN DATA FROM NaNS -- ROWWISE
     # save the genes containing NaN values to a specific data frame
