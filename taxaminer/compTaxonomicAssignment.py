@@ -544,19 +544,22 @@ def compute_majority_taxon(taxon_ids, fraction):
     """ compute the LCA of a list of taxon ID """
 
     taxa_list = [init_taxopyon(taxon_id) for taxon_id in taxon_ids]
-    if len(taxa_list) > 1:
-        return taxopy.find_majority_vote(taxa_list, TAX_DB, fraction=fraction)
+    nanfree_taxa_list = [taxon for taxon in taxa_list if taxon]
+    if len(nanfree_taxa_list) > 1:
+        return taxopy.find_majority_vote(nanfree_taxa_list, TAX_DB, fraction=fraction)
     else:
-        return taxa_list[0]
+        return nanfree_taxa_list[0]
 
 def compute_lca(taxon_ids):
     """ compute the LCA of a list of taxon ID """
 
     taxa_list = [init_taxopyon(taxon_id) for taxon_id in taxon_ids]
-    if len(taxa_list) > 1:
-        return taxopy.find_lca(taxa_list, TAX_DB)
+    nanfree_taxa_list = [taxon for taxon in taxa_list if taxon]
+    
+    if len(nanfree_taxa_list) > 1:
+        return taxopy.find_lca(nanfree_taxa_list, TAX_DB)
     else:
-        return taxa_list[0]
+        return nanfree_taxa_list[0]
 
 
 def write_hits2file(cfg, file_path, hits):
@@ -628,6 +631,7 @@ def calc_assignment(cfg, assignments_df, gene_id, hit_list, target_taxon):
 def process_multi_hit(hit, target_taxon):
 
     split_taxids = hit[-2].split(';')
+
     lca = compute_lca(split_taxids)
 
     if lca.taxid in target_taxon.taxid_lineage:
@@ -994,7 +998,7 @@ def run_assignment(cfg, gff_df, pca_coordinates, TAX_DB_local):
     diamond_cmd = f'{cfg.diamond} blastp -p {cfg.threads} ' \
                   f'-f 6 qseqid sseqid pident length mismatch gapopen qstart' \
                   f' qend sstart send evalue bitscore staxids sscinames ' \
-                  f'-b2.0 --tmpdir /dev/shm --sensitive -c1 ' \
+                  f'-b2.0 --tmpdir /dev/shm --{cfg.diamond_sensitivity} -c1 ' \
                   f'--top 10 -q "{tmp_prot_path}" -d "{cfg.database_path}"'
 
     target_taxon = init_taxopyon(cfg.taxon_id)
