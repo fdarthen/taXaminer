@@ -440,12 +440,6 @@ def set_gene_neighbours(gff_df):
             cur_gene = row.Index
 
 
-
-    pass
-
-
-
-
 def process(cfg):
     coding_type, transcript_type, parent_path = check_gff(cfg)
     gff_df = parse_file(cfg, coding_type, transcript_type, parent_path)
