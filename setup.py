@@ -5,7 +5,7 @@ with open("README.md", "r") as input:
 
 setup(
     name="taxaminer",
-    version="0.7.0",
+    version="0.7.1",
     python_requires='>=3.7.0',
     description="Interactive exploration of biodiverse genome assemblies",
     long_description=long_description,
