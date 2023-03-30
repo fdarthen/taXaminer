@@ -14,7 +14,8 @@ Besides the taxonomic assignment of genes, taXaminer uses a total of 16 further 
 
 # Installation
 
-To install taXaminer, use the python package installer pip.
+To install taXaminer, use the python package installer pip. 
+Note: taXaminer is as of yet not published at pypi, thus you need to download this repository and provide pip with the link to the directory for installation.
 ```
 pip install taxaminer
 ```
