@@ -756,7 +756,7 @@ def subset_protein_fasta(proteins_path, prot_list, path_out, mode):
             write_bool = False
             for line in file_prot:
                 if line.startswith('>'):
-                    transcript = line.split()[0].lstrip(">")
+                    transcript = line.split()[0][1:]
                     # gene = line.split()[0].split('|')[1].lstrip(">")
 
                     if ((transcript in prot_list) and mode) or (
@@ -786,7 +786,7 @@ def subset_prots_longest_cds(gff_df, proteins_path, path_out):
     """
 
     # when matching prot ID to gene ID it is already checked for the one with the longest CDS
-    longest_transcripts = gff_df.loc[gff_df['type'] == 'gene', 'transcript_id'].to_list()
+    longest_transcripts = gff_df.loc[gff_df['type'] == 'gene', 'fasta_header'].to_list()
 
     logging.info(
         f"{len(longest_transcripts)} proteins written to fasta file for "
