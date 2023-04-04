@@ -321,7 +321,6 @@ def create_3D_plot(cfg, all_data_df, pca_obj, variables, pca_coordinates, query_
 
     #save_gif(cfg,fig)
 
-    """
     ### ADD PCA CONTRIBUTION OF VARIABLES ###
     loadings = pca_obj.components_.T * np.sqrt(pca_obj.explained_variance_)
     # scaling of the loading to the data
@@ -371,8 +370,7 @@ def create_3D_plot(cfg, all_data_df, pca_obj, variables, pca_coordinates, query_
         
     fig.update_layout(legend=dict(groupclick="togglegroup"),
                       modebar_add=["v1hovermode"])
-    """
-    fig.update_layout(modebar_add=["v1hovermode"])
+
     fig.write_html(cfg.output_path + "taxonomic_assignment/3D_plot.html")
 
     return plot_df

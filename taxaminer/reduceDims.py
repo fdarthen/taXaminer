@@ -347,7 +347,7 @@ def compute_pca(cfg):
     create_heatmap(cfg, pca, data.columns[1:], plot_template)
     create_scree_plot(cfg, pca, plot_template)
     create_bar_plot(cfg, pca, plot_template)
-    #create_3d_biplot(cfg, pca, components, data.columns[1:], plot_template)
+    create_3d_biplot(cfg, pca, components, data.columns[1:], plot_template)
 
     write_contrib_report(cfg, pca, data.columns[1:])
     write_pca_summary(cfg, pca, data.columns[1:])
