@@ -99,7 +99,15 @@ def process_assignments(cfg, gff_df, all_data_df, TAX_DB_local):
         'num_of_genes': [None for i in range(contig_ids.size)],
         'percentage_target': [None for i in range(contig_ids.size)],
         'lca': [None for i in range(contig_ids.size)],
-        'most_abundant_taxon': [None for i in range(contig_ids.size)]
+        'most_abundant_taxon': [None for i in range(contig_ids.size)],
+        'target_bitscore_mean': [None for i in range(contig_ids.size)],
+        'target_bitscore_sd': [None for i in range(contig_ids.size)],
+        'target_evalue_mean': [None for i in range(contig_ids.size)],
+        'target_evalue_sd': [None for i in range(contig_ids.size)],
+        'other_bitscore_mean': [None for i in range(contig_ids.size)],
+        'other_bitscore_sd': [None for i in range(contig_ids.size)],
+        'other_evalue_mean': [None for i in range(contig_ids.size)],
+        'other_evalue_sd': [None for i in range(contig_ids.size)]
     }
     contigs = pd.DataFrame(contig_dict, index=contig_ids)
     contigs['num_of_genes'] = contigs.index.map(
@@ -113,17 +121,18 @@ def process_assignments(cfg, gff_df, all_data_df, TAX_DB_local):
         contigs.at[contig.Index, 'lca'] = comp_contig_lca(contig_genes)
         contigs.at[contig.Index, 'percentage_target'] = percentage_target(
             contig_genes)
-        #contigs.at[contig.Index, 'is_target'] = contig_is_target(contig_genes)
-        # add taxon which represents x% of the data
-        #contigs.at[contig.Index, 'majority_75_taxon'] = comp_majority_assignment(contig_genes, 0.75)
         contigs.at[
             contig.Index, 'most_abundant_taxon'] = comp_most_abundant_taxon(contig_genes)
-        #contigs.at[contig.Index, 'all_assignments'] = ';'.join(contig_genes['taxon_assignment'].dropna().unique().tolist())
+        # contigs.at[contig.Index, 'all_assignments'] = ';'.join(contig_genes['taxon_assignment'].dropna().unique().tolist())
 
-        # if cfg.include_coverage:
-        #     contigs.at[
-        #         contig.Index, 'putative_hgt'] = monitor_coverage(
-        #         contig_genes)
+        contigs.at[contig.Index, 'target_bitscore_mean'] = round(contig_genes.loc[contig_genes['is_target'] == 1, 'bh_bitscore'].astype(float).mean(),2)
+        contigs.at[contig.Index, 'target_bitscore_sd'] = round(contig_genes.loc[contig_genes['is_target'] == 1, 'bh_bitscore'].astype(float).std(),2)
+        contigs.at[contig.Index, 'target_evalue_mean'] = contig_genes.loc[contig_genes['is_target'] == 1, 'bh_evalue'].astype(float).mean()
+        contigs.at[contig.Index, 'target_evalue_sd'] = contig_genes.loc[contig_genes['is_target'] == 1, 'bh_evalue'].astype(float).std()
+        contigs.at[contig.Index, 'other_bitscore_mean'] = round(contig_genes.loc[contig_genes['is_target'] == 0, 'bh_bitscore'].astype(float).mean(),2)
+        contigs.at[contig.Index, 'other_bitscore_sd'] = round(contig_genes.loc[contig_genes['is_target'] == 0, 'bh_bitscore'].astype(float).std(),2)
+        contigs.at[contig.Index, 'other_evalue_mean'] = contig_genes.loc[contig_genes['is_target'] == 0, 'bh_evalue'].astype(float).mean()
+        contigs.at[contig.Index, 'other_evalue_sd'] = contig_genes.loc[contig_genes['is_target'] == 0, 'bh_evalue'].astype(float).std()
 
     contigs.to_csv(f"{cfg.output_path}taxonomic_assignment/contig_assignments.csv", index_label='c_name')
 
