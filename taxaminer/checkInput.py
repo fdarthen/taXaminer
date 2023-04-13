@@ -251,7 +251,7 @@ def set_yesno_default(config_obj, key_name, *default):
     """
 
     if key_name in config_obj.keys():
-        cfg_value = str(config_obj.get(key_name))
+        cfg_value = str(config_obj.get(key_name)).lower()
         if cfg_value == "true" or cfg_value == "yes" or cfg_value == "y":
             return True
         else:
