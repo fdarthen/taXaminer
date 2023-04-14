@@ -139,15 +139,15 @@ def main():
         compFeatures.process_gene_info(cfg, gff_df)
         logging.debug(f'finished [{int(time.time()-pre_time)}s]\n')
 
-        pre_time = time.time()
-        logging.info('> executing PCA and clustering')
-        pca_obj, pca_coordinates, variables = reduceDims.compute_pca(cfg)
-        logging.debug(f'finished [{int(time.time()-pre_time)}s]\n')
+    pre_time = time.time()
+    logging.info('> executing PCA and clustering')
+    pca_obj, pca_coordinates, variables = reduceDims.compute_pca(cfg)
+    logging.debug(f'finished [{int(time.time()-pre_time)}s]\n')
 
-        # create symlink if proteins.faa file does not exist in taxaminer
-        # report (for dashboard)
-        if not pathlib.Path(cfg.output_path+'proteins.faa').exists():
-            pathlib.Path(cfg.output_path+'proteins.faa').symlink_to(pathlib.Path(cfg.proteins_path).resolve())
+    # create symlink if proteins.faa file does not exist in taxaminer
+    # report (for dashboard)
+    if not pathlib.Path(cfg.output_path+'proteins.faa').exists():
+        pathlib.Path(cfg.output_path+'proteins.faa').symlink_to(pathlib.Path(cfg.proteins_path).resolve())
 
     pre_time = time.time()
     logging.info('> running taxonomic assignment')
