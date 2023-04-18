@@ -109,17 +109,28 @@ def check_gff(cfg):
                         elif feat.get('add_attrs').get('ID') == protein_id:
                             transcript_type = feat.get('type')
                             break
+                    # headers of the RefSeq representative protein files contain
+                    # the gene ID and are structured as the following:
+                    # >mRNA ID|gene ID|length
+                    # -> match to gene ID in case not the same isoform was chosen
+                    # for a genes
+                    if line.strip().split('|')[1] == gene['id']:
+                        geneid_in_fasta = True
+                    else:
+                        geneid_in_fasta = False
+
                 else:
                     if transcript_type:
                         break
                     continue
 
-    return coding_type, transcript_type, parent_path
+    return coding_type, transcript_type, parent_path, geneid_in_fasta
 
 
-def match_fasta2id(cfg, gff_df):
+def match_fasta2id(cfg, gff_df, geneid_in_fasta):
     """ Match the header of a precomputed protein FASTA file to gene ID
 
+    :param geneid_in_fasta:
     :return:
     """
 
@@ -130,12 +141,24 @@ def match_fasta2id(cfg, gff_df):
         with open(cfg.proteins_path, 'r') as p_file:
             for line in p_file:
                 if line.startswith('>'):
-                    protein_id = line.strip().split('|')[0][1:]
-                    # diamond uses everything until first whitespace as ID
-                    header_dict[protein_id] = line[1:].strip().split()[0]
+                    if geneid_in_fasta:
+                        gene_id = line.strip().split('|')[1]
+                        # diamond uses everything until first whitespace as ID
+                        header_dict[gene_id] = line[1:].strip().split()[0]
+                    else:
+                        protein_id = line.strip().split('|')[0][1:]
+                        # diamond uses everything until first whitespace as ID
+                        header_dict[protein_id] = line[1:].strip().split()[0]
                 else:
                     continue
-        gff_df['fasta_header'] = gff_df['transcript_id'].map(header_dict)
+        if geneid_in_fasta:
+            # use gene ID in header of RefSeq representative protein files
+            # (i.e., structure of header =  >.*|<gene ID>|.*
+            gff_df['fasta_header'] = gff_df.index.map(header_dict)
+        else:
+            # if protein was passed by user, 'transcript_id' resembles the id
+            # of the feature that denotes the header in the fasta file
+            gff_df['fasta_header'] = gff_df['transcript_id'].map(header_dict)
     else:
         gff_df['fasta_header'] = gff_df['transcript_id']
 
@@ -223,6 +246,8 @@ def spline2dict(spline, include_pseudogenes):
 def replace_longest_transcript(gene, transcript, transcript_type, transcript_cds_features):
 
     cds_ids = [cds.get('id') for cds in transcript_cds_features]
+    # check if CDS features have unique identifiers
+    # else enumerate them
     if len(set(cds_ids)) != len(cds_ids):
         cds_ids = []
         for i, cds in enumerate(transcript_cds_features):
@@ -251,20 +276,30 @@ def replace_longest_transcript(gene, transcript, transcript_type, transcript_cds
     return gene_cds_features
 
 
-def save_gene_features(feature_dict, pandas_row_list, transcript, gene,
+def save_gene_features(pandas_row_list, transcript, gene,
                        transcript_cds_features, transcript_cds_length,
-                       gene_cds_features, max_cds_len, upstream_gene, transcript_type):
+                       gene_cds_features, max_cds_len, transcript_type):
     # process previous gene
     if transcript:
         if transcript_cds_length > max_cds_len:
             gene_cds_features = replace_longest_transcript(
                 gene, transcript, transcript_type, transcript_cds_features)
     if gene:
-        # add gene neighbours
-        downstream_gene = feature_dict.get('id') if feature_dict.get('scaffold') == gene.get('scaffold') else None
-        gene['upstream_gene'] = upstream_gene
-        gene['downstream_gene'] = downstream_gene
-        upstream_gene = gene.get('id')
+        if not transcript:
+            cds_ids = [cds.get('id') for cds in transcript_cds_features]
+            # check if CDS features have unique identifiers
+            # else enumerate them
+            if len(set(cds_ids)) != len(cds_ids):
+                cds_ids = []
+                for i, cds in enumerate(transcript_cds_features):
+                    cds['id'] = f"{cds.get('id')}-{i}"
+                    cds_ids.append(cds.get('id'))
+            cds_coordindates = [(cds.get('start'), cds.get('end')) for cds in
+                                transcript_cds_features]
+            gene['coding_features'] = cds_ids
+            gene['coding_coordindates'] = cds_coordindates
+            gene['transcript_id'] = gene.get('id')
+            gene_cds_features = transcript_cds_features
         if gene.get('coding_features'):
             pandas_row_list.append(gene)
             pandas_row_list += gene_cds_features
@@ -274,7 +309,6 @@ def save_gene_features(feature_dict, pandas_row_list, transcript, gene,
             gene['coding_features'] = [gene.get('id')]
             pandas_row_list.append(gene)
 
-    return upstream_gene
 
 
 def parse_file(cfg, coding_type, transcript_type, parent_path):
@@ -289,8 +323,6 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
     pandas_row_list = []
 
     gene, transcript, exon, cds = None, None, None, None
-    upstream_gene = None
-    current_contig = None
     transcript_cds_features, transcript_cds_length, gene_cds_features = None, None, None
     max_cds_len = None
 
@@ -307,47 +339,54 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
 
             spline = line.strip().split('\t')
 
-            if ((not spline[2] in parent_path) and \
-                (spline[2] != 'pseudogene')):
+            # only relevant lines will be further processed
+            ## type in parent_path or a pseudogene
+            if (not spline[2] in parent_path) and (spline[2] != 'pseudogene'):
                 if spline[2] in ['tRNA', 'rRNA', 'lnc_RNA', 'lncRNA', 'ncRNA']:
                     # only process protein coding genes
+                    if gene:
+                        if (gene['id'] == feature_dict['gene_id']):
+                            # last parsed feature was assigned to active gene
+                            # i.e.: there was a coding feature assigned to the gene
+                            # catches: saving genes of coding features that are
+                            # followed by non-coding RNAs without a gene feature
+                            save_gene_features(pandas_row_list, transcript,
+                                               gene, transcript_cds_features,
+                                               transcript_cds_length,
+                                               gene_cds_features, max_cds_len,
+                                               transcript_type)
                     gene = None
                 continue
+            ## no further processing if pseudogenes are not ought to be included
+            elif not cfg.include_pseudogenes and spline[2] == 'pseudogene':
+                if gene:
+                    # process previous gene
+                    save_gene_features(pandas_row_list, transcript, gene,
+                                       transcript_cds_features,
+                                       transcript_cds_length, gene_cds_features,
+                                       max_cds_len, transcript_type)
+                gene = None
+                continue
+
+            # pseudogenes are returned with type "gene" by this function
             feature_dict = spline2dict(spline, cfg.include_pseudogenes)
 
             # feature == gene
             if (feature_dict.get('type') == parent_path[-1]):
                 if gene:
                     # process previous gene
-                    upstream_gene = save_gene_features(
-                        feature_dict, pandas_row_list, transcript, gene,
-                        transcript_cds_features, transcript_cds_length,
-                        gene_cds_features, max_cds_len, upstream_gene,
-                        transcript_type)
-
-                if spline[0] != current_contig:
-                    upstream_gene = None
-                    current_contig = spline[0]
+                    save_gene_features(pandas_row_list, transcript, gene,
+                                       transcript_cds_features,
+                                       transcript_cds_length, gene_cds_features,
+                                       max_cds_len, transcript_type)
 
                 # init new gene
                 gene = feature_dict
                 max_cds_len = 0
                 gene_cds_features = []
                 transcript, cds = None, None
-
-            # no processing if pseudogenes are not included
-            elif not cfg.include_pseudogenes and spline[2] == 'pseudogene':
-                if gene:
-                    # process previous gene
-                    upstream_gene = save_gene_features(
-                        feature_dict, pandas_row_list, transcript, gene,
-                        transcript_cds_features, transcript_cds_length,
-                        gene_cds_features, max_cds_len, upstream_gene,
-                        transcript_type)
-                if spline[0] != current_contig:
-                    upstream_gene = None
-                    current_contig = spline[0]
-                gene = None
+                transcript_cds_features = []
+                transcript_cds_length = 0
 
             # feature == coding feature
             elif feature_dict.get('type') == parent_path[0]:
@@ -355,7 +394,7 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
                     continue
                 cds = feature_dict
                 cds['gene_id'] = gene.get('id')
-                if cds.get('gene_id') == cds.get('parent_id'):
+                """if cds.get('gene_id') == cds.get('parent_id'):
                     # no transcript features
                     if cds.get('length') > max_cds_len:
                         max_cds_len = cds.get('length')
@@ -373,7 +412,19 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
                         # use translational table of CDS feature is gene has default info
                         if gene.get('transl_table') == '1' and cds.get('transl_table') != '1':
                             gene['transl_table'] = cds.get('transl_table')
-
+                else:"""
+                if feature_dict.get('type') == 'mRNA':
+                    # mRNA features, i.e. transcripts, are the coding features
+                    # in the GFF; choose the longest mRNA per gene
+                    if transcript:
+                        if transcript.get('length') > feature_dict.get('length'):
+                            continue
+                    transcript = feature_dict
+                    transcript['gene_id'] = gene.get('id')
+                    transcript['coding_features'] = [transcript.get('id')]
+                    gene['coding_features'] = transcript.get('id')
+                    transcript['coding_coordindates'] = [(transcript.get('start'), transcript.get('end'))]
+                    gene['coding_coordindates'] = [(transcript.get('start'), transcript.get('end'))]
                 else:
                     # add to list of CDS for transcript
                     transcript_cds_features.append(cds)
@@ -386,6 +437,9 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
                 if feature_dict.get('type') == 'mRNA':
                     # process previous transcript
                     if transcript:
+                        # update the rows to be added to the gff data frame
+                        # if new transcript is longer;
+                        # also update gene's transcript id
                         if transcript_cds_length > max_cds_len:
                             max_cds_len = transcript_cds_length
                             gene_cds_features = replace_longest_transcript(
@@ -402,19 +456,21 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
                     continue
 
     if gene:
-        save_gene_features(
-            {}, pandas_row_list, transcript, gene, transcript_cds_features,
-            transcript_cds_length, gene_cds_features, max_cds_len, upstream_gene,
-            transcript_type)
+        save_gene_features(pandas_row_list, transcript, gene,
+                           transcript_cds_features, transcript_cds_length,
+                           gene_cds_features, max_cds_len, transcript_type)
 
     gff_df = pd.DataFrame(pandas_row_list)
     # if features don't have ID attribute, concatenate type and line number
     no_id = gff_df['id'].isnull()
     gff_df.loc[no_id, 'id'] = gff_df['type'] + '-' + gff_df.index.astype(str)
-    # append start coordinate to duplicate ids
+    # check for duplicate gene IDs
+    if gff_df.loc[gff_df['type'] == 'gene'].duplicated(subset='id', keep=False).any():
+        logging.error('Duplicate gene IDs detected. Please correct your input GFF.')
+        sys.exit(1)
+    # append line number to duplicate ids
     duplicate_index = gff_df.duplicated(subset='id', keep=False)
-    gff_df.loc[duplicate_index, 'id'] = gff_df['id'] + '-' + gff_df[
-        'start'].astype(str)
+    gff_df.loc[(duplicate_index) & (gff_df['type'] != 'gene'), 'id'] = gff_df['id'] + '-' + gff_df.index.astype(str)
 
     gff_df.set_index('id', inplace=True)
 
@@ -441,10 +497,10 @@ def set_gene_neighbours(gff_df):
 
 
 def process(cfg):
-    coding_type, transcript_type, parent_path = check_gff(cfg)
+    coding_type, transcript_type, parent_path, geneid_in_fasta = check_gff(cfg)
     gff_df = parse_file(cfg, coding_type, transcript_type, parent_path)
     set_gene_neighbours(gff_df)
-    match_fasta2id(cfg, gff_df)
+    match_fasta2id(cfg, gff_df, geneid_in_fasta)
 
     return gff_df
 
