@@ -30,42 +30,8 @@ import pandas as pd
 
 from . import checkInput
 
-def check_gff(cfg):
-
-    gene, transcript, exon, cds = None, None, None, None
-    features = {}
-    with open(cfg.gff_path, 'r') as gff_file:
-        for line in gff_file:
-            # skip comments
-            if line.startswith('#'):
-                continue
-            spline = line.strip().split('\t')
-            feature_dict = spline2dict(spline, cfg.include_pseudogenes)
-            if feature_dict.get('type') == 'gene':
-                # read only first gene
-                if gene:
-                    break
-                else:
-                    transcript, exon, cds = None, None, None
-                    features = {}
-                gene = feature_dict
-                features[gene.get('id')] = gene
-            elif feature_dict.get('type') in ['tRNA', 'rRNA', 'lnc_RNA', 'lncRNA', 'ncRNA']:
-                gene, transcript, exon, cds = None, None, None, None
-                features = {}
-            elif feature_dict.get('type') == 'mRNA':
-                transcript = feature_dict
-                features[transcript.get('id')] = transcript
-            elif feature_dict.get('type') == 'exon':
-                exon = feature_dict
-                features[exon.get('id')] = exon
-            elif feature_dict.get('type') == 'CDS':
-                cds = feature_dict
-                features[cds.get('id')] = cds
-            else:
-                continue
-
-    transcript_type = 'gene' # feature type of which to use in the protein FASTA
+def assess_parent_path(features, gene, transcript, exon, cds):
+    transcript_type = 'gene'  # feature type of which to use in the protein FASTA
     if transcript:
         transcript_avail = True
         transcript_type = 'mRNA'
@@ -94,40 +60,82 @@ def check_gff(cfg):
         parent = features.get(parent).get('parent_id')
         parent_path.append(features.get(parent).get('type'))
 
+    return coding_type, transcript_type, parent_path
+
+def get_trancsript_type(cfg, features, gene):
+    # if proteins will not be extracted by taxaminer
+    # check of which feature type the ID is used in the protein FASTA
     transcript_type = None
-    if not cfg.extract_proteins:
-        # if proteins will not be extracted by taxaminer
-        # check of which feature type the ID is used in the protein FASTA
-        with open(cfg.proteins_path, 'r') as p_file:
-            for line in p_file:
-                if line.startswith('>'):
-                    protein_id = line.strip().split('|')[0][1:]
-                    for id, feat in features.items():
-                        if id == protein_id:
-                            transcript_type = feat.get('type')
-                            break
-                        elif feat.get('add_attrs').get('ID') == protein_id:
-                            transcript_type = feat.get('type')
-                            break
-                    # headers of the RefSeq representative protein files contain
-                    # the gene ID and are structured as the following:
-                    # >mRNA ID|gene ID|length
-                    # -> match to gene ID in case not the same isoform was chosen
-                    # for a genes
-                    if line.strip().split('|')[1] == gene['id']:
-                        geneid_in_fasta = True
-                    else:
-                        geneid_in_fasta = False
-
-                else:
-                    if transcript_type:
+    with open(cfg.proteins_path, 'r') as p_file:
+        for line in p_file:
+            if line.startswith('>'):
+                protein_id = line.strip().split('|')[0][1:]
+                # assess the feature whose ID is given in the first position
+                # of the header in the fasta file
+                for id, feat in features.items():
+                    if id == protein_id:
+                        transcript_type = feat.get('type')
                         break
-                    continue
+                    elif feat.get('add_attrs').get('ID') == protein_id:
+                        transcript_type = feat.get('type')
+                        break
+            else:
+                if transcript_type:
+                    break
+                continue
 
-    return coding_type, transcript_type, parent_path, geneid_in_fasta
+    return transcript_type
 
 
-def match_fasta2id(cfg, gff_df, geneid_in_fasta):
+def check_gff(cfg):
+
+    gene, transcript, exon, cds = None, None, None, None
+    features = {}
+    var_list = []
+    with open(cfg.gff_path, 'r') as gff_file:
+        for line in gff_file:
+            # skip comments
+            if line.startswith('#'):
+                continue
+            spline = line.strip().split('\t')
+            feature_dict = spline2dict(spline, cfg.include_pseudogenes)
+            if feature_dict.get('type') == 'gene':
+                # read only first gene
+                if gene:
+                    coding_type, transcript_type, parent_path = assess_parent_path(
+                        features, gene, transcript, exon, cds)
+                    if not cfg.extract_proteins:
+                        transcript_type = get_trancsript_type(
+                            cfg, features, gene)
+                    if var_list:
+                        if (var_list == [coding_type, transcript_type, parent_path])\
+                                and (not cfg.extract_proteins and transcript_type):
+                            break
+                    var_list = [coding_type, transcript_type, parent_path]
+                else:
+                    transcript, exon, cds = None, None, None
+                    features = {}
+                gene = feature_dict
+                features[gene.get('id')] = gene
+            elif feature_dict.get('type') in ['tRNA', 'rRNA', 'lnc_RNA', 'lncRNA', 'ncRNA']:
+                gene, transcript, exon, cds = None, None, None, None
+                features = {}
+            elif feature_dict.get('type') == 'mRNA':
+                transcript = feature_dict
+                features[transcript.get('id')] = transcript
+            elif feature_dict.get('type') == 'exon':
+                exon = feature_dict
+                features[exon.get('id')] = exon
+            elif feature_dict.get('type') == 'CDS':
+                cds = feature_dict
+                features[cds.get('id')] = cds
+            else:
+                continue
+
+    return coding_type, transcript_type, parent_path
+
+
+def match_fasta2id(cfg, gff_df):
     """ Match the header of a precomputed protein FASTA file to gene ID
 
     :param geneid_in_fasta:
@@ -141,24 +149,35 @@ def match_fasta2id(cfg, gff_df, geneid_in_fasta):
         with open(cfg.proteins_path, 'r') as p_file:
             for line in p_file:
                 if line.startswith('>'):
-                    if geneid_in_fasta:
-                        gene_id = line.strip().split('|')[1]
-                        # diamond uses everything until first whitespace as ID
-                        header_dict[gene_id] = line[1:].strip().split()[0]
-                    else:
-                        protein_id = line.strip().split('|')[0][1:]
-                        # diamond uses everything until first whitespace as ID
-                        header_dict[protein_id] = line[1:].strip().split()[0]
+                    protein_id = line.strip().split('|')[0][1:]
+                    # diamond uses everything until first whitespace as ID
+                    header_dict[protein_id] = line[1:].strip().split()[0]
                 else:
                     continue
-        if geneid_in_fasta:
-            # use gene ID in header of RefSeq representative protein files
-            # (i.e., structure of header =  >.*|<gene ID>|.*
-            gff_df['fasta_header'] = gff_df.index.map(header_dict)
-        else:
-            # if protein was passed by user, 'transcript_id' resembles the id
-            # of the feature that denotes the header in the fasta file
-            gff_df['fasta_header'] = gff_df['transcript_id'].map(header_dict)
+        # if protein was passed by user, 'transcript_id' resembles the id
+        # of the feature that denotes the header in the fasta file
+        gff_df['fasta_header'] = gff_df['transcript_id'].map(header_dict)
+        missing_header = gff_df.loc[gff_df['type'] == 'gene', 'fasta_header'].isna()
+        if missing_header.any(): # and geneid_in_fasta:
+            if gff_df.loc[gff_df['type'] == 'gene'][missing_header].shape[0] == gff_df.loc[gff_df['type'] == 'gene'].shape[0]:
+                # if not any gene was mapped to a fasta header
+                logging.error(
+                    f"Unable to map the gene IDs to the header in the protein "
+                    f"FASTA file. Header must start with ID of either the gene,"
+                    f"the transcript or the coding sequence in the GFF.")
+                sys.exit(1)
+            else:
+                if gff_df.loc[gff_df['type'] == 'gene'][~missing_header].shape[0] == len(header_dict):
+                    # if every fasta file header was mapped
+                    logging.info(f"All headers of the fasta file was mapped to "
+                                 f"a gene ID. Additional {gff_df.loc[gff_df['type'] == 'gene'][missing_header].shape[0]} "
+                                 f"genes remain without a protein sequence.")
+                else:
+                    logging.info(
+                        f"Unable to map the following "
+                        f"{gff_df.loc[gff_df['type'] == 'gene'][missing_header].shape[0]} "
+                        f"gene IDs to the headers in the protein FASTA file:\n"
+                        f"{gff_df.loc[gff_df['type'] == 'gene'][missing_header].index.to_list()}")
     else:
         gff_df['fasta_header'] = gff_df['transcript_id']
 
@@ -281,7 +300,7 @@ def save_gene_features(pandas_row_list, transcript, gene,
                        gene_cds_features, max_cds_len, transcript_type):
     # process previous gene
     if transcript:
-        if transcript_cds_length > max_cds_len:
+        if transcript_cds_length >= max_cds_len:
             gene_cds_features = replace_longest_transcript(
                 gene, transcript, transcript_type, transcript_cds_features)
     if gene:
@@ -417,7 +436,7 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
                     # mRNA features, i.e. transcripts, are the coding features
                     # in the GFF; choose the longest mRNA per gene
                     if transcript:
-                        if transcript.get('length') > feature_dict.get('length'):
+                        if transcript.get('length') >= feature_dict.get('length'):
                             continue
                     transcript = feature_dict
                     transcript['gene_id'] = gene.get('id')
@@ -440,7 +459,7 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
                         # update the rows to be added to the gff data frame
                         # if new transcript is longer;
                         # also update gene's transcript id
-                        if transcript_cds_length > max_cds_len:
+                        if transcript_cds_length >= max_cds_len:
                             max_cds_len = transcript_cds_length
                             gene_cds_features = replace_longest_transcript(
                                 gene, transcript, transcript_type,
@@ -497,10 +516,10 @@ def set_gene_neighbours(gff_df):
 
 
 def process(cfg):
-    coding_type, transcript_type, parent_path, geneid_in_fasta = check_gff(cfg)
+    coding_type, transcript_type, parent_path = check_gff(cfg)
     gff_df = parse_file(cfg, coding_type, transcript_type, parent_path)
     set_gene_neighbours(gff_df)
-    match_fasta2id(cfg, gff_df, geneid_in_fasta)
+    match_fasta2id(cfg, gff_df)
 
     return gff_df
 
