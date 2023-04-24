@@ -9,7 +9,6 @@ computed and makes sanity checks for input data
 Expects path to config file
 """
 __author__ = "Freya Arthen"
-__version__ = "0.6.0"
 
 import pathlib # to create directories
 import yaml # read config file
@@ -46,6 +45,7 @@ class Config:
         self.include_coverage = cfg_dict.get('include_coverage')
 
         self.proteins_path = cfg_dict.get('proteins_path')
+        self.prot2gene_mapper = cfg_dict.get('prot2gene_mapper')
         self.extract_proteins = cfg_dict.get('extract_proteins')
         self.diamond_sensitivity = cfg_dict.get('diamond_sensitivity')
         self.assignment_mode = cfg_dict.get('assignment_mode')
@@ -329,8 +329,7 @@ def set_config_defaults(config_obj, TAX_DB, db_dir):
     config_vars['taxon_id'] = int(set_default(config_obj, 'taxon_id'))
     config_vars['taxon_id_rank'] = TAX_DB.taxid2rank[config_vars['taxon_id']]
     config_vars['taxon_name'] = set_default(config_obj, 'taxon_name',
-                                            TAX_DB.taxid2name[
-                                                config_vars['taxon_id']])
+                                            f"\"{TAX_DB.taxid2name[config_vars['taxon_id']]}\"")
 
     gff_filename = '.'.join(config_vars['gff_path'].split('/')[-1].split('.')[:-1])
     config_vars['gff_ta_path'] = set_default(config_obj, 'gff_ta_path',
@@ -347,6 +346,8 @@ def set_config_defaults(config_obj, TAX_DB, db_dir):
     config_vars['proteins_path'] = set_default(config_obj, 'proteins_path',
                                                config_vars.get(
                                                    'output_path') + 'proteins.faa')
+    config_vars['prot2gene_mapper'] = set_default(config_obj, 'prot2gene_mapper',
+                                                   False)
     config_vars['extract_proteins'] = set_default(config_obj,
                                                   'extract_proteins',
                                                   check_file_inexistence(
