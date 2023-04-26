@@ -68,7 +68,7 @@ def get_trancsript_type(cfg, features, gene):
     with open(cfg.proteins_path, 'r') as p_file:
         for line in p_file:
             if line.startswith('>'):
-                protein_id = line.strip().split('|')[0][1:]
+                protein_id = line.strip().split()[0].split('|')[0][1:]
                 # assess the feature whose ID is given in the first position
                 # of the header in the fasta file
                 for id, feat in features.items():
@@ -86,7 +86,7 @@ def get_trancsript_type(cfg, features, gene):
     return transcript_type
 
 
-def check_gff(cfg):
+def check_gff(cfg, skipped_rnas):
 
     gene, transcript, exon, cds = None, None, None, None
     features = {}
@@ -107,16 +107,22 @@ def check_gff(cfg):
                         transcript_type = get_trancsript_type(
                             cfg, features, gene)
                     if var_list:
-                        if (var_list == [coding_type, transcript_type, parent_path])\
-                                and (not cfg.extract_proteins and transcript_type):
-                            break
+                        # if for two genes in a row the parsing rule is the same
+                        # accept it
+                        if (var_list == [coding_type, transcript_type, parent_path]):
+                            # if proteins are being extracted by taxaminer, the
+                            # transcript type does have to be specified
+                            if cfg.extract_proteins and not transcript_type:
+                                continue
+                            else:
+                                break
                     var_list = [coding_type, transcript_type, parent_path]
                 else:
                     transcript, exon, cds = None, None, None
                     features = {}
                 gene = feature_dict
                 features[gene.get('id')] = gene
-            elif feature_dict.get('type') in ['tRNA', 'rRNA', 'lnc_RNA', 'lncRNA', 'ncRNA']:
+            elif feature_dict.get('type') in skipped_rnas:
                 gene, transcript, exon, cds = None, None, None, None
                 features = {}
             elif feature_dict.get('type') == 'mRNA':
@@ -148,7 +154,7 @@ def match_fasta2id(cfg, gff_df):
         if cfg.prot2gene_mapper:
             # file that maps protein fasta file headers to gene IDs
             #TODO: change the delimiter
-            prot2gene = pd.read_csv(cfg.prot2gene_mapper, sep=' ',
+            prot2gene = pd.read_csv(cfg.prot2gene_mapper, sep='\t',
                                     names=['fasta_header', 'g_name'],
                                     index_col='g_name')
 
@@ -160,7 +166,7 @@ def match_fasta2id(cfg, gff_df):
             with open(cfg.proteins_path, 'r') as p_file:
                 for line in p_file:
                     if line.startswith('>'):
-                        protein_id = line.strip().split('|')[0][1:]
+                        protein_id = line.strip().split()[0].split('|')[0][1:]
                         # diamond uses everything until first whitespace as ID
                         header_dict[protein_id] = line[1:].strip().split()[0]
                     else:
@@ -293,6 +299,7 @@ def replace_longest_transcript(gene, transcript, transcript_type, transcript_cds
         if transcript_type == transcript.get('type'):
             gene['transcript_id'] = transcript.get('id')
         else:
+            # if not transcript the coding feature is transcript ID
             gene['transcript_id'] = transcript_cds_features[0].get('add_attrs').get('ID')
     else:
         gene['transcript_id'] = transcript.get('id')
@@ -328,7 +335,11 @@ def save_gene_features(pandas_row_list, transcript, gene,
                                 transcript_cds_features]
             gene['coding_features'] = cds_ids
             gene['coding_coordindates'] = cds_coordindates
-            gene['transcript_id'] = gene.get('id')
+            if transcript_type == 'gene':
+                gene['transcript_id'] = gene.get('id')
+            else:
+                gene['transcript_id'] = transcript_cds_features[0].get(
+                    'add_attrs').get('ID')
             gene_cds_features = transcript_cds_features
         if gene.get('coding_features'):
             pandas_row_list.append(gene)
@@ -341,7 +352,7 @@ def save_gene_features(pandas_row_list, transcript, gene,
 
 
 
-def parse_file(cfg, coding_type, transcript_type, parent_path):
+def parse_file(cfg, coding_type, transcript_type, parent_path, skipped_rnas):
     """
 
     :param coding_type:
@@ -372,7 +383,9 @@ def parse_file(cfg, coding_type, transcript_type, parent_path):
             # only relevant lines will be further processed
             ## type in parent_path or a pseudogene
             if (not spline[2] in parent_path) and (spline[2] != 'pseudogene'):
-                if spline[2] in ['tRNA', 'rRNA', 'lnc_RNA', 'lncRNA', 'ncRNA']:
+                # RNA features to skip since not protein coding
+                # TODO: add non-coding RNAs to analysis?
+                if spline[2] in skipped_rnas:
                     # only process protein coding genes
                     # if gene:
                     #     if (gene['id'] == feature_dict['gene_id']):
@@ -540,8 +553,14 @@ def set_gene_neighbours(gff_df):
 
 
 def process(cfg):
-    coding_type, transcript_type, parent_path = check_gff(cfg)
-    gff_df = parse_file(cfg, coding_type, transcript_type, parent_path)
+    skipped_rnas = ['antisense_RNA', 'guide_RNA', 'lnc_RNA', 'lncRNA', 'miRNA',
+                    'ncRNA', 'piRNA', 'pseudogenic_rRNA', 'pseudogenic_tRNA',
+                    'RNase_MRP_RNA', 'RNase_P_RNA',  'rRNA',  'snoRNA',
+                    'SRP_RNA', 'scRNA', 'snRNA', 'telomerase_RNA', 'tRNA',
+                    'tmRNA', 'vault_RNA', 'Y_RNA']
+
+    coding_type, transcript_type, parent_path = check_gff(cfg, skipped_rnas)
+    gff_df = parse_file(cfg, coding_type, transcript_type, parent_path, skipped_rnas)
     set_gene_neighbours(gff_df)
     gff_df = match_fasta2id(cfg, gff_df)
 
