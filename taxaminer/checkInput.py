@@ -47,6 +47,7 @@ class Config:
         self.proteins_path = cfg_dict.get('proteins_path')
         self.prot2gene_mapper = cfg_dict.get('prot2gene_mapper')
         self.extract_proteins = cfg_dict.get('extract_proteins')
+        self.use_phase = cfg_dict.get('use_phase')
         self.diamond_sensitivity = cfg_dict.get('diamond_sensitivity')
         self.assignment_mode = cfg_dict.get('assignment_mode')
         self.quick_mode_search_rank = cfg_dict.get('quick_mode_search_rank')
@@ -354,6 +355,7 @@ def set_config_defaults(config_obj, TAX_DB, db_dir):
                                                       config_vars.get(
                                                           'proteins_path'),
                                                       'AND'))
+    config_vars['use_phase'] = set_default(config_obj, 'use_phase', False)
     config_vars['diamond_sensitivity'] = set_default(config_obj, 'diamond_sensitivity',
                                                  'sensitive')
     config_vars['assignment_mode'] = set_default(config_obj, 'assignment_mode',

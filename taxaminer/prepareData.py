@@ -28,7 +28,7 @@ from Bio import Seq
 from . import checkInput
 
 
-def set_seqs(gff_df, gene, contig_seq, proteins_file):
+def set_seqs(cfg, gff_df, gene, contig_seq, proteins_file):
     """Extract nuc sequences and translate to AA for genes on contig.
 
     Use coordinates of longest transcript in gene Feature object
@@ -47,13 +47,20 @@ def set_seqs(gff_df, gene, contig_seq, proteins_file):
         return
 
     seq = ''
-    for coding_feature in gene.coding_features:
+
+    # sort coding feature by start coordinate
+    sorted_coding_features = sorted(gene.coding_features, key=lambda cds: gff_df.loc[cds].start)
+    for coding_feature in sorted_coding_features:
         cds = gff_df.loc[coding_feature]
-        # on reverse strand CDS needs to be reverse complemented before concatenated
-        # if gene.strand == '-':
-        #     seq += str(Seq.Seq(contig_seq[cds.start-1:cds.end]).reverse_complement())
-        # else:
-        seq += str(Seq.Seq(contig_seq[cds.start-1:cds.end]))
+        if not cfg.use_phase:
+            # per default do not use the phase info
+            seq += str(Seq.Seq(contig_seq[cds.start-1:cds.end]))
+        else:
+            if gene.strand == '-':
+                seq += str(Seq.Seq(
+                    contig_seq[(cds.start - 1):(cds.end- (int(cds.phase) if cds.phase != '.' else 0))]))
+            else:
+                seq += str(Seq.Seq(contig_seq[(cds.start - 1 + (int(cds.phase) if cds.phase != '.' else 0)):(cds.end)]))
 
     if gene.strand == '-':
         seq = str(Seq.Seq(seq).reverse_complement())
@@ -103,7 +110,7 @@ def extract_seq(cfg, gff_df):
                     # False if no genes in contig dict (geneless contigs)
                     if not gff_df.loc[(gff_df['scaffold'] == current_contig) & (gff_df['type'] == "gene")].empty:
                         genes = gff_df.loc[(gff_df['scaffold'] == current_contig) & (gff_df['type'] == "gene")]
-                        genes.apply(lambda row: set_seqs(gff_df, row, contig_seq, proteins_file), axis=1)
+                        genes.apply(lambda row: set_seqs(cfg, gff_df, row, contig_seq, proteins_file), axis=1)
                     # retrieve ID from current contig
                     current_contig = line.strip().lstrip(">").split()[0]
                     contig_seq = ''
@@ -112,7 +119,7 @@ def extract_seq(cfg, gff_df):
             # add genes from last contig
             if not gff_df.loc[(gff_df['scaffold'] == current_contig) & (gff_df['type'] == "gene")].empty:
                 genes = gff_df.loc[(gff_df['scaffold'] == current_contig) & (gff_df['type'] == "gene")]
-                genes.apply(lambda row: set_seqs(gff_df, row, contig_seq, proteins_file), axis=1)
+                genes.apply(lambda row: set_seqs(cfg, gff_df, row, contig_seq, proteins_file), axis=1)
 
 
 def generate_fasta(cfg, gff_df):

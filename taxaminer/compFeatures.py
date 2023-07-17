@@ -1560,7 +1560,7 @@ def init_contig_and_genes(gff_df, a, cfg, contig_id, raw_seq, proteins_file,
         genes = gff_df[contig_genes]
         genes.apply(lambda row: init_gene(a, row), axis=1)
         if proteins_file:
-            genes.apply(lambda row: prepareData.set_seqs(gff_df, row, raw_seq, proteins_file), axis=1)
+            genes.apply(lambda row: prepareData.set_seqs(cfg, gff_df, row, raw_seq, proteins_file), axis=1)
     else:
         # contig is geneless
         # a.remove_contig(tmp_contig_name)     #TODO: remove from list?!?!
