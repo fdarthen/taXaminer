@@ -255,6 +255,7 @@ def create_3D_plot(cfg, all_data_df, pca_obj, variables, pca_coordinates, query_
     # this enables to stack the data points in the desired order in the plot
     # i.e. putting the less interesting (background) data points with query assignment in the background
 
+    logging.debug('>>>loading traces')
     fig = go.Figure()
     for label in traces_reordered:
         labels = plot_df.loc[plot_df['plot_label'] == label, :]
@@ -344,6 +345,7 @@ def create_3D_plot(cfg, all_data_df, pca_obj, variables, pca_coordinates, query_
 
     coordinates_contribution = coordinates_contribution.join(colour_lengths)
 
+    logging.debug('>>>loading contribution of variables')
     for variable in coordinates_contribution.iterrows():
         x = [variable[1]['center'][0], variable[1]['loading'][0] * factor]
         y = [variable[1]['center'][1], variable[1]['loading'][1] * factor]
@@ -376,11 +378,11 @@ def create_3D_plot(cfg, all_data_df, pca_obj, variables, pca_coordinates, query_
     return plot_df
 
 
-def create_krona_plot(cfg, data):
-    krona_df = data['taxon_assignmentID']
-    krona_df.to_csv(cfg.output_path + 'tmp/krona.tsv', sep='\t', index=True,
-                    index_label='#g_name', header=['taxID'])
-    cmd_krona = f'{cfg.krona} {cfg.output_path}tmp/krona.tsv -o {cfg.output_path}taxonomic_assignment/krona.html'
+def create_taxsun_input(cfg, data):
+    taxsun_df = data['taxon_assignmentID']
+    taxsun_df.to_csv(cfg.output_path + 'taxonomic_assignment/taxsun.tsv', sep='\t', index=True,
+                     index_label='#g_name', header=['taxID'])
+    cmd_krona = f'{cfg.krona} {cfg.output_path}taxonomic_assignment/taxsun.tsv -o {cfg.output_path}taxonomic_assignment/krona.html'
     out_krona = subprocess.run([cmd_krona], shell=True, capture_output=True)
     if out_krona.returncode != 0:
         logging.error(f'creation of krona plot failed:\n{out_krona}')
@@ -405,12 +407,15 @@ def create_plots(cfg, genes, pca_obj, variables, pca_coordinates,
     global TAX_DB
     TAX_DB = tax_db
 
+
     all_data_df = gene_data2panda(cfg, genes, pca_coordinates)
     create_gene_table_taxon_assignment(cfg, gff_df, all_data_df)
+    logging.debug('>>creating 3D plot')
     create_3D_plot(cfg, all_data_df, pca_obj, variables, pca_coordinates, query_label)
     #TODO: krona optional
     # if cfg.create_krona:
-    create_krona_plot(cfg, all_data_df)
+    logging.debug('>>creating taxSun')
+    create_taxsun_input(cfg, all_data_df)
 
     return all_data_df
 
