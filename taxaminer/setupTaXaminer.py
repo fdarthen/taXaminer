@@ -122,11 +122,11 @@ def setup_conda():
 
     # install diamond
     print("installing diamond")
-    install_diamond = subprocess.run(["conda install -c bioconda diamond -y"],
+    install_diamond = subprocess.run(['conda install -c bioconda -c conda-forge "diamond>=2.1.7" -y'],
                                      shell=True, capture_output=True)
     if install_diamond.returncode != 0:
         print("Installation of diamond failed. Please try again "
-                        "by running\n\nconda install -c bioconda diamond\n")
+                        'by running\n\nconda install -c bioconda "diamond>=2.1.7"\n')
     cmd_dict["diamond"] = "diamond"
 
     # install Krona tools
@@ -283,8 +283,6 @@ def main():
             # shutil.rmtree(tool_path)
         cmd_dict = setup_locally(tool_path)
         check_executable(cmd_dict)
-
-    #TODO: Krona: add update_taxonomy
 
     if args.database:
         print("setting up database")
