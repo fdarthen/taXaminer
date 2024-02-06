@@ -4,3 +4,6 @@ output_path: "./report/"
 taxon_id: "107806"
 bam_path_1: "mapping.bam"
 database_path: "test_db.dmnd"
+extract_proteins: True
+target_exclude: False
+force: True

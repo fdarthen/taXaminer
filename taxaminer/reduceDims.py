@@ -7,21 +7,11 @@
 Expects path to config file
 """
 __author__ = "Freya Arthen"
-__version__ = "0.6.0"
 
-import numpy as np
-
-from . import classes
 from . import checkInput
 
-# import pathlib # to create directories
-# import operator # for quick comparisons
-# import scipy.stats as stats # for Pearson's R
-# from itertools import product as itertools_product # to generate all possible oligonucleotides from base alphabet
-# from Bio.Seq import Seq as BioPython_Seq # to count oligonucleotides (also overlapping ones! not implemented in normal count)
-
 import numpy as np
-import sys  # parse command line arguments
+import sys
 import logging
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
@@ -115,7 +105,7 @@ def create_2d_biplot(cfg, pca, components, features, plot_template):
     # scaling of the loading to the data
     coordinates_as_tuples = [(row[0], row[1], row[2]) for row in components[:, :3]]
     farthest_point = farthest((0, 0, 0), coordinates_as_tuples)
-    factor = max([np.abs(farthest_point[i]) / max(np.abs(loadings[:, i])) for i in range(len(farthest_point))])
+    factor = min([np.abs(farthest_point[i]) / max(np.abs(loadings[:, i]))*2 for i in range(len(farthest_point))])
 
     biplot = go.Figure()
     biplot.add_trace(go.Scatter(
@@ -218,12 +208,13 @@ def create_3d_biplot(cfg, pca, components, features, plot_template):
         scene=dict(
             xaxis_title="PC 1",
             yaxis_title="PC 2",
-            zaxis_title="PC 2"
+            zaxis_title="PC 3"
         ),
         template=plot_template
     )
 
     biplot.write_html(f"{cfg.output_path}PCA/biplot3d.html")
+
 
 def write_contrib_report(cfg, pca, variables):
 
@@ -256,6 +247,7 @@ def compute_umap(data):
 
 
 def compute_pca(cfg):
+
     gene_info = pd.read_csv(f'{cfg.output_path}gene_info/imputed_gene_table.csv',
                             header=0, index_col=0)
 
@@ -317,8 +309,6 @@ def compute_pca(cfg):
     # keep working only with the genes without NaNs (complete rows / cases)
     data = data.dropna()
 
-    # TODO: filter coverage modes
-
     # :::::::::::::::::::: PCA ::::::::::::::::::::::::::::::
 
     scaled_data = StandardScaler().fit_transform(data.iloc[:, 1:])
@@ -348,7 +338,6 @@ def compute_pca(cfg):
     create_scree_plot(cfg, pca, plot_template)
     create_bar_plot(cfg, pca, plot_template)
     create_3d_biplot(cfg, pca, components, data.columns[1:], plot_template)
-
     write_contrib_report(cfg, pca, data.columns[1:])
     write_pca_summary(cfg, pca, data.columns[1:])
 

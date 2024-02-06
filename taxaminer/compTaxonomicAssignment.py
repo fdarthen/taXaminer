@@ -5,25 +5,23 @@
 Expects processed config file
 """
 __author__ = "Freya Arthen"
-__version__ = "0.6.0"
 
-import numpy as np
 
 from . import checkInput
 
 import taxopy
 import sys
-import csv
 import pathlib
 import subprocess
 import logging
 import pandas as pd
+import multiprocessing as mp
 
 ###############################################################################
 ############################ HELPER FUNCTIONS #################################
 ###############################################################################
 
-def get_id_for_rank_of_species(target_id, rank):
+def get_id_for_rank_of_species(target_id, rank, missing_taxids, TAX_DB):
     """
     Returns ID of taxon at given rank for given taxon ID.
 
@@ -33,8 +31,9 @@ def get_id_for_rank_of_species(target_id, rank):
 
     Returns:
        (int) NCBI ID of taxon at the given rank for given taxon ID
+       :param TAX_DB:
      """
-    query_taxon = init_taxopyon(target_id)
+    query_taxon = init_taxopyon(target_id, missing_taxids, TAX_DB)
     query_ranks = query_taxon.rank_name_dictionary
     rank_of_interest = query_ranks.get(rank)
     # get ID for the specific class (function taxopy.taxid_from_name() might get multiple IDs because of homonyms)
@@ -46,7 +45,7 @@ def get_id_for_rank_of_species(target_id, rank):
         return None
 
 
-def get_children_ids(parent):
+def get_children_ids(TAX_DB, parent):
     """
     Returns list of taxon IDs which are children of given taxon
 
@@ -55,14 +54,17 @@ def get_children_ids(parent):
 
     Returns:
         (list) list of taxon IDs which are children of given taxon
+        :param TAX_DB:
     """
     # taxid2parent: dict with key = child, value = parent
     return [key for key in TAX_DB.taxid2parent.keys() if
             TAX_DB.taxid2parent[key] == parent]
 
 
-def init_taxopyon(taxid):
+def init_taxopyon(taxid, missing_taxids, TAX_DB):
     """ init taxopy taxon object
+    :param TAX_DB:
+    :param missing_taxids:
     """
 
     if ';LCA:' in str(taxid):
@@ -84,7 +86,7 @@ def init_taxopyon(taxid):
 ######################### PLOT LABEL COMPUTATION ##############################
 ###############################################################################
 
-def get_children_for_label(taxa, labelID):
+def get_children_for_label(taxa, labelID, missing_taxids, TAX_DB):
     """
     gets all descendants of label which are in lineage of one of the taxa the label represents
     also counts how many of these descendants are already in list of current labels
@@ -94,11 +96,12 @@ def get_children_for_label(taxa, labelID):
       labelID:
 
     Returns:
+    :param TAX_DB:
 
     """
     children = {}
     for taxID in taxa:
-        taxon = init_taxopyon(taxID)
+        taxon = init_taxopyon(taxID, missing_taxids, TAX_DB)
         child = taxon.taxid_lineage[max(taxon.taxid_lineage.index(labelID) - 1,
                                         0)]  # max 0 if taxon is end of lineage
         if child in children:
@@ -109,18 +112,19 @@ def get_children_for_label(taxa, labelID):
     return children
 
 
-def merge_assignments_at_rank(assignments_df, rank):
+def merge_assignments_at_rank(assignments_df, rank, missing_taxids, TAX_DB):
     """
     Merge taxonomic assignments at given rank.
     Args:
       genes(dict): dictionary of genes {g_name: gene object}
       rank(str): rank at which to merge all taxonomic assignments at
+      :param TAX_DB:
     """
 
     for assignmentID in assignments_df['taxon_assignmentID'].dropna().unique():
         genes_w_assignment = (
                     assignments_df['taxon_assignmentID'] == assignmentID)
-        taxon = init_taxopyon(assignmentID)
+        taxon = init_taxopyon(assignmentID, missing_taxids, TAX_DB)
         ranks = taxon.rank_name_dictionary
         merger_rank = ranks.get(rank)
         if merger_rank:
@@ -131,30 +135,33 @@ def merge_assignments_at_rank(assignments_df, rank):
             assignments_df.loc[genes_w_assignment, 'plot_labelID'] = assignments_df.loc[genes_w_assignment, 'taxon_assignmentID']
 
 
-def merge_assignments_at_id(assignments_df, ids):
+def merge_assignments_at_id(assignments_df, ids, missing_taxids, TAX_DB):
     """
     Merge taxonomic assignments at given NCBI taxon IDs.
 
     Args:
       assignments_df(dict): dictionary of genes {g_name: gene object}
       ids(int,list): list or int of taxon ID(s) at which to merge
+      :param TAX_DB:
     """
 
     if type(ids) != list:
         ids = [ids]
 
     for assignmentID in assignments_df['taxon_assignmentID'].dropna().unique():
-        taxon = init_taxopyon(assignmentID)
+        id_merger_taxon = None
+        taxon = init_taxopyon(assignmentID, missing_taxids, TAX_DB)
         lineage = taxon.taxid_lineage
         for id in ids:
             if id in lineage:
-                id_merger_taxon = init_taxopyon(id)
+                id_merger_taxon = init_taxopyon(id, missing_taxids, TAX_DB)
                 lineage = id_merger_taxon.taxid_lineage
-        genes_w_assignment = (assignments_df['taxon_assignmentID'] == assignmentID)
-        assignments_df.loc[genes_w_assignment, 'plot_label'] = id_merger_taxon.name
-        assignments_df.loc[genes_w_assignment, 'plot_labelID'] = id_merger_taxon.taxid
+        if id_merger_taxon:        
+            genes_w_assignment = (assignments_df['taxon_assignmentID'] == assignmentID)
+            assignments_df.loc[genes_w_assignment, 'plot_label'] = id_merger_taxon.name
+            assignments_df.loc[genes_w_assignment, 'plot_labelID'] = id_merger_taxon.taxid
 
-def rank_sorted_taxonids(ids):
+def rank_sorted_taxonids(ids, missing_taxids, TAX_DB):
 
     # use heuristic:
     # sort by length of the lineage (shortest first)
@@ -164,7 +171,7 @@ def rank_sorted_taxonids(ids):
     for rank in ['species', 'genus', 'family', 'order', 'class',
                  'phylum', 'kingdom', 'superkingdom']:
         for id in ids:
-            taxon = init_taxopyon(id)
+            taxon = init_taxopyon(id, missing_taxids, TAX_DB)
             if rank in taxon.rank_name_dictionary:
                 sorted_ids.append(id)
                 delete_ids.append(id)
@@ -176,7 +183,7 @@ def rank_sorted_taxonids(ids):
 
 
 
-def iterative_merging_top(assignments_df, num_groups_plot):
+def iterative_merging_top(assignments_df, num_groups_plot, missing_taxids, TAX_DB):
     """
     identify at which rank in query lineage to merge best
 
@@ -185,38 +192,41 @@ def iterative_merging_top(assignments_df, num_groups_plot):
       num_groups_plot:
 
     Returns:
+    :param TAX_DB:
+    :param missing_taxids:
 
     """
 
     unlabeled_genes = assignments_df.loc[assignments_df['plot_label'].isnull()]
     # taxa that have this label; label : set(taxa)
-    labelID_taxa = {1: set(unlabeled_genes['taxon_assignmentID'].dropna().unique())}
-
+    labelID_taxa = {1: set(unlabeled_genes['taxon_assignmentID'].dropna().unique().astype(int))}
 
     update_dict = {'nonempty-dummy'}
     while update_dict:
         update_dict = {}
         del_dict_keys = set()
         remaining_labels_num = num_groups_plot - len(labelID_taxa)
-        rank_sorted_labelIDs = rank_sorted_taxonids(labelID_taxa.keys())
+        rank_sorted_labelIDs = rank_sorted_taxonids(labelID_taxa.keys(), missing_taxids, TAX_DB)
         for labelID in rank_sorted_labelIDs:
             taxa = labelID_taxa.get(labelID)
             if len(taxa) >= 2:
                 lca_candidates = []
                 for taxon in taxa:
-                    lca_candidates.append(init_taxopyon(taxon))
+                    lca_candidates.append(
+                        init_taxopyon(taxon, missing_taxids, TAX_DB))
                 lca = taxopy.find_lca(lca_candidates, TAX_DB)
                 if lca.taxid != labelID:  # if it is possible to find a more specific label than the current one with the lca
                     del_dict_keys.add(labelID)
                     update_dict[lca.taxid] = taxa
                 else:
                     # get all children for label that are in list taxa
-                    children = get_children_for_label(taxa, labelID)
+                    children = get_children_for_label(taxa, labelID,
+                                                      missing_taxids, TAX_DB)
                     existing_labels = len(children.keys()) - len(
                         list(set(set(children.keys()) - labelID_taxa.keys())))
 
                     # check if number of new labels (= num of children - labels that are already in lablels)
-                    # fits in remainung number of possible new labels
+                    # fits in remaining number of possible new labels
                     if len(children) - existing_labels <= remaining_labels_num:
                         update_dict.update(children)
                         del_dict_keys.add(labelID)
@@ -238,14 +248,17 @@ def iterative_merging_top(assignments_df, num_groups_plot):
             for taxon in taxa:
                 taxid2label[taxon] = labelID
 
-    assignments_df['plot_label'] = assignments_df.apply(
-        lambda row: TAX_DB.taxid2name[taxid2label.get(row.taxon_assignmentID)] if row.taxon_assignmentID and not row.plot_label else row.plot_label, axis=1)
-    assignments_df['plot_labelID'] = assignments_df.apply(
+    assignments_df['plot_label'] = assignments_df.loc[~assignments_df['taxon_assignmentID'].isnull()].apply(
+        lambda row: TAX_DB.taxid2name.get(taxid2label.get(int(row.taxon_assignmentID))) if (row.taxon_assignmentID and not row.plot_label) else row.plot_label, axis=1)
+    assignments_df['plot_labelID'] = assignments_df.loc[~assignments_df['taxon_assignmentID'].isnull()].apply(
         lambda row: taxid2label.get(
-            row.taxon_assignmentID) if not row.plot_labelID else row.plot_labelID, axis = 1)
+            int(row.taxon_assignmentID)) if not row.plot_labelID else row.plot_labelID, axis=1)
 
 
-def merge_labels(assignments_df, target_id, merging_labels):
+    return assignments_df
+
+
+def merge_labels(assignments_df, target_id, merging_labels, missing_taxids, TAX_DB):
     """
     Merge plot labels based on user input.
 
@@ -259,6 +272,8 @@ def merge_labels(assignments_df, target_id, merging_labels):
             -> merge query lineage at that rank
         3. list of NCBI taxon IDs
             -> merge at each of the taxa provided
+            :param missing_taxids:
+            :param TAX_DB:
     """
 
     merger_ids = []
@@ -268,7 +283,10 @@ def merge_labels(assignments_df, target_id, merging_labels):
     if not merging_labels:
         merging_labels = []
     elif type(merging_labels) != list:
-        merging_labels = [merging_labels]
+        if ',' in merging_labels:
+            merging_labels = merging_labels.split(',')
+        else:
+            merging_labels = [merging_labels]
 
     for merger_label in merging_labels:
 
@@ -277,14 +295,19 @@ def merge_labels(assignments_df, target_id, merging_labels):
 
         if type(merger_label) == str:
             # option 1: string end with '-all' -> every taxonomic assignment is merged at that rank
-            # option 2: string does not end with '-all' -> only taxonomic assignments with same rank <merger_label> as the query species are merged
+            # option 2: string is a NCBI Taxonomy ID in string format
+            # option 3: string does not end with '-all' -> only taxonomic assignments with same rank <merger_label> as the query species are merged
+
             if merger_label.endswith('-all'):
                 all_merger_rank = merger_label[:-len('-all')]
                 break
+            elif merger_label.isdigit():
+                merger_ids.append(
+                    int(merger_label))  # ncbiID of <merger_label> to merge at            
             else:
                 # get ncbiID for rank <merger_label> of query
                 query_merger_id = get_id_for_rank_of_species(target_id,
-                                                             merger_label)
+                                                             merger_label, missing_taxids, TAX_DB)
                 break
         else:
             if type(merger_label) == int or merger_label.isdigit():
@@ -294,12 +317,14 @@ def merge_labels(assignments_df, target_id, merging_labels):
     # if there is an -all merger-label; this overwrites everything
     # else; merge at query_merger_id and merger_ids
     if all_merger_rank:
-        merge_assignments_at_rank(assignments_df, all_merger_rank)
+        merge_assignments_at_rank(assignments_df, all_merger_rank, missing_taxids, TAX_DB)
     else:
         if query_merger_id:
-            merge_assignments_at_id(assignments_df, query_merger_id)
+            merge_assignments_at_id(assignments_df, query_merger_id,missing_taxids, TAX_DB)
         if merger_ids:
-            merge_assignments_at_id(assignments_df, merger_ids)
+            merge_assignments_at_id(assignments_df, merger_ids,missing_taxids, TAX_DB)
+
+    return assignments_df
 
 
 def set_unassigned_labels(assignments_df):
@@ -312,9 +337,10 @@ def set_unassigned_labels(assignments_df):
 
     unassigned_genes = assignments_df['plot_labelID'].isnull()
     assignments_df.loc[unassigned_genes, 'plot_label'] = 'Unassigned'
+    return assignments_df
 
 
-def ident_query_label(assignments_df, target_taxon):
+def ident_query_label(assignments_df, target_taxon, TAX_DB):
     """
     Identify which label represents the query species.
 
@@ -323,6 +349,7 @@ def ident_query_label(assignments_df, target_taxon):
       target_id:
 
     Returns:
+    :param TAX_DB:
 
     """
 
@@ -341,7 +368,7 @@ def ident_query_label(assignments_df, target_taxon):
 ########################## TAXONOMIC ASSIGNMENT ###############################
 ###############################################################################
 
-def get_subset_id(target_id, subset_marker):
+def get_subset_id(target_id, subset_marker, missing_taxids, TAX_DB):
     """
     Return input if input.isdigit() or return ID for rank of query.
 
@@ -350,6 +377,8 @@ def get_subset_id(target_id, subset_marker):
       subset_marker:
 
     Returns:
+    :param missing_taxids:
+    :param TAX_DB:
 
     """
     if type(subset_marker) == int:
@@ -357,7 +386,7 @@ def get_subset_id(target_id, subset_marker):
     elif subset_marker.isdigit():
         return int(subset_marker)
     else:
-        return get_id_for_rank_of_species(target_id, subset_marker)
+        return get_id_for_rank_of_species(target_id, subset_marker, missing_taxids, TAX_DB)
 
 
 def run_diamond(diamond_cmd):
@@ -410,7 +439,7 @@ def run_diamond(diamond_cmd):
 
 
 def perform_quick_search_1(cfg, perform_diamond, diamond_cmd,
-                           quick_mode_search_rank, target_exclude, target_taxon):
+                           quick_mode_search_rank, target_exclude, target_taxon, missing_taxids, TAX_DB):
     """
     Perform first DIAMOND run for quick assignment mode.
 
@@ -421,19 +450,23 @@ def perform_quick_search_1(cfg, perform_diamond, diamond_cmd,
       quick_mode_search_rank:
       target_exclude:
       target_id:
+      :param missing_taxids:
+      :param TAX_DB:
     """
     logging.info("Quick mode for taxonomic assignment selected")
 
     if perform_diamond:
         # quick_mode_search_rank can be either taxon ID or rank
-        quick_mode_search_id = get_subset_id(target_taxon.taxid, quick_mode_search_rank)
+        quick_mode_search_id = get_subset_id(target_taxon.taxid,
+                                             quick_mode_search_rank,
+                                             missing_taxids, TAX_DB)
 
         if target_exclude:
             q1_exclude = target_exclude.rstrip('"') + ',' + ','.join(
-                diamond_inclusion_by_exclusion(quick_mode_search_id))
+                diamond_inclusion_by_exclusion(quick_mode_search_id, missing_taxids, TAX_DB))
         else:
             q1_exclude = f' --taxon-exclude ' \
-                         f'"{",".join(diamond_inclusion_by_exclusion(quick_mode_search_id))}"'
+                         f'"{",".join(diamond_inclusion_by_exclusion(quick_mode_search_id,missing_taxids, TAX_DB))}"'
         diamond_cmd_1 = f'{diamond_cmd} -o "{cfg.diamond_results_path}" {q1_exclude}'
         ###taxonlist###
         # diamond_cmd_1 = diamond_cmd + diamond_o1
@@ -447,7 +480,7 @@ def perform_quick_search_1(cfg, perform_diamond, diamond_cmd,
 
 def perform_quick_search_2(cfg, perform_diamond, diamond_cmd,
                            quick_mode_match_rank, assignment_df, tmp_prot_path,
-                           target_exclude, target_taxon):
+                           target_exclude, target_taxon, missing_taxids, TAX_DB):
     """
     Perform second DIAMOND run for quick assignment mode.
 
@@ -460,13 +493,17 @@ def perform_quick_search_2(cfg, perform_diamond, diamond_cmd,
       tmp_prot_path:
       target_exclude:
       target_id:
+      :param missing_taxids:
+      :param TAX_DB:
     """
 
     if perform_diamond:
-        quick_mode_match_id = get_subset_id(target_taxon.taxid, quick_mode_match_rank)
+        quick_mode_match_id = get_subset_id(target_taxon.taxid,
+                                            quick_mode_match_rank,
+                                            missing_taxids, TAX_DB)
 
         filter_prots_quick_hits(assignment_df, quick_mode_match_id,
-                                tmp_prot_path, tmp_prot_path)
+                                tmp_prot_path, tmp_prot_path, missing_taxids, TAX_DB)
 
         diamond_cmd_2 = f'{diamond_cmd} -o "{cfg.diamond_results_path}" {target_exclude}'
         logging.debug(f"Diamond command for quick search round 2:\n{diamond_cmd_2}")
@@ -491,7 +528,7 @@ def perform_exhaustive_search(cfg, perform_diamond, diamond_cmd, target_exclude)
         run_diamond(diamond_cmd)
 
 
-def generalize_unclassified(assignments_df):
+def generalize_unclassified(assignments_df, missing_taxids, TAX_DB):
 
     # for assignment in tax assignemnts
     # if unclassified in taxonomy_string:
@@ -500,20 +537,23 @@ def generalize_unclassified(assignments_df):
     unclassified_strings = ['unclassified', 'environmental', 'uncultured'] # incertae sedis?
 
     for assignmentID in assignments_df['taxon_assignmentID'].dropna().unique():
-        taxon = init_taxopyon(assignmentID)
+        new_assignment = None
+        taxon = init_taxopyon(assignmentID, missing_taxids, TAX_DB)
         if any((string in taxon.name) for string in unclassified_strings):
             for taxon in zip(taxon.rank_name_dictionary.values(),
                              taxon.rank_taxid_dictionary.values()):
                 if not any((string in taxon[0]) for string in unclassified_strings):
                     new_assignment = taxon
                     break
-
+            if not new_assignment:
+                print(taxon)
+                continue
             genes_w_assignments = assignments_df['taxon_assignmentID'] == assignmentID
             assignments_df.loc[genes_w_assignments, 'taxon_assignment'] = new_assignment[0]
             assignments_df.loc[genes_w_assignments, 'taxon_assignmentID'] = new_assignment[1]
 
 
-def assess_closest_of_hits(taxIDs, target_taxon):
+def assess_closest_of_hits(taxIDs, target_taxon, missing_taxids, TAX_DB):
     """
     for a list of taxa IDs, get the one where LCA with target_id is closest to query
 
@@ -522,6 +562,7 @@ def assess_closest_of_hits(taxIDs, target_taxon):
       target_id:
 
     Returns:
+    :param TAX_DB:
 
     """
 
@@ -530,7 +571,7 @@ def assess_closest_of_hits(taxIDs, target_taxon):
     # (taxon, index in lineage, lca with target)
     closest_hit = (None, len(target_lineage) + 1)
     for taxID in taxIDs:     
-        taxon = init_taxopyon(taxID)
+        taxon = init_taxopyon(taxID, missing_taxids, TAX_DB)
         if taxon:
             lca = taxopy.find_lca([target_taxon, taxon], TAX_DB)
             lca_index = target_lineage.index(lca.taxid)
@@ -540,26 +581,37 @@ def assess_closest_of_hits(taxIDs, target_taxon):
 
     return closest_hit[0], closest_hit[2]
 
-def compute_majority_taxon(taxon_ids, fraction):
-    """ compute the LCA of a list of taxon ID """
+def compute_majority_taxon(taxon_ids, fraction, missing_taxids, TAX_DB):
+    """ compute the LCA of a list of taxon ID
+    :param TAX_DB:
+    """
 
-    taxa_list = [init_taxopyon(taxon_id) for taxon_id in taxon_ids]
+    taxa_list = [init_taxopyon(taxon_id, missing_taxids, TAX_DB) for taxon_id in taxon_ids]
     nanfree_taxa_list = [taxon for taxon in taxa_list if taxon]
     if len(nanfree_taxa_list) > 1:
         return taxopy.find_majority_vote(nanfree_taxa_list, TAX_DB, fraction=fraction)
     else:
         return nanfree_taxa_list[0]
 
-def compute_lca(taxon_ids):
-    """ compute the LCA of a list of taxon ID """
 
-    taxa_list = [init_taxopyon(taxon_id) for taxon_id in taxon_ids]
+def compute_lca(taxon_ids, missing_taxids, TAX_DB):
+    """ compute the LCA of a list of taxon ID
+    :param TAX_DB:
+    :param missing_taxids:
+    """
+
+    taxa_list = [init_taxopyon(taxon_id, missing_taxids, TAX_DB) for taxon_id in taxon_ids]
     nanfree_taxa_list = [taxon for taxon in taxa_list if taxon]
-    
+
+    if not nanfree_taxa_list:
+        print(taxon_ids)
+        return None
     if len(nanfree_taxa_list) > 1:
         return taxopy.find_lca(nanfree_taxa_list, TAX_DB)
-    else:
+    elif nanfree_taxa_list:
         return nanfree_taxa_list[0]
+    else:
+        return None
 
 
 def write_hits2file(cfg, file_path, hits):
@@ -572,7 +624,36 @@ def write_hits2file(cfg, file_path, hits):
                 file.write('\t'.join(hit) + '\n')
 
 
-def calc_assignment(cfg, assignments_df, gene_id, hit_list, target_taxon):
+def process_multi_hit(hit, target_taxon, missing_taxids, TAX_DB):
+
+    split_taxids = hit[-2].split(';')
+
+    lca = compute_lca(split_taxids, missing_taxids, TAX_DB)
+    if not lca:
+        return ['', '']
+
+    if lca.taxid in target_taxon.taxid_lineage:
+        closest_hit, closest_lca = assess_closest_of_hits(split_taxids,
+                                                          target_taxon,missing_taxids, TAX_DB)
+        return [f"{closest_hit.taxid};LCA:{lca.taxid}",
+                f"{closest_hit.name};LCA:{lca.name}"]
+    else:
+        return [f"{lca.taxid};LCA:{lca.taxid}", f"{lca.name};LCA:{lca.name}"]
+
+
+def process_hit(hit, target_taxon, missing_taxids, TAX_DB):
+
+    if ';' in hit[-2]:  # hit is a multihit
+        cropped_hit = process_multi_hit(hit, target_taxon, missing_taxids,
+                                        TAX_DB)
+        return hit[:-2]+cropped_hit
+    # elif 'N/A' in hit[-1]: # no taxon matched to accession number
+    #     list.append(hit[:-2] + ['N/A', 'N/A'])
+    else:
+        return hit
+
+
+def calc_assignment(in_queue, results_queue, target_taxon, missing_taxids, TAX_DB):
     """
     Calculate the LCA for each gene based on taxonomic hits.
 
@@ -580,36 +661,71 @@ def calc_assignment(cfg, assignments_df, gene_id, hit_list, target_taxon):
       genes:
 
     Returns:
+    :param missing_taxids:
+    :param TAX_DB:
     :param target_taxon:
 
     """
 
-    hit_ids = [id[-2].split(';')[0] for id in hit_list if id[-2] != '']
-    if hit_ids == []:
-        acc_nums = ','.join([elem[0] for elem in hit_list])
-        logging.info(f"Protein(s) with following acession number(s) couldn't "
-                     f"be matched to corresponding taxon: \n {acc_nums}")
+    while True:
+        queue_item = in_queue.get()
+        # check for end of queue
+        if queue_item is None:
+            break
+
+        (gene_name, raw_hitlist) = queue_item
+
+        hitlist = [process_hit(hit, target_taxon, missing_taxids, TAX_DB) for hit in raw_hitlist]
+        hit_ids = [id[-2].split(';')[0] for id in hitlist if id[-2] != '']
+
+        if hit_ids == []:
+            acc_nums = ','.join([elem[0] for elem in hitlist])
+            logging.info(f"Hits for protein(s) with following accession number(s) "
+                         f"couldn't be matched to corresponding taxon: \n {acc_nums}")
+            continue
+        else:
+            lca = compute_lca(hit_ids, missing_taxids, TAX_DB)
+            if lca:
+                if lca.taxid in target_taxon.taxid_lineage:
+                    closest_hit, closest_lca = assess_closest_of_hits(hit_ids,
+                                                                      target_taxon, missing_taxids, TAX_DB)
+                else:
+                    closest_lca = None
+            else:
+                closest_lca = None
+        # all hit IDs were unable to be recognized
+        if not lca:
+            lca = None
+
+        results_queue.put((gene_name, hitlist, lca, closest_lca))
+
+    # put sentinel to indicate end of queue
+    results_queue.put(None)
+
+
+def add_ta2gene(results, cfg, tax_assignment_path, assignments_df, target_taxon):
+
+    (gene_id, hitlist, lca, closest_lca) = results
+
+    #gene_id = assignments_df.query(f'fasta_header == "{fasta_header}"').index.item()
+
+    if not hitlist or not lca:
         return
-    else:
-        lca = compute_lca(hit_ids)
 
     # lca is ubiquitous
     assignments_df.at[gene_id,'lcaID'] = lca.taxid
     assignments_df.at[gene_id,'lca'] = lca.name
 
     # best hit is ubiquitous
-    assignments_df.at[gene_id, 'best_hitID'] = hit_list[0][-2].split(';')[0]
-    assignments_df.at[gene_id, 'best_hit'] = hit_list[0][-1].split(';')[0]
-    assignments_df.at[gene_id, 'bh_evalue'] = hit_list[0][10]
-    assignments_df.at[gene_id, 'bh_pident'] = hit_list[0][2]
-    assignments_df.at[gene_id, 'bh_bitscore'] = hit_list[0][11]
-
+    assignments_df.at[gene_id, 'best_hitID'] = hitlist[0][-2].split(';')[0]
+    assignments_df.at[gene_id, 'best_hit'] = hitlist[0][-1].split(';')[0]
+    assignments_df.at[gene_id, 'bh_evalue'] = hitlist[0][10]
+    assignments_df.at[gene_id, 'bh_pident'] = hitlist[0][2]
+    assignments_df.at[gene_id, 'bh_bitscore'] = hitlist[0][11]
 
     # condition -> taxonomic assignment
     ## taxonomic assignment in target lineage -> refined LCA
     if lca.taxid in target_taxon.taxid_lineage:
-        # refine the LCA with taxon that has clostest LCA with target
-        closest_hit, closest_lca = assess_closest_of_hits(hit_ids, target_taxon)
         assignments_df.at[gene_id, 'refined_lcaID'] = closest_lca.taxid
         assignments_df.at[gene_id, 'refined_lca'] = closest_lca.name
         assignments_df.at[gene_id, 'taxon_assignmentID'] = closest_lca.taxid
@@ -628,32 +744,10 @@ def calc_assignment(cfg, assignments_df, gene_id, hit_list, target_taxon):
         assignments_df.at[gene_id, 'taxon_assignment'] = lca.name
 
 
-def process_multi_hit(hit, target_taxon):
-
-    split_taxids = hit[-2].split(';')
-
-    lca = compute_lca(split_taxids)
-
-    if lca.taxid in target_taxon.taxid_lineage:
-        closest_hit, closest_lca = assess_closest_of_hits(split_taxids, target_taxon)
-        return [f"{closest_hit.taxid};LCA:{lca.taxid}",
-                f"{closest_hit.name};LCA:{lca.name}"]
-    else:
-        return [f"{lca.taxid};LCA:{lca.taxid}", f"{lca.name};LCA:{lca.name}"]
+    write_hits2file(cfg, tax_assignment_path, hitlist)
 
 
-def add_hit2list(list, hit, target_taxon):
-
-    if ';' in hit[-2]:  # hit is a multihit
-        cropped_hit = process_multi_hit(hit, target_taxon)
-        list.append(hit[:-2]+cropped_hit)
-    # elif 'N/A' in hit[-1]: # no taxon matched to accession number
-    #     list.append(hit[:-2] + ['N/A', 'N/A'])
-    else:
-        list.append(hit)
-
-
-def set_tax_assignments(cfg, gff_df, tax_assignment_path, assignments_df, target_taxon):
+def read_hit_file(cfg, assignments_df, in_queue):
     """
     Read DIAMOND output file and assign hits to genes.
 
@@ -665,8 +759,76 @@ def set_tax_assignments(cfg, gff_df, tax_assignment_path, assignments_df, target
     Returns:
 
     """
+    with open(cfg.diamond_results_path, 'r') as diamond_hits:
+        # tax assignments list is sorted by query sequence
+        # thus, all hits for one gene are following one another
 
-    # emtpy file
+        first_spline = next(diamond_hits).strip().split('\t')
+        if first_spline[0] == 'qseqid':
+            #TODO: extend support to parsing already parsed diamond tables
+            first_spline = next(diamond_hits).strip().split('\t')
+
+        gene = assignments_df.loc[assignments_df.fasta_header == first_spline[0]]
+        try:
+            gene.fasta_header.item()
+        except:
+            logging.error(f"Following protein sequence header could not be "
+                          f"conclusively matched to gene ID: {first_spline[0]}\n"
+                          f"Please check GFF for ambiguity. "
+                          f"Matched genes:\n {gene}")
+        #fasta_header = first_spline[0]
+        gene_assignments = [first_spline]
+        for line in diamond_hits:
+            # first hit per gene is "best hit" in terms of alignment score
+            spline = line.strip().split('\t')
+            if spline[0] == gene.fasta_header.item(): #fasta_header: #
+                gene_assignments.append(spline)
+            else:
+                # compute the assignment with list of hits
+                if not gene.empty:
+                    #in_queue.put((fasta_header, gene_assignments))
+                    in_queue.put((gene.index.item(), gene_assignments))
+
+                # new gene
+                # fasta_header = spline[0]
+                gene = assignments_df.loc[assignments_df.fasta_header == spline[0]]
+                try:
+                    gene.fasta_header.item()
+                except:
+                    logging.error(
+                        f"Following protein sequence header could not be "
+                        f"conclusively matched to gene ID: {spline[0]}\n"
+                        f"Please check GFF for ambiguity or other issues."
+                        f"Matched genes:\n {gene}")
+                gene_assignments = [spline]
+
+        if not gene.empty:
+            in_queue.put((gene.index.item(), gene_assignments))
+
+    logging.info(f">>> processing DIAMOND hits")
+
+    # add sentinels to track if queue really is empty
+    for p in range(cfg.threads-1):
+        in_queue.put(None)
+
+
+def process_hits(cfg, tax_assignment_path, assignments_df, target_taxon, missing_taxids, TAX_DB):
+
+    logging.info(f">> reading DIAMOND hits file")
+    in_queue = mp.Queue()
+    results_queue = mp.Queue()
+    # start the processing
+    pool = mp.Pool(cfg.threads-1, calc_assignment, (in_queue, results_queue, target_taxon, missing_taxids, TAX_DB))
+    # start the reading
+    read_process = mp.Process(target=read_hit_file,
+                              args=(cfg, assignments_df, in_queue,))
+    read_process.start()
+    # wait for all processes to finish
+    read_process.join()
+    read_process.close()
+    pool.close()
+
+    # empty file
     with open(tax_assignment_path, 'w') as file:
         if cfg.slim_diamond_results:
             file.write('\t'.join(['qseqid', 'sseqid', 'pident', 'evalue',
@@ -677,42 +839,22 @@ def set_tax_assignments(cfg, gff_df, tax_assignment_path, assignments_df, target
                                   'sstart', 'send', 'evalue', 'bitscore',
                                   'taxid', 'taxname']) + '\n')
 
-    with open(cfg.diamond_results_path, 'r') as diamond_hits:
-        # tax assignments list is sorted by query sequence
-        # thus, all hits for one gene are following one another
+        sentinel_countdown = cfg.threads - 1
+        while sentinel_countdown > 0:
+            results = results_queue.get()
+            if results is None:
+                sentinel_countdown -= 1
+                continue
+            add_ta2gene(results, cfg, tax_assignment_path, assignments_df,
+                        target_taxon)
 
-        first_spline = next(diamond_hits).strip().split('\t')
-        gene = assignments_df.loc[
-            assignments_df['fasta_header'] == first_spline[0]]
-        gene_assignments = []
-        add_hit2list(gene_assignments, first_spline, target_taxon)
-        for line in diamond_hits:
-            # first is "best hit" in terms of alignment score
-            spline = line.strip().split('\t')
-            if spline[0] == gene.fasta_header.item():
-                add_hit2list(gene_assignments, spline, target_taxon)
-            else:
-                # compute the assignment with list of hits
-                if not gene.empty:
-                    calc_assignment(cfg, assignments_df, gene.index.item(),
-                                    gene_assignments, target_taxon)
-                    write_hits2file(cfg, tax_assignment_path, gene_assignments)
+        in_queue.close()
+        in_queue.join_thread()
+        results_queue.close()
+        results_queue.join_thread()
+        pool.join()
 
-                # new gene
-                gene = assignments_df.loc[
-                    assignments_df['fasta_header'] == spline[0]]
-                gene_assignments = []
-                add_hit2list(gene_assignments, spline, target_taxon)
-
-        if not gene.empty:
-            calc_assignment(cfg, assignments_df, gene.index.item(),
-                            gene_assignments, target_taxon)
-            write_hits2file(cfg, tax_assignment_path, gene_assignments)
-
-
-
-
-def taxonomic_assignment(cfg, gff_df, assignments_df, tax_assignment_path, target_taxon):
+def taxonomic_assignment(cfg, gff_df, assignments_df, tax_assignment_path, target_taxon, missing_taxids, TAX_DB):
     """
     Run functions to save taxonomic assignment to gene objects
 
@@ -721,9 +863,14 @@ def taxonomic_assignment(cfg, gff_df, assignments_df, tax_assignment_path, targe
       genes:
       prots:
       target_id:
+      :param missing_taxids:
+      :param TAX_DB:
     """
-    set_tax_assignments(cfg, gff_df, tax_assignment_path, assignments_df, target_taxon)
-    generalize_unclassified(assignments_df)
+
+    process_hits(cfg, tax_assignment_path, assignments_df, target_taxon,
+                 missing_taxids, TAX_DB)
+    generalize_unclassified(assignments_df, missing_taxids, TAX_DB)
+
 
 ###############################################################################
 ########################### PROTEIN FASTA FILE ################################
@@ -795,10 +942,11 @@ def subset_prots_longest_cds(gff_df, proteins_path, path_out):
                          "include")
 
 
-def detect_appropriate_assignment(gene, quick_mode_match_id):
+def detect_appropriate_assignment(gene, quick_mode_match_id, missing_taxids, TAX_DB):
 
 
-    tax_lineage = init_taxopyon(gene.taxon_assignmentID).taxid_lineage
+    tax_lineage = init_taxopyon(gene.taxon_assignmentID, missing_taxids,
+                                TAX_DB).taxid_lineage
     # if quick_mode_match_id not in tax_lineage or quick_mode_match_id == tax_lineage[0]: # <- option 2: exclusive
     if quick_mode_match_id not in tax_lineage:  # <- option 1: inclusive
         # inclusive: if match id equals class, assignment must be at least same class as query
@@ -811,7 +959,7 @@ def detect_appropriate_assignment(gene, quick_mode_match_id):
 
 
 def filter_prots_quick_hits(assignments_df, quick_mode_match_id, prot_path_in,
-                            prot_path_out):
+                            prot_path_out, missing_taxids, TAX_DB):
     """
     write proteins to tmp protein FASTA which were not assigned in first
     quick search with DIAMOND
@@ -827,7 +975,8 @@ def filter_prots_quick_hits(assignments_df, quick_mode_match_id, prot_path_in,
     """
 
     no_match = assignments_df.apply(
-        lambda row: detect_appropriate_assignment(row, quick_mode_match_id),
+        lambda row: detect_appropriate_assignment(row,
+                                                  quick_mode_match_id, missing_taxids, TAX_DB),
         axis=1).to_list()
 
     logging.info(f"{len(no_match)} proteins written to fasta file for 2nd DIAMOND run")
@@ -839,7 +988,7 @@ def filter_prots_quick_hits(assignments_df, quick_mode_match_id, prot_path_in,
 ###############################################################################
 
 
-def diamond_inclusion_by_exclusion(include_id):
+def diamond_inclusion_by_exclusion(include_id, missing_taxids, TAX_DB):
     """
     diamond can not exclude and include taxa simultaneously
     thus, this script identifies all taxIDs to exclude to simulate inclusion
@@ -848,22 +997,23 @@ def diamond_inclusion_by_exclusion(include_id):
       include_id:
 
     Returns:
+    :param TAX_DB:
 
     """
 
     exclude_list = []
 
-    include_taxon = init_taxopyon(include_id)
+    include_taxon = init_taxopyon(include_id, missing_taxids, TAX_DB)
     include_lineage = include_taxon.taxid_lineage
     for parent in include_lineage[1:]:
-        childs = get_children_ids(parent)
+        childs = get_children_ids(TAX_DB, parent)
         exclude_list = exclude_list + [str(child) for child in childs if
                                        child not in include_lineage]
 
     return exclude_list
 
 
-def taxonomy_summary(cfg, assignments_df, target_taxon, query_label):
+def taxonomy_summary(cfg, assignments_df, target_taxon, query_label, missing_taxids, TAX_DB):
     """
     computing a score to assess the quality of the assembly
 
@@ -872,6 +1022,8 @@ def taxonomy_summary(cfg, assignments_df, target_taxon, query_label):
       assignments_df:
 
     Returns:
+    :param TAX_DB:
+    :param missing_taxids:
 
     """
 
@@ -885,7 +1037,8 @@ def taxonomy_summary(cfg, assignments_df, target_taxon, query_label):
     total_assignments = unique_assignments.shape[0]
 
     for index, row in unique_assignments.iterrows():
-        g_taxon = init_taxopyon(row['taxon_assignmentID'])
+        g_taxon = init_taxopyon(row['taxon_assignmentID'], missing_taxids,
+                                TAX_DB)
         if not g_taxon.taxid in query_lineage:
             outside_query_lineage += 1
         for rank in ['superkingdom', 'kingdom', 'phylum',
@@ -955,13 +1108,13 @@ def write_output(cfg, assignments_df):
     out_path = cfg.output_path + 'taxonomic_assignment/taxonomic_assignments.csv'
     assignments_df.to_csv(out_path, index=True, index_label='gene_id')
 
-def assignment_lineages(assignments_df):
+def assignment_lineages(assignments_df, missing_taxids, TAX_DB):
 
     rank_subset = ['superkingdom', 'kingdom', 'phylum', 'class', 'order',
                    'family', 'genus', 'species', 'strain']
 
     for assignment in assignments_df['taxon_assignmentID'].dropna().unique():
-        assigned_taxon = init_taxopyon(assignment)
+        assigned_taxon = init_taxopyon(assignment, missing_taxids, TAX_DB)
         ranks_of_interest = {key: assigned_taxon.rank_name_dictionary.get(key)
                              for key in rank_subset}
 
@@ -970,7 +1123,7 @@ def assignment_lineages(assignments_df):
 ###############################################################################
 
 
-def run_assignment(cfg, gff_df, pca_coordinates, TAX_DB_local):
+def run_assignment(cfg, gff_df, pca_coordinates, TAX_DB):
     """
 
     Args:
@@ -980,10 +1133,6 @@ def run_assignment(cfg, gff_df, pca_coordinates, TAX_DB_local):
 
     """
 
-    global TAX_DB
-    TAX_DB = TAX_DB_local
-
-    global missing_taxids
     missing_taxids = set()
 
 
@@ -1001,11 +1150,23 @@ def run_assignment(cfg, gff_df, pca_coordinates, TAX_DB_local):
                   f'-b2.0 --tmpdir /dev/shm --{cfg.diamond_sensitivity} -c1 ' \
                   f'--top 10 -q "{tmp_prot_path}" -d "{cfg.database_path}"'
 
-    target_taxon = init_taxopyon(cfg.taxon_id)
+    target_taxon = init_taxopyon(cfg.taxon_id, missing_taxids, TAX_DB)
 
+    excluded_ids = ""
     if cfg.target_exclude:
+        excluded_ids += f'{get_id_for_rank_of_species(target_taxon.taxid, cfg.exclusion_rank, missing_taxids, TAX_DB)},'
+    if cfg.add_exclude:
+        if type(cfg.add_exclude) == list:
+            for id in cfg.add_exclude:
+                excluded_ids += f'{id},'
+        elif ',' in cfg.add_exclude:
+            for id in cfg.add_exclude.split(','):
+                excluded_ids += f'{id},'
+        else:
+            excluded_ids += f'{cfg.add_exclude},'
+    if cfg.target_exclude or cfg.add_exclude:
         target_exclude = f' --taxon-exclude ' \
-                        f'"{get_id_for_rank_of_species(target_taxon.taxid, cfg.exclusion_rank)}"'
+                         f'"{excluded_ids[:-1]}"' # remove trailing comma
     else:
         target_exclude = ''
 
@@ -1021,7 +1182,10 @@ def run_assignment(cfg, gff_df, pca_coordinates, TAX_DB_local):
         logging.warning('No valid option for "num_groups_plot"')
         sys.exit()
 
-    perform_diamond = cfg.compute_tax_assignment and not cfg.update_plots
+    perform_diamond = cfg.compute_tax_assignment
+    # let cfg.force not affect this
+    # cfg.compute_tax_assignment is true when either file does not exist or
+    # user specified to run it
 
     # init empty dataframe for taxonomic assignments
     num_genes = gff_df.loc[gff_df['type'] == 'gene'].shape[0]
@@ -1046,35 +1210,38 @@ def run_assignment(cfg, gff_df, pca_coordinates, TAX_DB_local):
     if perform_diamond:
         subset_prots_longest_cds(gff_df, cfg.proteins_path, tmp_prot_path)
     if cfg.assignment_mode == 'quick':
-        perform_quick_search_1(cfg, perform_diamond, diamond_cmd, cfg.quick_mode_search_rank,
-                               target_exclude, cfg.taxon_id)
-        taxonomic_assignment(cfg, gff_df, assignments_df,
-                             tax_assignment_path_1, target_taxon)
+        perform_quick_search_1(cfg, perform_diamond, diamond_cmd,
+                               cfg.quick_mode_search_rank, target_exclude,
+                               cfg.taxon_id, missing_taxids, TAX_DB)
+        taxonomic_assignment(cfg, gff_df, assignments_df, tax_assignment_path_1,
+                             target_taxon, missing_taxids, TAX_DB)
         perform_quick_search_2(cfg, perform_diamond, diamond_cmd,
-                               cfg.quick_mode_match_rank,
-                               assignments_df, tmp_prot_path, target_exclude,
-                               target_taxon)
-        taxonomic_assignment(cfg, gff_df, assignments_df,
-                             tax_assignment_path_2, target_taxon)
+                               cfg.quick_mode_match_rank, assignments_df,
+                               tmp_prot_path, target_exclude, target_taxon,
+                               missing_taxids, TAX_DB)
+        taxonomic_assignment(cfg, gff_df, assignments_df, tax_assignment_path_2,
+                             target_taxon, missing_taxids, TAX_DB)
     elif cfg.assignment_mode == 'exhaustive':
         perform_exhaustive_search(cfg, perform_diamond, diamond_cmd, target_exclude)
-        taxonomic_assignment(cfg, gff_df, assignments_df,
-                             tax_assignment_path, target_taxon)
+        taxonomic_assignment(cfg, gff_df, assignments_df, tax_assignment_path,
+                             target_taxon, missing_taxids, TAX_DB)
     else:
         logging.error('Assignment mode not one of quick or exhaustive')
         sys.exit()
 
     assignments_df['plot_label'] = None
     assignments_df['plot_labelID'] = None
-    merge_labels(assignments_df, target_taxon, cfg.merging_labels)
+    assignments_df = merge_labels(assignments_df, target_taxon, cfg.merging_labels,
+                 missing_taxids, TAX_DB)
     if num_groups_plot:
         num_labels = len(assignments_df['plot_labelID'].unique())
-        iterative_merging_top(assignments_df, num_groups_plot - num_labels)
-    set_unassigned_labels(assignments_df)
+        assignments_df = iterative_merging_top(assignments_df, num_groups_plot - num_labels,
+                              missing_taxids, TAX_DB)
+    assignments_df = set_unassigned_labels(assignments_df)
 
     assignments_df = assignments_df.astype({'plot_labelID': 'Int64'})
 
-    query_label = ident_query_label(assignments_df, target_taxon)
+    query_label = ident_query_label(assignments_df, target_taxon, TAX_DB)
 
     if missing_taxids:
         logging.info(
@@ -1085,7 +1252,8 @@ def run_assignment(cfg, gff_df, pca_coordinates, TAX_DB_local):
                                                                   exist_ok=True)
 
     #assignment_lineages(assignments_df)
-    taxonomy_summary(cfg, assignments_df, target_taxon, query_label)
+    taxonomy_summary(cfg, assignments_df, target_taxon, query_label,
+                     missing_taxids, TAX_DB)
     return assignments_df, query_label
 
 

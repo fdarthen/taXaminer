@@ -61,8 +61,9 @@ class Config:
         self.target_exclude = cfg_dict.get('target_exclude')
         self.exclusion_rank = cfg_dict.get('exclusion_rank')
         self.ta_generalisation_rank = cfg_dict.get('ta_generalisation_rank')
+        self.add_exclude = cfg_dict.get('add_exclude')
 
-        self.update_plots = cfg_dict.get('update_plots')
+        self.force = cfg_dict.get('force')
         self.num_groups_plot = cfg_dict.get('num_groups_plot')
         self.merging_labels = cfg_dict.get('merging_labels')
         self.output_pdf = cfg_dict.get('output_pdf')
@@ -387,11 +388,14 @@ def set_config_defaults(config_obj, TAX_DB, db_dir):
                                                        'slim_diamond_results',
                                                        False)
 
+
     if config_vars.get('assignment_mode') == 'quick':
         if type(config_vars.get('tax_assignment_path')) != list:
             if len([config_vars.get('tax_assignment_path')]) != 2:
-                path_1 = '.'.join(config_vars.get('tax_assignment_path').split('.')[:-1]) + "_1.txt"
-                path_2 = '.'.join(config_vars.get('tax_assignment_path').split('.')[:-1]) + "_2.txt"
+                path_1 = '.'.join(config_vars.get(
+                    'tax_assignment_path').split('.')[:-1]) + "_1.txt"
+                path_2 = '.'.join(config_vars.get(
+                    'tax_assignment_path').split('.')[:-1]) + "_2.txt"
                 config_vars['tax_assignment_path'] = [path_1, path_2]
     config_vars['compute_tax_assignment'] = set_yesno_default(config_obj,
                                                         'compute_tax_assignment',
@@ -399,10 +403,14 @@ def set_config_defaults(config_obj, TAX_DB, db_dir):
                                                             config_vars.get(
                                                                 'tax_assignment_path'),
                                                             'AND'))
-    config_vars['database_path'] = set_default(config_obj,
-                                               'database_path', f"{db_dir}/nr.dmnd")
-    config_vars['target_exclude'] = set_yesno_default(config_obj, 'target_exclude',
-                                               True)
+    config_vars['database_path'] = set_default(config_obj, 'database_path',
+                                               f"{db_dir}/nr.dmnd")
+    config_vars['target_exclude'] = set_yesno_default(config_obj,
+                                                      'target_exclude', True)
+    config_vars['add_exclude'] = set_default(config_obj, 'add_exclude',
+                                             False)
+
+
     # use taxon_id_rank for exclusion, if not more specific than "species"
     query_taxon = taxopy.Taxon(config_vars['taxon_id'], TAX_DB)
     if "species" in query_taxon.rank_name_dictionary.keys():
@@ -415,7 +423,7 @@ def set_config_defaults(config_obj, TAX_DB, db_dir):
                                                 'genus')
 
     ## Plotting
-    config_vars['update_plots'] = set_yesno_default(config_obj, 'update_plots',
+    config_vars['force'] = set_yesno_default(config_obj, 'force',
                                               False)
     config_vars['num_groups_plot'] = set_default(config_obj, 'num_groups_plot',
                                                  '25')
@@ -492,6 +500,8 @@ def write_run_overview(config_path, config_vars):
         logging.info(f"Proteins:\t{config_vars.get('proteins_path')} [exists]")
     else:
         logging.info(f"Proteins:\t{config_vars.get('proteins_path')}")
+    if config_vars.get('compute_tax_assignment'):
+        logging.info(f"Database:\t{config_vars.get('database_path')}\n")
     if config_vars.get('assignment_mode') == 'quick':
         logging.info("Quick assignment mode selected")
         logging.info(f"Filtering search performed "

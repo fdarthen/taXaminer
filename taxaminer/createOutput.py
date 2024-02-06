@@ -8,15 +8,9 @@ the text in the hoverwindow selectable. Creates final 3D and Krona plot
 Expects processed config file
 """
 __author__ = "Freya Arthen"
-__version__ = "0.6.0"
-
-
-
 
 from bs4 import BeautifulSoup as bs
 from jsmin import jsmin
-
-import json
 
 from . import checkInput
 from . import reduceDims
@@ -24,17 +18,16 @@ from . import compFeatures
 
 import taxopy
 import sys
-import csv
 import pathlib
 import subprocess
 import logging
 import pandas as pd
 from Bio import SeqIO
 
+
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
-from plotly.colors import n_colors
 import plotly.io as pio
 
 # mathjax is not required for saving of the plots;
@@ -55,7 +48,7 @@ def rotate_z(x, y, z, theta):
 
 
 def gene_data2panda(cfg, assignment_df, pca_coordinates):
-    gene_features = pd.read_csv(f"{cfg.output_path}gene_info/raw_gene_table.csv",
+    gene_features = pd.read_csv(pathlib.Path(f"{cfg.output_path}gene_info/raw_gene_table.csv"),
                                 index_col=0)
 
     df = gene_features.merge(
@@ -171,7 +164,7 @@ def save_gif(cfg, fig):
 
 
 
-def create_3D_plot(cfg, all_data_df, pca_obj, variables, pca_coordinates, query_label):
+def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_label):
     """
 
     Args:
@@ -186,7 +179,6 @@ def create_3D_plot(cfg, all_data_df, pca_obj, variables, pca_coordinates, query_
 
     # ________________ PLOT PREPARATION _______________ #
 
-    plot_df = all_data_df
 
     # frequency information for labels in plots
     plot_df['label_count'] = plot_df['plot_label'].map(
@@ -258,7 +250,8 @@ def create_3D_plot(cfg, all_data_df, pca_obj, variables, pca_coordinates, query_
     logging.debug('>>>loading traces')
     fig = go.Figure()
     for label in traces_reordered:
-        labels = plot_df.loc[plot_df['plot_label'] == label, :]
+        #logging.debug(f'>>>>loading trace {label}')
+        #labels = plot_df.loc[plot_df['plot_label'] == label, :]
         fig.add_trace(go.Scatter3d(
             x=plot_df.loc[plot_df['plot_label'] == label, 'PC 1'],
             y=plot_df.loc[plot_df['plot_label'] == label, 'PC 2'],
@@ -311,13 +304,15 @@ def create_3D_plot(cfg, all_data_df, pca_obj, variables, pca_coordinates, query_
     )
 
 
-
     # pio.kaleido.scope.default_width = 700
     # pio.kaleido.scope.default_height = 500
-    fig.write_image(cfg.output_path + "taxonomic_assignment/3D_plot.pdf",
-                    engine='kaleido',
-                    width = 850,
-                    height = 650)
+    # print("saving 3D plot to pdf")
+    # pre= time.time()
+    # fig.write_image(cfg.output_path + "taxonomic_assignment/3D_plot.pdf",
+    #                 engine='kaleido',
+    #                 width = 850,
+    #                 height = 650)
+    # print(f"pdf: {time.time() -pre}")
 
 
     #save_gif(cfg,fig)
@@ -373,15 +368,27 @@ def create_3D_plot(cfg, all_data_df, pca_obj, variables, pca_coordinates, query_
     fig.update_layout(legend=dict(groupclick="togglegroup"),
                       modebar_add=["v1hovermode"])
 
-    fig.write_html(cfg.output_path + "taxonomic_assignment/3D_plot.html")
 
+    config = {
+        'toImageButtonOptions': {
+            'format': 'svg',  # one of png, svg, jpeg, webp
+            'filename': 'custom_image',
+            'height': 500,
+            'width': 700,
+            'scale': 1  # Multiply title/legend/axis/canvas sizes by this factor
+        },
+        'doubleClickDelay': 5
+    }
+
+    fig.write_html(cfg.output_path + "taxonomic_assignment/3D_plot.html",
+                   config=config)
     return plot_df
 
 
 def create_taxsun_input(cfg, data):
-    taxsun_df = data['taxon_assignmentID']
+    taxsun_df = data[['taxon_assignmentID', 'bh_evalue', 'fasta_header']]
     taxsun_df.to_csv(cfg.output_path + 'taxonomic_assignment/taxsun.tsv', sep='\t', index=True,
-                     index_label='#g_name', header=['taxID'])
+                     index_label='#gene_id', header=['taxID', 'e_value', 'fasta_id'])
     cmd_krona = f'{cfg.krona} {cfg.output_path}taxonomic_assignment/taxsun.tsv -o {cfg.output_path}taxonomic_assignment/krona.html'
     out_krona = subprocess.run([cmd_krona], shell=True, capture_output=True)
     if out_krona.returncode != 0:

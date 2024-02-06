@@ -10,15 +10,10 @@ Expects path to raw config file
 """
 
 __author__ = "Freya Arthen"
-__version__ = "0.6.0"
-
-# package specific modules
-import pickle
 
 from . import reduceDims
 from . import createOutput
 from . import checkInput
-from . import prepareData
 from . import compFeatures
 from . import compTaxonomicAssignment
 from . import parseGFF
@@ -28,13 +23,12 @@ import os
 import sys
 import yaml
 import pathlib
-import subprocess
 import shutil
 import logging
 import time
 import argparse
 import taxopy
-
+import pandas as pd
 
 # custom logging format per level
 class Formatter(logging.Formatter):
@@ -43,19 +37,21 @@ class Formatter(logging.Formatter):
         """Set different logging styles for different log levels."""
         if record.levelno == logging.INFO:
             self._style._fmt = "%(message)s"
-        else:
-            self._style._fmt = "[%(asctime)s] %(levelname)s [%(funcName)s:%(lineno)d] %(message)s"
+        elif record.levelno == logging.WARNING or record.levelno == logging.ERROR:
+            self._style._fmt = "%(levelname)s: %(message)s"
+        else: #debug
+            self._style._fmt = "%(levelname)s [%(asctime)s][%(funcName)s:%(lineno)d]: %(message)s"
         self.datefmt = "%Y-%m-%d %H:%M:%S"
         return super().format(record)
 
 
 def main():
-    """Run the program and call submodules."""
 
     # location of script on system to run from outside of directory
     SCRIPT_DIR = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 
     start_time = time.time()
+
 
     # TODO: add more options to pass config parameters via command line
     # TODO: add levels of cleaning (temporarily) created data
@@ -87,33 +83,21 @@ def main():
     if pathlib.Path(args.config_path).is_file():
         user_config_dict = yaml.safe_load(open(args.config_path, 'r'))
     else:
-        logging.error(f'config file not found:   {args.config_path}')
+        logging.error(f'Config file not found. Please check path:\n\t{args.config_path}')
         sys.exit()
-    output_path = user_config_dict.get('output_path') # location for results
+    output_path = user_config_dict.get('output_path')
     if not output_path.endswith('/'): # sanity check path to dir
         output_path = output_path + '/'
     # create dictionaries for output
-    pathlib.Path(output_path+'tmp/').mkdir(parents=True, exist_ok=True)
-    pathlib.Path(output_path+'gene_info/').mkdir(parents=True, exist_ok=True)
-    pathlib.Path(output_path+'PCA/').mkdir(parents=True, exist_ok=True)
+    pathlib.Path(f'{output_path}tmp/').mkdir(parents=True, exist_ok=True)
 
-    database_dir = eval(open(f"{SCRIPT_DIR}/pathconfig.txt",
-                             'r').readline().strip()).get('data_path')
+    database_dir = eval(
+        open(f"{SCRIPT_DIR}/pathconfig.txt", 'r').readline().strip()).get('data_path')
 
-    # TODO: precompute the tax_db during setup
     TAX_DB = taxopy.TaxDb(nodes_dmp=database_dir + "/nodes.dmp",
                           names_dmp=database_dir + "/names.dmp",
                           merged_dmp=database_dir + "/merged.dmp",
                           keep_files=True)
-
-    # f = open('tax_db.obj', 'wb')
-    # pickle.dump(TAX_DB, f)
-    # f.close()
-
-    # f = open('tax_db.obj', 'rb')
-    # TAX_DB = pickle.load(f)
-    # f.close()
-
 
     ## create config file to be used by subsequent modules
     # includes default for parameters not given by user and checks
@@ -122,37 +106,68 @@ def main():
     # create class object with configuration parameters
     cfg = checkInput.cfg2obj(output_path+'tmp/tmp.cfg.yml')
 
-
     pre_time = time.time()
     logging.info('> parsing GFF file')
     gff_df = parseGFF.process(cfg)
     logging.debug(f'finished [{int(time.time() - pre_time)}s]\n')
 
-    if not cfg.update_plots:
+    if not os.path.isfile(f"{cfg.output_path}gene_info/imputed_gene_table.csv") or cfg.force:
+
+        pathlib.Path(output_path + 'gene_info/').mkdir(parents=True,
+                                                       exist_ok=True)
 
         ## make data integrity checks
         # check GFF and assembly FASTA for ID compatibility
         #checkInput.check_assembly_ids(cfg)
 
         pre_time = time.time()
-        logging.info('> computing gene descriptors')
+        logging.info('> computing gene features')
         compFeatures.process_gene_info(cfg, gff_df)
         logging.debug(f'finished [{int(time.time()-pre_time)}s]\n')
 
+    else:
+        logging.info(f"> Reusing gene features in"
+                     f" {cfg.output_path}gene_info/imputed_gene_table.csv\n"
+                     f"Use option 'force' to overwrite.")
+
+
     pre_time = time.time()
     logging.info('> executing PCA and clustering')
+    pathlib.Path(output_path + 'PCA/').mkdir(parents=True, exist_ok=True)
     pca_obj, pca_coordinates, variables = reduceDims.compute_pca(cfg)
     logging.debug(f'finished [{int(time.time()-pre_time)}s]\n')
+
 
     # create symlink if proteins.faa file does not exist in taxaminer
     # report (for dashboard)
     if not pathlib.Path(cfg.output_path+'proteins.faa').exists():
         pathlib.Path(cfg.output_path+'proteins.faa').symlink_to(pathlib.Path(cfg.proteins_path).resolve())
 
-    pre_time = time.time()
-    logging.info('> running taxonomic assignment')
-    taxonomic_assignment, query_label = compTaxonomicAssignment.run_assignment(cfg, gff_df, pca_coordinates, TAX_DB)
-    logging.debug(f'finished [{int(time.time()-pre_time)}s]\n')
+    if not os.path.isfile(
+            f"{cfg.output_path}taxonomic_assignment/gene_table_taxon_assignment.csv") or cfg.force:
+        pre_time = time.time()
+        logging.info('> running taxonomic assignment')
+        taxonomic_assignment, query_label = compTaxonomicAssignment.run_assignment(cfg, gff_df, pca_coordinates, TAX_DB)
+        logging.debug(f'finished [{int(time.time()-pre_time)}s]\n')
+    else:
+        logging.info(f"> Reusing taxonomic assignment in in"
+                     f" {cfg.output_path}taxonomic_assignment/gene_table_taxon_assignment.csv")
+        taxonomic_assignment = pd.read_csv(f"{cfg.output_path}taxonomic_assignment/gene_table_taxon_assignment.csv",
+            sep=',', index_col='g_name',
+            usecols = ['g_name','fasta_header', 'best_hit', 'best_hitID',
+                        'bh_pident', 'bh_evalue', 'bh_bitscore',
+                        'lca', 'lcaID', 'refined_lca', 'refined_lcaID',
+                        'taxon_assignment', 'taxon_assignmentID', 'is_target',
+                        'plot_label', 'plot_labelID'],
+            dtype={'taxon_assignmentID': 'str', 'best_hitID': 'str',
+                    'refinedLCAID': 'str', 'lcaID': 'str', 'plot_labelID': 'Int64'},
+            keep_default_na=False)
+        # replace empty value with None
+        taxonomic_assignment = taxonomic_assignment.replace(r'^\s*$', None, regex=True)
+        target_taxon = compTaxonomicAssignment.init_taxopyon(cfg.taxon_id, set(), TAX_DB)
+        query_label = compTaxonomicAssignment.ident_query_label(
+                    taxonomic_assignment, target_taxon, TAX_DB)
+
 
     pre_time = time.time()
     logging.info('> creating plots')

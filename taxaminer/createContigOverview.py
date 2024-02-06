@@ -5,17 +5,11 @@
 Expects processed config file
 """
 __author__ = "Freya Arthen"
-__version__ = "0.6.0"
 
 from . import checkInput
 from . import compTaxonomicAssignment
 
-import taxopy
 import sys
-import csv
-import pathlib
-import subprocess
-import logging
 import pandas as pd
 
 def percentage_target(contig_genes):
@@ -35,27 +29,32 @@ def contig_is_target(contig_genes):
         return 0
 
 
-def comp_contig_lca(contig_genes):
+def comp_contig_lca(contig_genes, missing_taxids, TAX_DB):
     """
 
-
+    :param TAX_DB:
+    :param missing_ids:
     :return:
     """
 
     gene_assignments = contig_genes['taxon_assignmentID'].dropna().unique()
     if len(gene_assignments) == 0:
         return 'Unassigned'
-    lca = compTaxonomicAssignment.compute_lca(gene_assignments)
-    return lca.name
+    lca = compTaxonomicAssignment.compute_lca(gene_assignments, missing_taxids, TAX_DB)
+    if lca:
+        return lca
+    else:
+        return None
 
-def comp_majority_assignment(contig_genes, fraction):
+
+def comp_majority_assignment(contig_genes, fraction, missing_taxids, TAX_DB):
 
 
     gene_assignments = contig_genes['taxon_assignmentID'].dropna().unique()
     if len(gene_assignments) == 0:
         return 'Unassigned'
-    majority = compTaxonomicAssignment.compute_majority_taxon(
-        gene_assignments, fraction)
+    majority = compTaxonomicAssignment.compute_majority_taxon(gene_assignments,
+                                                              fraction, missing_taxids, TAX_DB)
     return majority.name
 
 
@@ -81,7 +80,7 @@ def monitor_coverage(contig_genes):
 ###############################################################################
 
 
-def process_assignments(cfg, gff_df, all_data_df, TAX_DB_local):
+def process_assignments(cfg, gff_df, all_data_df, TAX_DB):
     """
 
     Args:
@@ -91,8 +90,7 @@ def process_assignments(cfg, gff_df, all_data_df, TAX_DB_local):
 
     """
 
-    global TAX_DB
-    TAX_DB = TAX_DB_local
+    missing_taxids = set()
 
     contig_ids = all_data_df.c_name.unique()
     contig_dict = {
@@ -118,7 +116,13 @@ def process_assignments(cfg, gff_df, all_data_df, TAX_DB_local):
 
         if contig_genes.empty:
             continue
-        contigs.at[contig.Index, 'lca'] = comp_contig_lca(contig_genes)
+        contig_lca = comp_contig_lca(contig_genes, missing_taxids, TAX_DB)
+        if not contig_lca or contig_lca == "Unassigned":
+            contigs.at[contig.Index, 'lca'] = "Unassigned"
+            contigs.at[contig.Index, 'lcaID'] = None
+        else:
+            contigs.at[contig.Index, 'lca'] = contig_lca.name
+            contigs.at[contig.Index, 'lcaID'] = contig_lca.taxid
         contigs.at[contig.Index, 'percentage_target'] = percentage_target(
             contig_genes)
         contigs.at[
@@ -143,7 +147,7 @@ def main():
     # create class object with configuration parameters
     cfg = checkInput.cfg2obj(config_path)
 
-    process_assignments(cfg, gff_df, taxonomic_assignment, TAX_DB_local)
+    process_assignments(cfg, gff_df, taxonomic_assignment, TAX_DB)
 
 
 if __name__ == '__main__':

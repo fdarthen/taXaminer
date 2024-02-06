@@ -7,27 +7,22 @@
 Expects path to config file
 """
 __author__ = "Simonida Zehr, Freya Arthen"
-__version__ = "0.6.0"
 
-import os
-import time
 
 from . import classes
 from . import checkInput
 from . import prepareData
 
 import numpy as np
-import pathlib # to create directories
 import operator # for quick comparisons
 import scipy.stats as stats # for Pearson's R
 from itertools import product as itertools_product # to generate all possible oligonucleotides from base alphabet
-from Bio.Seq import Seq as BioPython_Seq # to count oligonucleotides (also overlapping ones! not implemented in normal count)
 import sys # parse command line arguments
 import logging
-import pandas as pd
 import pysam
 import multiprocessing as mp
-
+from tqdm import tqdm
+import os
 
 # ====================== CONSTANTS ======================
 # define nucleotide alphabet
@@ -420,10 +415,10 @@ def compute_coverage_and_positional_info(a, cfg):
 
     """
 
-    all_genes_coverage = []
+    bam_indices = a.get_bam_paths().keys()
 
     # for ALL contigs (with coverage info)
-    for contig in a.get_contigs().values():
+    for contig_name, contig in a.get_contigs().items():
 
         if cfg.include_coverage:
             # compute coverage info for this contig:
@@ -435,28 +430,28 @@ def compute_coverage_and_positional_info(a, cfg):
         if contig.geneless_info() == 1:
             if cfg.include_coverage:
                 contig.set_gene_coverage_mean_and_sd(
-                            {bam_index: np.nan for bam_index in a.get_bam_paths().keys()},
-                            {bam_index: np.nan for bam_index in a.get_bam_paths().keys()})
+                            {bam_index: np.nan for bam_index in bam_indices},
+                            {bam_index: np.nan for bam_index in bam_indices})
             contig.set_gene_lengths_mean_and_sd(np.nan, np.nan)
 
         else:
             # compute coverage info for the genes on this contig
             #  (also set length_of_covered_bases for each gene)
-            contig.compute_gene_coverage_info(a)
+            contig.compute_gene_coverage_info()
+
             # compute info on absolute positions of genes
-            contig.compute_gene_positional_info(a)
+            contig.compute_gene_positional_info()
 
             # to store all ACTUAL gene lengths on this contig
             contig_gene_lengths = []
             # to store how many bases are covered in each gene on this contig
-            contig_gene_covered_base_lengths = {bam_index: [] for bam_index in a.get_bam_paths().keys()}
+            contig_gene_covered_base_lengths = {bam_index: [] for bam_index in bam_indices}
             # to store each gene's mean GC value
             contig_gene_gcs = []
             # to store each gene's mean coverage
-            contig_gene_covs = {bam_index: [] for bam_index in a.get_bam_paths().keys()}
+            contig_gene_covs = {bam_index: [] for bam_index in bam_indices}
 
-            for gene_name in contig.get_genes():
-                gene = a.get_gene(gene_name)
+            for gene_name, gene in contig.get_genes().items():
 
                 contig_gene_lengths.append(gene.get_length())
                 contig_gene_gcs.append(gene.get_gc_content())
@@ -524,7 +519,16 @@ def get_observed_oligonuc_freq(given_seq, oligonuc):
     Returns:
 
     """
-    return BioPython_Seq(given_seq).count_overlap(oligonuc)
+
+    count = start = 0
+    while True:
+        start = given_seq.find(oligonuc, start) + 1
+        if start > 0:
+            count += 1
+        else:
+            break
+
+    return count
 
 #TODO: merge the next three functions into one
 def get_tetranuc_freqs(given_seq):
@@ -821,13 +825,7 @@ def compute_stats(a, cfg, lgth_corr_function):
     # gather how many bases are COVERED for each gene
     gene_covered_bases_lengths = {bam_index: [] for bam_index in a.get_bam_paths().keys()}
 
-    #print(a.get_contigs().keys())
-
     for contig_name, contig in a.get_contigs().items():
-
-        if contig_name in a.get_geneless_contigs().keys():
-            #print(contig_name)
-            continue
 
         #------ Gather Length, Coverage & GC Info Contig ----------------
         # get contig length + add it to list of all contig lengths
@@ -1037,15 +1035,14 @@ def filter_contigs_and_genes(a, cfg):
         if contig.geneless_info() == 1:
             a.add_geneless_contig(contig_name, contig)
 
-
         # if no read coverage info is available for this contig
         if cfg.include_coverage and contig.no_coverage_info():
             # store it to appropriate dict
             a.add_contig_without_cov(contig_name, contig)
 
             # and store all its genes to an appropriate dict
-            for gene_name in contig.get_genes():
-                a.add_gene_without_cov(gene_name, a.get_gene(gene_name))
+            for gene_name, gene in contig.get_genes().items():
+                a.add_gene_without_cov(gene_name, gene)
 
     if cfg.include_coverage:
         # delete all contigs & genes that have no cov info
@@ -1056,7 +1053,131 @@ def filter_contigs_and_genes(a, cfg):
             a.remove_contig(contig_name)
 
 
-def get_raw_array(a, stats_ref):
+def compute_raw_array(args):
+
+    (contig, stats_ref, bam_indices) = args
+
+    contig_arrays = []
+
+    c_len = contig.get_length()
+    c_pct_assembly_len = percentage_assembly_length(c_len, stats_ref[
+        "considered assembly length"])
+    # to get the percentage of only the contigs considered, this line should be:
+    # c_pct_assembly_len = percentage_assembly_length(c_len, stats_ref["considered assembly length"])
+
+    # -------oligo info--------
+    # compute correlation between the z-score vectors of the oligonucleotide frequencies
+    # of this contig and of all contigs (only those considered)
+    c_z_score_vector = contig.get_z_score_vector()
+    c_pearson_test = pearsonr_with_nans_omitted(c_z_score_vector,
+                                                stats_ref[
+                                                    "z-score vector (considered contigs)"])
+    c_pearson_r = c_pearson_test[0]  # get the correlation coefficient
+    c_pearson_p = c_pearson_test[1]  # get the p-value of the correlation
+    # -------oligo info--------
+
+    c_gc_content = contig.get_gc_content()
+    c_gcdev = contig.gcdev_from_overall(stats_ref["contig gc mean"],
+                                        stats_ref["contig gc sd"])
+
+    c_cov = {bam_index: contig.get_coverage(bam_index) for bam_index in
+             bam_indices}
+    c_covsd = {bam_index: contig.get_coverage_sd(bam_index) for bam_index in
+               bam_indices}
+    c_covdev = {bam_index: contig.covdev_from_overall(
+        stats_ref["contig cov mean"][bam_index],
+        stats_ref["contig cov sd"][bam_index], bam_index)
+                for bam_index in bam_indices}
+    c_genecovm = {bam_index: contig.get_gene_coverage_mean(bam_index) for
+                  bam_index in bam_indices}
+    c_genecovsd = {bam_index: contig.get_gene_coverage_sd(bam_index) for
+                   bam_index in bam_indices}
+    c_genelenm = contig.get_gene_lengths_mean()
+    c_genelensd = contig.get_gene_lengths_sd()
+
+    contig_array = [
+        contig.get_name(),  # index 1
+
+        # spatial contig variables:
+        contig.get_number_of_genes(),  # index 2
+        c_len,  # index 3
+        c_pct_assembly_len,  # c_lendev # index 4
+        c_genelenm,  # index 5
+        c_genelensd,  # index 6
+
+        # coverage-related contig variables:
+        c_cov,  # index 7
+        c_covsd,  # index 8
+        c_covdev,  # index 9
+        c_genecovm,  # index 10
+        c_genecovsd,  # index 11
+
+        # compositional contig variables:
+        c_pearson_r,  # index 12
+        c_pearson_p,  # index 13
+        c_gc_content,  # index 14
+        c_gcdev,  # index 15
+    ]
+
+    for gene in contig.get_genes().values():
+        # compute correlation between the z-score vectors of the
+        # oligonucleotide frequencies ...
+        # ... of this gene and of all contigs (only those considered)
+        g_z_score_vector = gene.get_z_score_vector()
+        g_pearson_test_o = pearsonr_with_nans_omitted(g_z_score_vector,
+                                                      stats_ref[
+                                                          "z-score vector (considered contigs)"])
+        g_pearson_r_o = g_pearson_test_o[0]  # correlation coefficient
+        g_pearson_p_o = g_pearson_test_o[1]  # p-value of the correlation
+
+        # ... of this gene and of its contig
+        g_pearson_test_c = pearsonr_with_nans_omitted(g_z_score_vector,
+                                                      c_z_score_vector)
+        g_pearson_r_c = g_pearson_test_c[0]  # correlation coefficient
+        g_pearson_p_c = g_pearson_test_c[1]  # p-value of the correlation
+        # ------------------
+
+        gene_array = [
+            # spatial gene variables:
+            gene.get_length(),  # index 16
+            gene.lendev_from_contig(contig),  # index 17
+            gene.lendev_from_overall(stats_ref["gene len mean"],
+                                     stats_ref["gene len sd"]),  # index 18
+            gene.get_absolute_pos(),  # index 19
+            gene.get_terminal_info(),  # index 20
+            gene.get_single_gene_info(),  # index 21
+
+            # coverage-related gene variables:
+            {bam_index: gene.get_coverage(bam_index) for bam_index in bam_indices},
+            # index 22
+            {bam_index: gene.get_coverage_sd(bam_index) for bam_index in
+             bam_indices},  # index 23
+            {bam_index: gene.covdev_from_contig(contig, bam_index) for bam_index in
+             bam_indices},  # index 24
+            {bam_index: gene.covdev_from_overall(
+                stats_ref["gene cov mean"][bam_index],
+                stats_ref["gene cov sd"][bam_index], bam_index) \
+             for bam_index in bam_indices},  # index 25
+
+            # compositional gene variables:
+            g_pearson_r_o,  # index 26
+            g_pearson_p_o,  # index 27
+            g_pearson_r_c,  # index 28
+            g_pearson_p_c,  # index 29
+
+            gene.get_gc_content(),  # index 30
+            gene.gcdev_from_contig(contig),  # index 31
+            gene.gcdev_from_overall(stats_ref["gene gc mean"],
+                                    stats_ref["gene gc sd"]),  # index 32
+        ]
+
+        contig_arrays.append([gene.get_name()] + contig_array + gene_array)
+
+    return contig_arrays
+
+
+
+def get_raw_array(cfg, a, stats_ref):
     """
     Loops over all  contigs requested in a.contigs.keys()
     and returns their metrics in an (n x p) "matrix" (data type: array of arrays)
@@ -1069,118 +1190,25 @@ def get_raw_array(a, stats_ref):
       stats_ref:
 
     Returns:
+    :param cfg:
 
     """
 
     output_array = []
+    bam_indices = list(a.get_bam_paths().keys())
+    calls = []
+    pool = mp.Pool(cfg.threads)
 
     for contig_name, contig in a.get_contigs().items():
 
         c_ngenes = contig.get_number_of_genes()
-
-        # only if the contig has any genes:
+        # only if the contig has any genes (otherwise no gene_array to obtain)
         if c_ngenes > 0:
+            calls.append((contig, stats_ref, bam_indices))
 
-            c_len = contig.get_length()
-            c_pct_assembly_len = percentage_assembly_length(c_len, stats_ref["considered assembly length"])
-            # to get the percentage of only the contigs considered, this line should be:
-            #c_pct_assembly_len = percentage_assembly_length(c_len, stats_ref["considered assembly length"])
-
-            # -------oligo info--------
-            # compute correlation between the z-score vectors of the oligonucleotide frequencies
-            # of this contig and of all contigs (only those considered)
-            c_z_score_vector = contig.get_z_score_vector()
-            c_pearson_test = pearsonr_with_nans_omitted(c_z_score_vector,
-                                                  stats_ref["z-score vector (considered contigs)"])
-            c_pearson_r = c_pearson_test[0] # get the correlation coefficient
-            c_pearson_p = c_pearson_test[1] # get the p-value of the correlation
-            # -------oligo info--------
-
-            c_gc_content = contig.get_gc_content()
-            c_gcdev = contig.gcdev_from_overall(stats_ref["contig gc mean"],
-                                                   stats_ref["contig gc sd"])
-
-            c_cov = {bam_index: contig.get_coverage(bam_index) for bam_index in a.get_bam_paths().keys()}
-            c_covsd = {bam_index: contig.get_coverage_sd(bam_index) for bam_index in a.get_bam_paths().keys()}
-            c_covdev = {bam_index: contig.covdev_from_overall(stats_ref["contig cov mean"][bam_index],
-                            stats_ref["contig cov sd"][bam_index], bam_index)
-                            for bam_index in a.get_bam_paths().keys()}
-            c_genecovm = {bam_index: contig.get_gene_coverage_mean(bam_index) for bam_index in a.get_bam_paths().keys()}
-            c_genecovsd = {bam_index: contig.get_gene_coverage_sd(bam_index) for bam_index in a.get_bam_paths().keys()}
-            c_genelenm = contig.get_gene_lengths_mean()
-            c_genelensd = contig.get_gene_lengths_sd()
-
-            for gene_name in contig.get_genes():
-                gene = a.get_gene(gene_name)
-
-                # compute correlation between the z-score vectors of the oligonucleotide frequencies ...
-                #        ... of this gene and of all contigs (only those considered)
-                g_z_score_vector = gene.get_z_score_vector()
-                g_pearson_test_o = pearsonr_with_nans_omitted(g_z_score_vector,
-                                        stats_ref["z-score vector (considered contigs)"])
-                g_pearson_r_o = g_pearson_test_o[0] # get the correlation coefficient
-                g_pearson_p_o = g_pearson_test_o[1] # get the p-value of the correlation
-
-                #        ... of this gene and of its contig
-                g_pearson_test_c = pearsonr_with_nans_omitted(g_z_score_vector, c_z_score_vector)
-                g_pearson_r_c = g_pearson_test_c[0] # get the correlation coefficient
-                g_pearson_p_c = g_pearson_test_c[1] # get the p-value of the correlation
-                # ------------------
-
-                gene_array = [
-
-                    gene_name, # index 0
-                    contig_name, # index 1
-
-                    # spatial contig variables:
-                    c_ngenes, # index 2
-                    c_len, # index 3
-                    c_pct_assembly_len, # c_lendev # index 4
-                    c_genelenm, # index 5
-                    c_genelensd, # index 6
-
-                    # coverage-related contig variables:
-                    c_cov,  # index 7
-                    c_covsd, # index 8
-                    c_covdev, # index 9
-                    c_genecovm, # index 10
-                    c_genecovsd, # index 11
-
-                    # compositional contig variables:
-                    c_pearson_r, # index 12
-                    c_pearson_p, # index 13
-                    c_gc_content, # index 14
-                    c_gcdev, # index 15
-
-                    # spatial gene variables:
-                    gene.get_length(), # index 16
-                    gene.lendev_from_contig(a), # index 17
-                    gene.lendev_from_overall(stats_ref["gene len mean"],
-                                            stats_ref["gene len sd"]), # index 18
-                    gene.get_absolute_pos(), # index 19
-                    gene.get_terminal_info(), # index 20
-                    gene.get_single_gene_info(), # index 21
-
-                    # coverage-related gene variables:
-                    {bam_index: gene.get_coverage(bam_index) for bam_index in a.get_bam_paths().keys()}, # index 22
-                    {bam_index: gene.get_coverage_sd(bam_index) for bam_index in a.get_bam_paths().keys()}, # index 23
-                    {bam_index: gene.covdev_from_contig(a, bam_index) for bam_index in a.get_bam_paths().keys()}, # index 24
-                    {bam_index: gene.covdev_from_overall(stats_ref["gene cov mean"][bam_index], stats_ref["gene cov sd"][bam_index], bam_index) \
-                        for bam_index in a.get_bam_paths().keys()}, # index 25
-
-                    # compositional gene variables:
-                    g_pearson_r_o, # index 26
-                    g_pearson_p_o, # index 27
-                    g_pearson_r_c, # index 28
-                    g_pearson_p_c, # index 29
-
-                    gene.get_gc_content(), # index 30
-                    gene.gcdev_from_contig(a), # index 31
-                    gene.gcdev_from_overall(stats_ref["gene gc mean"],
-                                            stats_ref["gene gc sd"]), # index 32
-                ]
-
-                output_array.append(gene_array)
+    if calls:
+        for i in pool.imap_unordered(compute_raw_array, calls):
+            output_array = output_array + i
 
     return output_array
 
@@ -1414,29 +1442,20 @@ def init_contig(a, name, length):
       name:
       length:
     """
-    # add this length to a.all_contig_lengths
-    # to store the size of the initial (unfiltered) assembly
-    a.add_contig_length(length)
+
     # initialise contig
     contig = classes.Contig(name, length, a)
-    # add to dictionary of contigs
-    a.add_contig(name, contig)
+    return contig
 
 
-def init_gene(a, row):
+def init_gene(bam_indicies, contig, row):
 
-    gene = classes.Gene(row.name, row.start, row.end,
-                        row.scaffold, row.source, row.score, row.strand, row.add_attrs, a)
-
-
-    if any('partial' in key for key in row.add_attrs.keys()):
-        a.add_partial_gene(row.name, gene)
-
-    # add to dictionary of genes
-    a.add_gene(row.name, gene)
+    gene = classes.Gene(row.name, row.start, row.end,row.scaffold,
+                        row.source, row.score, row.strand, row.add_attrs, bam_indicies, contig)
 
     # add to list of genes in associated contig
-    a.get_contig(row.scaffold).add_gene(row.name)
+    contig.add_gene(row.name, gene)
+
 
 
 # ==============================================================
@@ -1470,7 +1489,7 @@ def return_positions_of_Ns(sequence):
     return {(i+1) for i, base in enumerate(sequence) if base == "N"}
 
 
-def set_seq_info(a, cfg, current_contig, raw_seq, total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs):
+def set_seq_info(current_contig, raw_seq):
     """set sequence info for given contig.
 
     Args:
@@ -1485,11 +1504,11 @@ def set_seq_info(a, cfg, current_contig, raw_seq, total_tetranuc_freqs, total_tr
 
     """
 
-
     # get a set holding the (1-based) positions of all Ns in this contig
     contig_N_pos = return_positions_of_Ns(raw_seq)
     # pass the set to the contig
     current_contig.set_positions_of_Ns(contig_N_pos)
+
     contig_seq = raw_seq.replace("N", "") # remove all ambiguous characters
     # CAUTION!! LENGTH OF CONTIGS / GENES IS *WITH* AMBIGUOUS CHARACTERS
 
@@ -1502,11 +1521,6 @@ def set_seq_info(a, cfg, current_contig, raw_seq, total_tetranuc_freqs, total_tr
     contig_z_score_vector =\
       calculate_z_score_vector(contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs)
     current_contig.set_z_score_vector(contig_z_score_vector)
-    # add oligofrequencies in contig to total oligofrequencies observed so far
-    total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs = \
-      update_observed_oligofreqs(total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs,
-                                    contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs)
-    # <----- OLIGOTEST
 
     # compute GC content of this contig
     contig_gc = (contig_seq.count('G')  / len(contig_seq)) \
@@ -1514,8 +1528,7 @@ def set_seq_info(a, cfg, current_contig, raw_seq, total_tetranuc_freqs, total_tr
 
     current_contig.set_gc_content(contig_gc)
 
-    for gene_name in current_contig.get_genes():
-        current_gene = a.get_gene(gene_name)
+    for gene_name, current_gene in current_contig.get_genes().items():
 
         # ---- get start and end position ------------
         # because bp are 1-based but python lists are 0-based:
@@ -1545,33 +1558,79 @@ def set_seq_info(a, cfg, current_contig, raw_seq, total_tetranuc_freqs, total_tr
 
         current_gene.set_gc_content(gene_gc)
 
+    return contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs #total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs
+
+
+def init_contig_and_genes(in_queue, results_queue):
+
+    while True:
+        queue_item = in_queue.get()
+        # check for end of queue
+        if queue_item is None:
+            break
+
+        (contig_gff, bam_indicies, cfg, contig_id, raw_seq) = queue_item
+        # initialize contig and its genes
+        current_contig = init_contig(bam_indicies, contig_id, len(raw_seq))
+
+
+        seqs = {}
+        ## init genes for current scaffold (which is already initialized)
+        contig_genes = (contig_gff['type'] == "gene")
+        genes = contig_gff[contig_genes]
+        #print(f"{contig_id}: {genes.shape}")
+        if not genes.empty:
+            genes.apply(lambda row: init_gene(bam_indicies, current_contig, row), axis=1)
+            if cfg.extract_proteins:
+                seqs = genes.apply(lambda row: prepareData.set_seqs(cfg, contig_gff, row, raw_seq, "#>#dummy"), axis=1)
+
+        contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs = \
+            set_seq_info(current_contig, raw_seq)
+
+        results_queue.put((current_contig, contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs, seqs))
+
+    results_queue.put(None)
+
+def add_fasta_data2a(results, a, cfg, proteins_file,
+                     total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs):
+
+
+    (contig, contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs,
+     seqs) = results
+
+    # save results to a
+    # add length to a.all_contig_lengths
+    # to store the size of the initial (unfiltered) assembly
+    a.add_contig_length(contig.length)
+    # add to dictionary of contigs
+    a.add_contig(contig.name, contig)
+
+    # add oligofrequencies in contig to total oligofrequencies observed so far
+    total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs = \
+        update_observed_oligofreqs(total_tetranuc_freqs, total_trinuc_freqs,
+                                   total_dinuc_freqs,
+                                   contig_tetranuc_freqs, contig_trinuc_freqs,
+                                   contig_dinuc_freqs)
+
+    ## genes
+    if contig.genes:
+        for g_name, gene in contig.get_genes().items():
+            # add to dictionary of genes
+            a.add_gene(g_name, gene)
+            if gene.partial:
+                a.add_partial_gene(g_name, gene)
+
+        if cfg.extract_proteins:
+            # write protein sequence
+            for seq in seqs:
+                proteins_file.write(f">{seq[0]}\n{seq[1]}\n")
+    else:
+        a.add_geneless_contig(contig.name, contig)
+
     return total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs
 
 
-def init_contig_and_genes(gff_df, a, cfg, contig_id, raw_seq, proteins_file,
-                          total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs):
-    # initialize contig and it sgenes
-    init_contig(a, contig_id, len(raw_seq))
-    current_contig = a.get_contig(contig_id)
-
-    ## only init genes for current scaffold (which is already initialized)
-    contig_genes = (gff_df['scaffold'] == contig_id) & (gff_df['type'] == "gene")
-    if not gff_df[contig_genes].empty:
-        genes = gff_df[contig_genes]
-        genes.apply(lambda row: init_gene(a, row), axis=1)
-        if proteins_file:
-            genes.apply(lambda row: prepareData.set_seqs(cfg, gff_df, row, raw_seq, proteins_file), axis=1)
-    else:
-        # contig is geneless
-        # a.remove_contig(tmp_contig_name)     #TODO: remove from list?!?!
-        a.add_geneless_contig(contig_id, current_contig)
-
-    total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs = \
-        set_seq_info(a, cfg, current_contig, raw_seq, total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs)
-
-
-
-def read_fasta(cfg, a, gff_df):
+def read_fasta(cfg, a, gff_df, in_queue):
     """
 
     Args:
@@ -1582,26 +1641,24 @@ def read_fasta(cfg, a, gff_df):
 
     """
 
-    # variable needed to keep track of currently parsed contig
-    total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs = init_tetranuc_freq()
+    bam_indicies = list(a.get_bam_paths().keys())
+    num_lines = sum(1 for line in open(a.get_fasta_path(), 'r'))
 
-    logging.info(f">> reading FASTA file")
     with open(a.get_fasta_path(), 'r') as fasta: # open FASTA file
-        if cfg.extract_proteins:
-            proteins_file = open(cfg.proteins_path, 'w')
-        else:
-            proteins_file = None
         contig_id = next(fasta).split()[0][1:]
         raw_seq = ''
-        for line in fasta:
+
+        for line in tqdm(fasta, desc ="lines read", total=num_lines-1):
             line = line.strip()
 
             # if line contains fasta header
             # store sequence of previous contig and save new name
             if line.startswith(">"):
 
-                init_contig_and_genes(gff_df, a, cfg, contig_id, raw_seq, proteins_file,
-                                      total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs)
+                #c_count += 1
+                # reduce amount of data to be pickeled for parallelization
+                contig_gff = gff_df.query(f'scaffold == "{contig_id}"')
+                in_queue.put((contig_gff, bam_indicies, cfg, contig_id, raw_seq))
 
                 # refresh for new contig
                 raw_seq = ''
@@ -1609,19 +1666,87 @@ def read_fasta(cfg, a, gff_df):
             else:
                 raw_seq = raw_seq + line.upper()
 
-        # last contig
-        init_contig_and_genes(gff_df, a, cfg, contig_id, raw_seq, proteins_file,
-                              total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs)
+        contig_gff = gff_df.query(f'scaffold == "{contig_id}"')
+        in_queue.put((contig_gff, bam_indicies, cfg, contig_id, raw_seq))
+
+    logging.info(">>> processing sequence information")
+
+    # add sentinels to track if queue really is empty
+    for p in range(cfg.threads):
+        in_queue.put(None)
+
+
+def process_fasta(cfg, a, gff_df):
+
+    logging.info(f">> reading FASTA file")
+    in_queue = mp.Queue()
+    results_queue = mp.Queue()
+    # start the processing
+    pool = mp.Pool(cfg.threads-1, init_contig_and_genes, (in_queue, results_queue,))
+    # start the reading
+    read_process = mp.Process(target=read_fasta, args=(cfg, a, gff_df, in_queue,))
+    read_process.start()
+    # wait for all processes to finish
+    read_process.join()
+    read_process.close()
+    pool.close()
+
+    total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs = init_tetranuc_freq()
+    if cfg.extract_proteins:
+        proteins_file = open(cfg.proteins_path, 'w')
+    else:
+        proteins_file = None
+
+    sentinel_countdown = cfg.threads - 1
+    while sentinel_countdown > 0:
+        results = results_queue.get()
+        if results is None:
+            sentinel_countdown -= 1
+            continue
+        total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs = add_fasta_data2a(
+            results, a, cfg, proteins_file, total_tetranuc_freqs,
+            total_trinuc_freqs, total_dinuc_freqs)
 
     if proteins_file:
         proteins_file.close()
-    a.set_total_z_score_vector(calculate_z_score_vector(total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs))
+
+    a.set_total_z_score_vector(
+        calculate_z_score_vector(total_tetranuc_freqs,
+                                 total_trinuc_freqs,
+                                 total_dinuc_freqs))
+
+    in_queue.close()
+    in_queue.join_thread()
+    results_queue.close()
+    results_queue.join_thread()
+    pool.join()
 
 
 # ==============================================================
 # ===================== READ COVERAGE FILE =====================
 # ==============================================================
 
+
+def compute_coverage(args):
+    (contig_name, bam_path, index_path) = args
+
+    bamfile = pysam.AlignmentFile(bam_path, "rb",
+                                  index_filename=index_path)
+
+    cov_array = bamfile.count_coverage(contig_name,
+                                       quality_threshold=0,
+                                       read_callback='nofilter')
+
+
+    # cov_array is a tuple of 4 arrays: one for each nucleotide, each position representing the
+    # number of reads with the respective nucleotide at respective position
+    # position wit Ns will be included with a coverage of 0
+    contig_coverage = [sum([cov_array[base][pos] for base in range(4)]) for pos
+                       in range(len(cov_array[0]))]
+
+    bamfile.close()
+
+    return contig_name, contig_coverage
 
 
 def read_bam(cfg, a):
@@ -1641,24 +1766,32 @@ def read_bam(cfg, a):
             bamfile = pysam.AlignmentFile(bam_path, "rb")
             try:
                 bamfile.check_index()
+                index_path = f"{bam_path}.bai"
             except ValueError:
-                #TODO: check if bai exists in tmp dir
-                logging.info('>>> generating BAM file index')
-                pysam.index(bam_path,
-                            f"{cfg.output_path}/tmp/mapping_{bam_index}.bam.bai")
-                bamfile = pysam.AlignmentFile(bam_path, "rb",
-                                              index_filename=f"{cfg.output_path}tmp/mapping_{bam_index}.bam.bai")
+                index_path = f"{cfg.output_path}tmp/mapping_{bam_index}.bam.bai"
+                if os.path.exists(index_path):
+                    logging.info(f'>>> using BAM file index at {index_path}')
+                else:
+                    logging.info('>>> creating BAM file index')
+                    pysam.index(bam_path, index_path)
+
+            calls = []
 
             for contig_name, contig in a.get_contigs().items():
                 if not contig_name in a.get_contigs().keys(): # if contig has no genes
                     continue
-                cov_array = bamfile.count_coverage(contig_name,
-                                                   quality_threshold=0,
-                                                   read_callback='nofilter')
-                # cov_array is a tuple of 4 arrays: one for each nucleotide, each position representing the
-                # number of reads with the respective nucleotide at respective position
-                contig_coverage = [sum([cov_array[base][pos] for base in range(4)]) for pos in range(len(cov_array[0]))]
-                contig.add_base_coverage(bam_index, contig_coverage)
+                calls.append((contig_name, bam_path, index_path))
+
+
+            if calls:
+                pool = mp.Pool(cfg.threads)
+                for i in tqdm(pool.imap_unordered(compute_coverage, calls),
+                              desc ="contigs processed", total=len(calls)):
+                    contig = a.get_contig(i[0])
+                    coverage_wo_ns = [np.nan if pos in contig.positions_of_Ns else cov for pos, cov in enumerate(i[1])]
+                    contig.add_base_coverage(bam_index, coverage_wo_ns)
+                pool.close()
+                pool.join()
 
 
 # # !!!!!!!!!!!!!!!!!!!!!!!!!!! GENERATE OUTPUT PART !!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1681,7 +1814,7 @@ def process_gene_info(cfg, gff_df):
 
     a = classes.Assembly(cfg.gff_path, cfg.fasta_path, cfg.bam_paths, cfg.output_path)
 
-    read_fasta(cfg, a, gff_df)
+    process_fasta(cfg, a, gff_df)
     # if a.partial_genes:
     #     logging.warning(f'Gene(s) excluded due to partialness:\n'
     #                     f'{list(a.partial_genes.keys())}')
@@ -1705,8 +1838,8 @@ def process_gene_info(cfg, gff_df):
 
     # ----------------------------------------------------------------------------------
 
-    raw_array = get_raw_array(a, stats_for_all_contigs)
-    output_table(a, raw_array, "raw_gene_table")
+    raw_array = get_raw_array(cfg, a, stats_for_all_contigs)
+    output_table(a, raw_array, "raw_gene_table")#
     imputed_array = impute_array(a, raw_array, cfg.include_coverage)
     output_table(a, imputed_array, "imputed_gene_table")
 

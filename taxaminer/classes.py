@@ -3,12 +3,9 @@
 """Classes for taXaminer
 """
 __author__ = "Simonida Zehr, Freya Arthen"
-__version__ = "0.6.0"
 
 
 import numpy as np
-from operator import itemgetter
-
 
 
 class Assembly:
@@ -153,27 +150,27 @@ class Contig:
     """Object to store information for each contig
     """
 
-    def __init__(self, name, length, a):
+    def __init__(self, name, length, bam_indicies):
         self.name = name
         self.length = length
 
         self.centre_corrector = 0 # see method set_centre_corrector() for detailed explanation
         self.set_centre_corrector()
 
-        self.per_base_coverages = {bam_index: [] for bam_index in a.get_bam_paths().keys()} # array that holds the coverage per base in this contig
+        self.per_base_coverages = {bam_index: [] for bam_index in bam_indicies} # array that holds the coverage per base in this contig
                                 # note that the element at index i is the coverage at base i+1
                                 # (indexing in python is 0-based but sequences are 1-based)
-        self.coverage = {bam_index: np.nan for bam_index in a.get_bam_paths().keys()}
-        self.coverage_sd = {bam_index: np.nan for bam_index in a.get_bam_paths().keys()}
+        self.coverage = {bam_index: np.nan for bam_index in bam_indicies}
+        self.coverage_sd = {bam_index: np.nan for bam_index in bam_indicies}
 
         # set that will hold all positions of Ns in this contig (1-based)
         self.positions_of_Ns = None # used in --> add_base_coverage() function
 
 
-        self.genes = [] # fill with gene names in order to be able to access them from all_genes
+        self.genes = {} # fill with gene names in order to be able to access them from all_genes
 
-        self.gene_coverage_mean = {bam_index: np.nan for bam_index in a.get_bam_paths().keys()}
-        self.gene_coverage_sd = {bam_index: np.nan for bam_index in a.get_bam_paths().keys()}
+        self.gene_coverage_mean = {bam_index: np.nan for bam_index in bam_indicies}
+        self.gene_coverage_sd = {bam_index: np.nan for bam_index in bam_indicies}
 
         self.gene_lengths_mean = None
         self.gene_lengths_sd = None
@@ -188,7 +185,6 @@ class Contig:
         self.dinuc_freqs = None
 
         self.z_score_vector = None
-
 
 
     def get_name(self):
@@ -227,8 +223,8 @@ class Contig:
             self.centre_corrector = 0.5
 
 
-    def add_gene(self, gene):
-        self.genes.append(gene)
+    def add_gene(self, g_name, gene):
+        self.genes[g_name] = gene
 
     def get_genes(self):
         return self.genes
@@ -237,7 +233,7 @@ class Contig:
         return len(self.genes)
 
 
-    def set_gene_positions(self, a):
+    def set_gene_positions(self):
         """Computes the absolute positions for all genes of this contig
         Scaling to 1-----(0.5)-----0-----(0.5)-----1
 
@@ -252,10 +248,10 @@ class Contig:
         tmp_gene_list = []
 
         # for each gene name in the array that holds all genes of this contig
-        for gene in self.genes: # this fills tmp_list with the tuples (gene, gene_start_pos)
-            gene_start_pos = a.get_gene(gene).get_start_pos()
-            gene_centre = a.get_gene(gene).get_centre()
-            gene_end_pos = a.get_gene(gene).get_end_pos()
+        for gene_name, gene in self.genes.items(): # this fills tmp_list with the tuples (gene, gene_start_pos)
+            gene_start_pos = gene.get_start_pos()
+            gene_centre = gene.get_centre()
+            gene_end_pos = gene.get_end_pos()
 
 
             # if the gene is located in the left half of the contig
@@ -291,20 +287,20 @@ class Contig:
             # either gene_centre or contig_centre is erroneous
             else:
                 print("""ERROR IN GENE POS CALCULATION. \n
-                gene = """, gene, ", gene_centre = ", gene_centre, ", contig_centre= ", contig_centre)
+                gene = """, gene_name, ", gene_centre = ", gene_centre, ", contig_centre= ", contig_centre)
 
 
-            a.get_gene(gene).set_absolute_pos(gene_position)
+            gene.set_absolute_pos(gene_position)
 
             # append gene and its start pos info to this list
-            tmp_gene_list.append((gene, gene_start_pos))
+            tmp_gene_list.append((gene_name, gene, gene_start_pos))
 
 
         # sort list holding (gene, start_pos) by second item in the tuple, i.e. gene_start_pos
-        sorted_gene_list = sorted(tmp_gene_list, key=itemgetter(1))
+        sorted_gene_list = sorted(tmp_gene_list, key=lambda x: x[2])
 
         # substitute contig's gene list with list of genes sorted by start_pos
-        self.genes = [i[0] for i in sorted_gene_list]
+        self.genes = {i[0]: i[1] for i in sorted_gene_list}
 
 
     def set_positions_of_Ns(self, N_positions):
@@ -363,12 +359,11 @@ class Contig:
         return self.coverage_sd.get(bam_index)
 
 
-    def compute_gene_coverage_info(self, a):
+    def compute_gene_coverage_info(self):
         """Compute the coverage mean & SD and set them
         for each Gene object associated with this contig"""
 
-        for gene_name in self.genes:
-            gene = a.get_gene(gene_name)
+        for gene_name, gene in self.genes.items():
 
             # because bp are 1-based but python lists are 0-based:
             cov_start = gene.get_start_pos() - 1
@@ -382,7 +377,7 @@ class Contig:
             # missing base coverages are substituted with NaNs
             # get array WITHOUT NaNs
             gene_bam_without_nans = {}
-            for bam_index in a.get_bam_paths().keys():
+            for bam_index in self.gene_coverage_mean.keys():
                 gene_bam_without_nans[bam_index] = [cov for cov in self.per_base_coverages[bam_index][cov_start:cov_end]
                                                 if not np.isnan(cov)]
 
@@ -427,26 +422,26 @@ class Contig:
     def get_gene_gc_sd(self):
         return self.gene_gc_sd
 
-    def compute_gene_positional_info(self, a):
+    def compute_gene_positional_info(self):
         """Compute and set all positional information for this gene
         i.e. absolute position, no right/left neighbour info, single-gene contig info"""
         # set absolute positions of genes
         if self.genes: # check for emtpy list
-            self.set_gene_positions(a)
+            self.set_gene_positions()
             # self.genes get sorted by start_pos in this step
 
             # flag first gene as without left neighbour
-            first_gene = a.get_gene(self.genes[0])
+            first_gene = self.genes.get(list(self.genes.keys())[0])
             first_gene.set_no_left_neighbour(1)
 
             # flag last gene as without right neighbour
-            last_gene = a.get_gene(self.genes[(len(self.genes) - 1)])
+            last_gene = self.genes.get(list(self.genes.keys())[-1])
             last_gene.set_no_right_neighbour(1)
 
             # if there is only one gene in self.genes
             if len(self.genes) == 1:
                 # flag as only gene
-                a.get_gene(self.genes[0]).set_single_gene_info(1)
+                self.genes.get(list(self.genes.keys())[0]).set_single_gene_info(1)
 
     def single_gene_info(self):
         """Returns pseudobool 1 if this contig has only one gene
@@ -571,11 +566,11 @@ class Gene:
     z_score_vector : str
     """
 
-    def __init__(self, name, start_pos, end_pos, contig, source, score, strand, attributes, a):
+    def __init__(self, name, start_pos, end_pos, contig_id, source, score, strand, attributes, bam_indicies, contig):
         self.name = name
         self.start_pos = start_pos
         self.end_pos = end_pos
-        self.contig = contig
+        self.contig = contig_id
         self.source = source
         self.score = score
         self.strand = strand
@@ -583,11 +578,11 @@ class Gene:
 
         # set length
         self.length = self.end_pos - self.start_pos + 1
-        self.percentage_of_contig_length = self.compute_percentage_of_contig_length(a)
-        self.length_of_covered_bases = {bam_index: np.nan for bam_index in a.get_bam_paths().keys()}
+        self.percentage_of_contig_length = self.compute_percentage_of_contig_length(contig)
+        self.length_of_covered_bases = {bam_index: np.nan for bam_index in bam_indicies}
 
-        self.coverage = {bam_index: np.nan for bam_index in a.get_bam_paths().keys()} # list of mean coverage for each cov profile
-        self.coverage_sd = {bam_index: np.nan for bam_index in a.get_bam_paths().keys()} # dict of coverage SD for each coverage profile
+        self.coverage = {bam_index: np.nan for bam_index in bam_indicies} # list of mean coverage for each cov profile
+        self.coverage_sd = {bam_index: np.nan for bam_index in bam_indicies} # dict of coverage SD for each coverage profile
 
 
         self.absolute_pos = None
@@ -597,6 +592,8 @@ class Gene:
         self.single_gene = 0            # "false" by default
 
         self.gc_content = None
+
+        self.partial = 1 if any(True if ('partial' in key and attributes.get(key).lower() in ['yes', 'true']) else False for key in attributes.keys()) else 0
 
         self.tetranuc_freqs = None
         self.trinuc_freqs = None
@@ -689,8 +686,8 @@ class Gene:
     def get_length_of_covered_bases(self, bam_index):
         return self.length_of_covered_bases.get(bam_index)
 
-    def compute_percentage_of_contig_length(self, a):
-        contig_length = a.get_contig(self.contig).get_length()
+    def compute_percentage_of_contig_length(self, contig):
+        contig_length = contig.get_length()
         return ((self.length / contig_length) * 100)
 
     def get_percentage_of_contig_length(self):
@@ -703,7 +700,7 @@ class Gene:
         return self.gc_content
 
 
-    def lendev_from_contig(self, a):
+    def lendev_from_contig(self, contig):
         """Indicates how much the gene length deviates from the mean gene length
         on the contig, in units of gene length SD (contig)."""
 
@@ -713,13 +710,13 @@ class Gene:
             return np.nan
 
 
-        gene_length_sd_contig = a.get_contig(self.contig).get_gene_lengths_sd()
+        gene_length_sd_contig = contig.get_gene_lengths_sd()
         # if all genes in the contig have the same length
         if gene_length_sd_contig == 0:
             # no deviation from contig
             return np.nan
 
-        gene_length_mean_contig = a.get_contig(self.contig).get_gene_lengths_mean()
+        gene_length_mean_contig = contig.get_gene_lengths_mean()
 
         # deviation in units of 1 SD (contig)
         dev_in_sd = abs(gene_length_mean_contig - self.length) / gene_length_sd_contig
@@ -746,7 +743,7 @@ class Gene:
             return dev_in_sd
 
 
-    def covdev_from_contig(self, a, bam_index):
+    def covdev_from_contig(self, contig, bam_index):
         """Indicates how much the gene cov deviates from the mean gene coverage
         on the contig, in units of gene cov SD (contig)."""
 
@@ -755,11 +752,11 @@ class Gene:
             # no comparisons possible
             return np.nan
 
-        gene_cov_sd_contig = a.get_contig(self.contig).get_gene_coverage_sd(bam_index)
+        gene_cov_sd_contig = contig.get_gene_coverage_sd(bam_index)
         if gene_cov_sd_contig == 0:
             # no deviation from contig
             return np.nan
-        gene_cov_mean_contig = a.get_contig(self.contig).get_gene_coverage_mean(bam_index)
+        gene_cov_mean_contig = contig.get_gene_coverage_mean(bam_index)
 
 
         # deviation in units of 1 SD (contig)
@@ -792,7 +789,7 @@ class Gene:
             return dev_in_sd
 
 
-    def gcdev_from_contig(self, a):
+    def gcdev_from_contig(self, contig):
         """Indicates how much the gene GC deviates from the mean gene GC content
         on the contig, in units of gene GC SD (contig)."""
         # if this is the only gene on the contig
@@ -801,13 +798,13 @@ class Gene:
             return np.nan
 
 
-        gene_gc_sd_contig = a.get_contig(self.contig).get_gene_gc_sd()
+        gene_gc_sd_contig = contig.get_gene_gc_sd()
         # if all genes in the contig have the same gc content
         if gene_gc_sd_contig == 0:
             # no deviation from contig
             return np.nan
 
-        gene_gc_mean_contig = a.get_contig(self.contig).get_gene_gc_mean()
+        gene_gc_mean_contig = contig.get_gene_gc_mean()
 
         # deviation in units of 1 SD (contig)
         dev_in_sd = abs(gene_gc_mean_contig - self.gc_content) / gene_gc_sd_contig

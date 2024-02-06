@@ -17,12 +17,8 @@ coverage information and corresponding paths to find the files
 (preparation of config by prepare_and_check.py)
 """
 __author__ = "Freya Arthen"
-__version__ = "0.6.0"
 
-import logging
 import sys
-import pathlib
-import subprocess
 from Bio import Seq
 
 from . import checkInput
@@ -68,9 +64,11 @@ def set_seqs(cfg, gff_df, gene, contig_seq, proteins_file):
     if len(seq)%3 != 0:
         seq += ("N"*(3-(len(seq)%3)))
 
-    protein = str(Seq.Seq(seq).translate(table=int(gene.transl_table)))
+    protein_seq = str(Seq.Seq(seq).translate(table=int(gene.transl_table)))
 
-    write_seq2file(proteins_file, gene.transcript_id, protein)
+    #>#write_seq2file(proteins_file, gene.transcript_id, protein_seq)
+
+    return (gene.transcript_id, protein_seq)
 
 
 def write_seq2file(file, seq_id, seq):
