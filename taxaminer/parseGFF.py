@@ -159,7 +159,7 @@ def strip_ids(gff_df):
     return gff_df
 
 
-def ident_parent(feature, search_features):
+def ident_parent_path(feature, search_features):
     parent_id = [feature.get('parent_id')]
     updated = True
     while updated:
@@ -167,10 +167,10 @@ def ident_parent(feature, search_features):
         for feature in search_features:
             if feature.get('id') == parent_id[-1]:
                 parent_id.append(feature.get('parent_id'))
-                update = True
+                updated = True
                 break
 
-    return parent_id[-2]
+    return parent_id
 
 def process_gene(gene, parent_ids, transcripts, gene_features, non_transcript_types):
 
@@ -207,7 +207,8 @@ def process_gene(gene, parent_ids, transcripts, gene_features, non_transcript_ty
                     for transcript in transcripts:
                         associated_coding_features = \
                             [feat for feat in all_coding_features
-                            if ident_parent(feat, transcripts+gene_features) == transcript.get('id')]
+                             if transcript.get('id') in ident_parent_path(feat,
+                                                  transcripts + gene_features) ]
                         transcript_cds_len = sum([feat.get('length') for feat in associated_coding_features])
                         if transcript_cds_len > gene_cds_len:
                             gene_cds_len = transcript_cds_len
