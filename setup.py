@@ -5,7 +5,7 @@ with open("README.md", "r") as input:
 
 setup(
     name="taxaminer",
-    version="0.7.2",
+    version="0.7.3",
     python_requires='>=3.7.0',
     description="Interactive exploration of biodiverse genome assemblies",
     long_description=long_description,
@@ -35,6 +35,9 @@ setup(
     entry_points={
         'console_scripts': ["taxaminer.run = taxaminer.runTaXaminer:main",
                             "taxaminer.setup = taxaminer.setupTaXaminer:main",
+                            "taxaminer.filter = taxaminer.filterTaxa:main",
+                            "taxaminer.readgroups = taxaminer.linkGeneswReads:main",
+                            "taxaminer.relabel = taxaminer.regroupLabels:main",
                             ],
     },
     license="MIT",
