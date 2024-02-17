@@ -405,7 +405,7 @@ def run_diamond(diamond_cmd):
         logging.error(f'Error running DIAMOND '
                       f'with following command:\n{diamond_cmd}')
         if '\nOpening the database... No such file or directory\n' in dmdnOut.stderr.decode():
-            logging.error('Database does not exists. Please check your input.')
+            logging.error('Database does not exists. Please check the taXaminer setup.')
         # TODO: check for output when putting empty protein file
         elif 'chuighdseck' in dmdnOut.stderr.decode():
             logging.error('Empty protein FASTA file. Please check your input.')
@@ -707,7 +707,7 @@ def add_ta2gene(results, cfg, tax_assignment_path, assignments_df, target_taxon)
 
     (gene_id, hitlist, lca, closest_lca) = results
 
-    #gene_id = assignments_df.query(f'fasta_header == "{fasta_header}"').index.item()
+    #gene_id = assignments_df.query(f'diamond_header == "{diamond_header}"').index.item()
 
     if not hitlist or not lca:
         return
@@ -768,41 +768,46 @@ def read_hit_file(cfg, assignments_df, in_queue):
             #TODO: extend support to parsing already parsed diamond tables
             first_spline = next(diamond_hits).strip().split('\t')
 
-        gene = assignments_df.loc[assignments_df.fasta_header == first_spline[0]]
+        gene = assignments_df.loc[assignments_df.diamond_header == first_spline[0]]
         try:
-            gene.fasta_header.item()
+            gene.diamond_header.item()
+            current_diamond_header = gene.diamond_header.item()
         except:
             logging.error(f"Following protein sequence header could not be "
                           f"conclusively matched to gene ID: {first_spline[0]}\n"
                           f"Please check GFF for ambiguity. "
                           f"Matched genes:\n {gene}")
-        #fasta_header = first_spline[0]
+            current_diamond_header = None
+        #diamond_header = first_spline[0]
         gene_assignments = [first_spline]
         for line in diamond_hits:
             # first hit per gene is "best hit" in terms of alignment score
             spline = line.strip().split('\t')
-            if spline[0] == gene.fasta_header.item(): #fasta_header: #
+            if spline[0] == current_diamond_header: #diamond_header: #
                 gene_assignments.append(spline)
             else:
                 # compute the assignment with list of hits
-                if not gene.empty:
-                    #in_queue.put((fasta_header, gene_assignments))
+                if gene.shape[0] == 1:
+                    #in_queue.put((diamond_header, gene_assignments))
                     in_queue.put((gene.index.item(), gene_assignments))
 
                 # new gene
-                # fasta_header = spline[0]
-                gene = assignments_df.loc[assignments_df.fasta_header == spline[0]]
+                # diamond_header = spline[0]
+                gene = assignments_df.loc[assignments_df.diamond_header == spline[0]]
                 try:
-                    gene.fasta_header.item()
+                    gene.diamond_header.item()
+                    current_diamond_header = gene.diamond_header.item()
                 except:
                     logging.error(
-                        f"Following protein sequence header could not be "
+                        f"Following diamond hit could not be "
                         f"conclusively matched to gene ID: {spline[0]}\n"
-                        f"Please check GFF for ambiguity or other issues."
-                        f"Matched genes:\n {gene}")
+                        f"Please check GFF for ambiguity or other issues. "
+                        f"Will skip hits. Matched genes:\n {gene}.")
+                    current_diamond_header = None
+                    continue
                 gene_assignments = [spline]
 
-        if not gene.empty:
+        if gene.shape[0] == 1:
             in_queue.put((gene.index.item(), gene_assignments))
 
     logging.info(f">>> processing DIAMOND hits")
@@ -933,7 +938,7 @@ def subset_prots_longest_cds(gff_df, proteins_path, path_out):
     """
 
     # when matching prot ID to gene ID it is already checked for the one with the longest CDS
-    longest_transcripts = gff_df.loc[gff_df['type'] == 'gene', 'fasta_header'].to_list()
+    longest_transcripts = gff_df.loc[gff_df['type'] == 'gene', 'diamond_header'].to_list()
 
     logging.info(
         f"{len(longest_transcripts)} proteins written to fasta file for "
@@ -1190,6 +1195,7 @@ def run_assignment(cfg, gff_df, pca_coordinates, TAX_DB):
     # init empty dataframe for taxonomic assignments
     num_genes = gff_df.loc[gff_df['type'] == 'gene'].shape[0]
     assignments_dict = {
+        'diamond_header': gff_df.loc[gff_df['type'] == 'gene', 'diamond_header'].to_list(),
         'fasta_header': gff_df.loc[gff_df['type'] == 'gene', 'fasta_header'].to_list(),
         'best_hit': [None for i in range(num_genes)],
         'best_hitID': [None for i in range(num_genes)],
