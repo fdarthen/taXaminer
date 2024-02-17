@@ -399,6 +399,8 @@ def match_fasta2id(cfg, gff_df):
 
             gff_df = gff_df.join(prot2gene)
 
+            unmapped_header = list(set(prot2gene['fasta_header']) - set(gff_df['fasta_header']))
+
         else:
             # if proteins will not be extracted by taxaminer
             # check of which feature type the ID is used in the protein FASTA
@@ -414,6 +416,9 @@ def match_fasta2id(cfg, gff_df):
             # of the feature that denotes the header in the fasta file
             gff_df['fasta_header'] = gff_df['transcript_id'].map(header_dict)
             gff_df.loc[(gff_df['type'] == 'gene') & (gff_df['fasta_header'].isna()),'fasta_header'] = gff_df['unique_coding_id'].map(header_dict)
+
+            unmapped_header = [key for key in header_dict.keys() if
+                               key not in gff_df['fasta_header']]
 
         # check for protein coding genes that have no assigned protein fasta header
         missing_header = gff_df['fasta_header'].isna()
@@ -431,7 +436,7 @@ def match_fasta2id(cfg, gff_df):
                     f"For details see documentation")
                 sys.exit(1)
             else:
-                if gff_df[~missing_header].shape[0] == len(header_dict):
+                if not unmapped_header:
                     # if every fasta file header was mapped
                     logging.info(f"All headers of the fasta file were mapped to "
                                  f"a gene ID. Additional {gff_df.loc[gff_df['type'] == 'gene'][missing_header].shape[0]} "
@@ -441,6 +446,12 @@ def match_fasta2id(cfg, gff_df):
                         f"Unable to map the following {gff_df[missing_header].shape[0]} "
                         f"gene IDs to a header in the protein FASTA file:\n"
                         f"{gff_df[missing_header].index.to_list()}")
+
+        if unmapped_header:
+            logging.info(f"The following {len(unmapped_header)} header from the "
+                         f"provided file were not mapped to a gene: \n{unmapped_header}")
+
+    gff_df['diamond_header'] = [str(x).split()[0] for x in gff_df['fasta_header'].tolist()]
 
     return gff_df
 
