@@ -9,16 +9,13 @@ __author__ = "Freya Arthen"
 __version__ = "0.6.0"
 
 import argparse
+import gzip
 import os
 import pathlib
-import stat
 import tarfile
-import zipfile
 import requests
-import shutil
 import subprocess
 import sys
-import glob
 
 
 def download_file(local_filename, url):
@@ -70,36 +67,138 @@ def check_executable(cmd_dict):
         print("Installation of Krona failed. Please try again "
                         "by running\n\nconda install -c bioconda krona\n")
 
+def prepare_nr(outPath, db_name):
+    print(f">> downloading {db_name}")
+    download_file(f"{outPath}/{db_name}.gz",
+                  f"https://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/{db_name}.gz")
 
-def setup_db(outPath, cmd_dict):
+    print(">> downloading accession mapping file")
+    download_file(f"{outPath}/prot2taxid.tsv.gz",
+                  "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/prot.accession2taxid.FULL.gz")
+
+    return f"{outPath}/{db_name}.gz"
+
+
+def prepare_uniref(outPath, db_name):
+    print(f">> downloading {db_name}")
+    download_file(f"{outPath}/{db_name}.gz",
+                  f"https://ftp.uniprot.org/pub/databases/uniprot/uniref/{db_name}/{db_name}.fasta.gz")
+    print(">> downloading accession mapping file")
+    download_file(f"{outPath}/idmapping_selected.tab.gz",
+                  "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/idmapping_selected.tab.gz")
+
+    # Columns idmapping_selected.tab
+    # # 0.     UniProtKB - AC
+    # # 1.     UniProtKB - ID
+    # # 2.     GeneID(EntrezGene)
+    # # 3.     RefSeq
+    # # 4.     GI
+    # # 5.     PDB
+    # # 6.     GO
+    # # 7.     UniRef100
+    # # 8.     UniRef90
+    # # 9.     UniRef50
+    # # 10.    UniParc
+    # # 11.    PIR
+    # # 12.    NCBI - taxon
+    # # 13.    MIM
+    # # 14.    UniGene
+    # # 15.    PubMed
+    # # 16.    EMBL
+    # # 17.    EMBL - CDS
+    # # 18.    Ensembl
+    # # 19.    Ensembl_TRS
+    # # 20.    Ensembl_PRO
+    # # 21.    Additional PubMed
+
+    # read taxids that are in nodes files
+    nodes_taxids = []
+    with open(f"{outPath}/nodes.dmp", 'r') as nodes_file:
+        for node in nodes_file:
+            nodes_taxids.append(node.split()[0])
+    old2new = {}
+    with open(f"{outPath}/merged.dmp", 'r') as nodes_file:
+        for match in nodes_file:
+            old2new[match.split()[0]] = match.split()[1]
+
+    # select correct column for respective uniref version
+    if db_name == 'Uniref100':
+        col_num = 7
+    elif db_name == 'Uniref90':
+        col_num = 8
+    else:
+        col_num = 9
+
+    mapping_dict = {}
+
+    with gzip.open(f"{outPath}/idmapping_selected.tab.gz", 'rb') as in_mapping, \
+        gzip.open(f"{outPath}/prot2taxid.tsv.gz", 'wb') as out_mapping:
+        out_mapping.write(f"accession.version\ttaxid\n".encode('utf-8'))
+        for line in in_mapping:
+            spline = line.decode('utf-8').strip().split('\t')
+            if spline[col_num] and spline[12]:
+                if spline[12] in nodes_taxids:
+                    out_mapping.write(f"{spline[0]}\t{spline[12]}\n".encode('utf-8'))
+                    if spline[col_num] in mapping_dict.keys():
+                        mapping_dict[spline[col_num]].append(spline[0])
+                    else:
+                        mapping_dict[spline[col_num]] = [spline[0]]
+                elif spline[col_num] in old2new.keys():
+                    out_mapping.write(
+                        f"{spline[0]}\t{old2new.get(spline[col_num])}\n".encode('utf-8'))
+
+
+    with gzip.open(f"{outPath}/{db_name}.gz", 'rb') as in_db_file, \
+        gzip.open(f"{outPath}/db.gz", 'wb') as out_db_file:
+        for line in in_db_file:
+            if line.decode('utf-8').startswith('>'):
+                uniref_id = line.decode('utf-8').split()[0][1:]
+                if uniref_id in mapping_dict.keys():
+                    joined_accessions = '\x01'.join(mapping_dict.get(uniref_id))
+                    out_db_file.write(f">{joined_accessions}\n".encode('utf-8'))
+                else:
+                    prefix_stripped_line = '_'.join(line.decode('utf-8').split('_')[1:])
+                    out_db_file.write(f">{prefix_stripped_line}".encode('utf-8'))
+            else:
+                out_db_file.write(line)
+
+    os.remove(f"{outPath}/idmapping_selected.tab.gz")
+
+    return f"{outPath}/db.gz"
+
+def setup_db(db_name, outPath, cmd_dict):
     pathlib.Path(outPath).mkdir(parents=True, exist_ok=True)
     print("> downloading files")
-    print(">> downloading nr")
-    download_file(f"{outPath}/nr.gz", "https://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz")
     print(">> downloading taxdmp")
     download_file(f"{outPath}/taxdump.tar.gz",
                   "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz")
-    print(">> downloading accession")
-    download_file(f"{outPath}/prot.accession2taxid.FULL.gz",
-                  "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/prot.accession2taxid.FULL.gz")
+    print("> unpacking taxdmp")
+    open_tarfile(f"{outPath}/taxdump.tar.gz", outPath, "gz",
+                 ["names.dmp", "nodes.dmp", "merged.dmp"])
 
-    print("> unpacking files")
-    open_tarfile(f"{outPath}/taxdump.tar.gz", outPath, "gz", ["names.dmp", "nodes.dmp", "merged.dmp"])
+    if db_name == 'nr' or db_name == 'swissprot':
+        db_path = prepare_nr(outPath, db_name)
+    elif "uniref" in db_name:
+        db_path = prepare_uniref(outPath, db_name)
+
 
     print("> preparing database")
-    index_db = (f'{cmd_dict.get("diamond")} makedb --in "{outPath}/nr.gz" -d "{outPath}/nr" \
-        --taxonmap "{outPath}/prot.accession2taxid.FULL.gz" \
-        --taxonnodes "{outPath}/nodes.dmp" \
-        --taxonnames "{outPath}/names.dmp" \
-        && rm -rf nr.gz prot.accession2taxid.FULL.gz taxdump.tar.gz')
+    index_db = (f'{cmd_dict.get("diamond")} makedb -v --in "{db_path}" '
+                f'-d "{outPath}/db" '
+                f'--taxonmap "{outPath}/prot2taxid.tsv.gz" '
+                f'--taxonnodes "{outPath}/nodes.dmp" '
+                f'--taxonnames "{outPath}/names.dmp" ')
+                #f'&& rm -rf {outPath}/{db_name}.gz {outPath}/db.gz {outPath}/prot2taxid.tsv.gz {outPath}/taxdump.tar.gz')
     out_index_db = subprocess.run([index_db], shell=True, capture_output=True)
     if out_index_db.returncode != 0:
-        print(
-            f"creation of diamond database failed:\n{out_index_db}")
+        print(f"creation of diamond database failed:\n{out_index_db}")
         print("Error message:\n" + out_index_db.stderr.decode())
         sys.exit()
     else:
         print(f">> creation of diamond database successful!")
+        print(
+            f"Setup log:\n{out_index_db}")
+        print("Stdout:\n" + out_index_db.stderr.decode())
 
 
 def setup_krona_taxonomy(path):
@@ -208,7 +307,7 @@ def main():
                           action="store_true", default=False)
     optional.add_argument("-db", "--database",
                           help="Download/Update database for taXaminer",
-                          action="store_true", default=False)
+                          choices=['nr', 'swissprot', 'uniref90', 'uniref100', 'uniref50'])
     optional.add_argument("-d", "--dataPath",
                           help="Path to taXaminer database",
                           action="store", default="")
@@ -297,7 +396,7 @@ def main():
         else:
             data_path = taxaminer_paths_save.get("data_path")
         # TODO: use tools either via conda or via local installation
-        setup_db(args.dataPath, cmd_dict)
+        setup_db(args.database, args.dataPath, cmd_dict)
     elif args.dataPath:
         # database already precomputed -> adjust the path
         data_path = os.path.abspath(args.dataPath)

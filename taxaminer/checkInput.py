@@ -404,7 +404,7 @@ def set_config_defaults(config_obj, TAX_DB, db_dir):
                                                                 'tax_assignment_path'),
                                                             'AND'))
     config_vars['database_path'] = set_default(config_obj, 'database_path',
-                                               f"{db_dir}/nr.dmnd")
+                                               f"{db_dir}/db.dmnd")
     config_vars['target_exclude'] = set_yesno_default(config_obj,
                                                       'target_exclude', True)
     config_vars['add_exclude'] = set_default(config_obj, 'add_exclude',
