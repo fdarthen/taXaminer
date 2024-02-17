@@ -216,9 +216,6 @@ def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_labe
     plot_df['g_covdeviations'] = g_covdev_cols.apply(
         lambda x: '; '.join(x.dropna().astype(str)), axis=1)
 
-
-
-
     traces = plot_df['plot_label'].unique()
     traces_reordered = [plot_df.loc[plot_df['plot_label'] == query_label,
                             'plot_label'][0]]
@@ -256,14 +253,14 @@ def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_labe
             x=plot_df.loc[plot_df['plot_label'] == label, 'PC 1'],
             y=plot_df.loc[plot_df['plot_label'] == label, 'PC 2'],
             z=plot_df.loc[plot_df['plot_label'] == label, 'PC 3'],
-            name=plot_df.loc[plot_df['plot_label'] == label, 'plot_label_freq'][0],
+            name=plot_df.loc[plot_df['plot_label'] == label, 'plot_label_freq'].iloc[0],
             mode='markers',
             marker=dict(
                 size=2,
                 color=
-                plot_df.loc[plot_df['plot_label'] == label, 'plot_colour'][0],
+                plot_df.loc[plot_df['plot_label'] == label, 'plot_colour'].iloc[0],
                 opacity=plot_df.loc[
-                    plot_df['plot_label'] == label, 'plot_opacity'][0],
+                    plot_df['plot_label'] == label, 'plot_opacity'].iloc[0],
             ),
             text=[f"</br>ID: {index} | Scaffold: {row['c_name']} \
                             </br>Taxonomic assignment: {row['taxon_assignment']} | Label: {row['plot_label']} \
