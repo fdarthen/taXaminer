@@ -172,6 +172,58 @@ def ident_parent_path(feature, search_features):
 
     return parent_id
 
+def multi_transcript_gene(non_transcript_types, gene_features, transcripts):
+    coding_features = None
+    if 'exon' in non_transcript_types:
+        if 'CDS' in non_transcript_types:
+            # CDS is coding type
+            all_coding_features = [cds for cds in gene_features if
+                                   cds.get('type') == 'CDS']
+        else:
+            # exon is coding type
+            all_coding_features = [exon for exon in gene_features if
+                                   exon.get('type') == 'exon']
+    elif 'CDS' in non_transcript_types:
+        # CDS is coding type
+        all_coding_features = [cds for cds in gene_features if
+                               cds.get('type') == 'CDS']
+    else:
+        # mRNA is coding type
+        coding_features = sorted(transcripts,
+                                 key=lambda dict: dict.get('length'))[-1:]
+        longest_transcript = coding_features[0]
+
+
+    if not coding_features:
+        if len(transcripts) == 1:
+            longest_transcript = transcripts[0]
+            coding_features = sorted(all_coding_features,
+                                     key=lambda dict: dict.get(
+                                         'start'))
+        else:
+            # identify longest transcript subfeatures
+            gene_cds_len = 0
+            unsorted_coding_features = None
+            longest_transcript = None
+            for transcript in transcripts:
+                associated_coding_features = \
+                    [feat for feat in all_coding_features
+                     if transcript.get('id') in ident_parent_path(feat,
+                                                                  transcripts + gene_features)]
+                transcript_cds_len = sum(
+                    [feat.get('length') for feat in associated_coding_features])
+                if transcript_cds_len > gene_cds_len:
+                    gene_cds_len = transcript_cds_len
+                    unsorted_coding_features = associated_coding_features
+                    longest_transcript = transcript
+            if unsorted_coding_features:
+                coding_features = sorted(unsorted_coding_features,
+                                         key=lambda dict: dict.get('start'))
+            else:
+                return None, None
+
+    return coding_features, longest_transcript
+
 def process_gene(gene, parent_ids, transcripts, gene_features, non_transcript_types):
 
 
@@ -185,37 +237,8 @@ def process_gene(gene, parent_ids, transcripts, gene_features, non_transcript_ty
             transcript_type = transcript_types[0]
 
             if transcript_type == 'mRNA':
-                coding_features = None
-                if 'exon' in non_transcript_types:
-                    if 'CDS' in non_transcript_types:
-                        # CDS is coding type
-                        all_coding_features = [cds for cds in gene_features if cds.get('type') == 'CDS']
-                    else:
-                        # exon is coding type
-                        all_coding_features = [exon for exon in gene_features if exon.get('type') == 'exon']
-                elif 'CDS' in non_transcript_types:
-                    # CDS is coding type
-                    all_coding_features = [cds for cds in gene_features if cds.get('type') == 'CDS']
-                else:
-                    # mRNA is coding type
-                    coding_features = sorted(transcripts, key=lambda dict : dict.get('length'))[-1:]
-                    longest_transcript = coding_features[0]
-
-                # identify longest transcript subfeatures
-                if not coding_features:
-                    gene_cds_len = 0
-                    for transcript in transcripts:
-                        associated_coding_features = \
-                            [feat for feat in all_coding_features
-                             if transcript.get('id') in ident_parent_path(feat,
-                                                  transcripts + gene_features) ]
-                        transcript_cds_len = sum([feat.get('length') for feat in associated_coding_features])
-                        if transcript_cds_len > gene_cds_len:
-                            gene_cds_len = transcript_cds_len
-                            unsorted_coding_features = associated_coding_features
-                            longest_transcript = transcript
-                    coding_features = sorted(unsorted_coding_features,
-                                             key=lambda dict : dict.get('start'))
+                coding_features, longest_transcript = multi_transcript_gene(
+                    non_transcript_types, gene_features, transcripts)
 
             elif transcript_type == 'exon':
                 if 'CDS' in non_transcript_types:
@@ -240,28 +263,47 @@ def process_gene(gene, parent_ids, transcripts, gene_features, non_transcript_ty
                 # non-protein-coding RNA
                 gene_biotype = transcript_type
                 gene['coding_features'] = None
-                gene['coding_coordindates'] = None
+                gene['coding_coordinates'] = None
                 gene['transcript_id'] = None
                 gene['gene_biotype'] = gene_biotype
                 return [gene]
 
-        elif set(transcript_types) == set(['exon', 'CDS']):
+        elif set(transcript_types) == {'exon', 'CDS'}:
             # CDS is coding type
-            unsorted_coding_features = [cds for cds in transcripts]
+            unsorted_coding_features = [cds for cds in transcripts if
+                                  cds.get('type') == 'CDS']
             coding_features = sorted(unsorted_coding_features,
                                      key=lambda dict: dict.get(
                                          'start'))
+        elif 'mRNA' in set(transcript_types):
+            coding_transcripts = [feat for feat in transcripts if
+                                  feat.get('type') == 'mRNA']
+            if 'exon' in set(transcript_types):
+                non_transcript_types.append('exon')
+                gene_features += [feat for feat in transcripts
+                                  if feat.get('type') == 'exon']
+            if 'CDS' in set(transcript_types):
+                non_transcript_types.append('CDS')
+                gene_features += [feat for feat in transcripts if
+                                  feat.get('type') == 'CDS']
+            coding_features, longest_transcript = multi_transcript_gene(
+                non_transcript_types, gene_features, coding_transcripts)
 
         else:
             logging.warning(f"Transcript type of gene {gene.get('id')} ambiguous."
-                            f"Will skip gene.")
-            return []
+                            f" Will add without coding features.")
+            return [gene]
 
 
     else:
         # gene == coding type
         coding_features = [gene]
         longest_transcript = gene
+
+    if not coding_features:
+        logging.warning(f"Coding features of {gene.get('id')} inconclusive."
+                        f" Will add without coding features.")
+        return [gene]
 
     # identify unambigous id amongst coding features to use as potential
     # mapping value of protein headers
@@ -275,7 +317,7 @@ def process_gene(gene, parent_ids, transcripts, gene_features, non_transcript_ty
         # coding features all have same ID but are enumerated
         for sep in ['.', '-', '_']:
             if len(set([sep.join(id.split(sep)[:-1]) for id in cf_ids])) == 1:
-                unique_coding_id = cf_ids[0] = sep.join(cf_ids[0].split(sep)[:-1])
+                unique_coding_id = sep.join(cf_ids[0].split(sep)[:-1])
                 gene['unique_coding_id'] = unique_coding_id
                 break
 
@@ -290,7 +332,7 @@ def process_gene(gene, parent_ids, transcripts, gene_features, non_transcript_ty
         gene['transcript_id'] = longest_transcript.get('id')
 
     gene['coding_features'] = [feat.get('id') for feat in coding_features]
-    gene['coding_coordindates'] = [(feat.get('start'),feat.get('end')) for feat in coding_features]
+    gene['coding_coordinates'] = tuple([(feat.get('start'),feat.get('end')) for feat in coding_features])
     gene['gene_biotype'] = gene_biotype
 
     for feat in coding_features:
