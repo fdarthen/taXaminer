@@ -1,8 +1,10 @@
 # taXaminer
 
-taXaminer enables the interactive exploration of taxonomic footprints in gene sets. The specific goal is to detect and differentiate contamination and horizontal gene transfer.
+taXaminer - examine the taxonomic diversity in genome assemblies. Designed to detect and differentiate contamination and horizontal gene transfer. 
 
-Besides the taxonomic assignment of genes, taXaminer uses a total of 16 further indicators to faciliate this. Among these indicators are read coverage, sequence composition, gene length and position of genes within their scaffold. To identify genes which deviate from the mean set of genes, a principal component analysis (PCA) is used as it condenses data to fewer dimensions. Genes with similar values for certain variables are thereby clustered together, so that deviations are made visible. The results can be interactively examined in a 3D scatterplot, where the dot position respresents a combination of coverage, sequence composition and spatial information provided by the PCA and the color the taxonomic assignment.
+taXaminer combines a reference-free and an alignment-based approach to detect and differentiate contamination and horizontal gene transfer in genome assemblies. It uses a total of 16 intrinsic features to describe the gene set. Among these are the read coverage, sequence composition, gene length and the size of the scaffold it is annotated on (see details [here](https://github.com/BIONF/taXaminer/wiki/Additional-information#pca-variables)). To identify genes which discern from the average, a Principal Component Analysis is used to cluster genes with similar features. The taxonomic assignment targets at identifying the true taxon of origin for each gene. It is based on their protein sequence to reduce the need of having the exact reference in the database. 
+
+The results can be interactively explored in the accompanying [[dashboard|https://github.com/BIONF/taxaminer-dashboard]].
 
 # Table of Contents
 * [Installation](#installation)
@@ -17,7 +19,8 @@ Besides the taxonomic assignment of genes, taXaminer uses a total of 16 further 
 To install taXaminer, use the python package installer pip. 
 Note: taXaminer is as of yet not published at pypi, thus you need to download this repository and provide pip with the link to the directory for installation.
 ```
-pip install taxaminer
+git clone https://github.com/BIONF/taXaminer.git
+pip install ./taXaminer
 ```
 
 To install the additional dependencies, use the setup function included in taXaminer. You can install the tools either via conda or locally in a specified directory.
