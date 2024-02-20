@@ -52,7 +52,7 @@ taxon_id: "<NCBI taxon ID>" # NCBI Taxon ID of query species
 ```
 2. To include coverage information, add the path to a sorted bam file (this is optional). Otherwise, omit this parameter from the configuration file.
 ```
-bam_path_1: "path/to/mapping.bam" # path to BAM file; omit to use default location in output directory
+bam_path_1: "path/to/mapping.bam" # path to BAM file
 ```
 * Note: When using multiple coverage sets, duplicate the parameter and increase the number in the suffix
 
