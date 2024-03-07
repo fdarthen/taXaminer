@@ -488,10 +488,9 @@ def match_fasta2id(cfg, gff_df):
                         f"Unable to map the following {gff_df[missing_header].shape[0]} "
                         f"gene IDs to a header in the protein FASTA file:\n"
                         f"{gff_df[missing_header].index.to_list()}")
+        else:
+            logging.info(f"All genes attributed with protein sequence header.")
 
-        if unmapped_header:
-            logging.info(f"The following {len(unmapped_header)} header from the "
-                         f"provided file were not mapped to a gene: \n{unmapped_header}")
 
     gff_df['diamond_header'] = [str(x).split()[0] for x in gff_df['fasta_header'].tolist()]
 
