@@ -6,7 +6,6 @@
 """
 
 __author__ = "Freya Arthen"
-__version__ = "0.6.0"
 
 import argparse
 import gzip
@@ -16,6 +15,7 @@ import tarfile
 import requests
 import subprocess
 import sys
+import logging
 
 
 def download_file(local_filename, url):
@@ -41,6 +41,7 @@ def open_tarfile(file, destination, compression, files=[]):
         tar.extractall(destination)
     tar.close()
 
+
 def write_tool_cmds(taxaminer_path, cmd_dict):
 
     with open(f"{taxaminer_path}/pathconfig.txt", "a") as config_file:
@@ -52,27 +53,28 @@ def check_executable(cmd_dict):
     #TODO: check what this should print out
 
     # check diamond
-    print("checking diamond")
+    logging.info("checking diamond")
     check_diamond = subprocess.run([f"{cmd_dict.get('diamond')} --version"],
                                      shell=True, capture_output=True)
     if check_diamond.returncode != 0:
-        print("Installation of diamond failed. Please try again "
+        logging.error("Installation of diamond failed. Please try again "
                         "by running\n\nconda install -c bioconda diamond\n")
 
     # check Krona tools
-    print("checking krona tools")
+    logging.info("checking krona tools")
     check_krona = subprocess.run([f"{cmd_dict.get('krona')}"],
                                    shell=True, capture_output=True)
     if check_krona.returncode != 0:
-        print("Installation of Krona failed. Please try again "
+        logging.error("Installation of Krona failed. Please try again "
                         "by running\n\nconda install -c bioconda krona\n")
 
+
 def prepare_nr(outPath, db_name):
-    print(f">> downloading {db_name}")
+    logging.info(f">> downloading {db_name}")
     download_file(f"{outPath}/{db_name}.gz",
                   f"https://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/{db_name}.gz")
 
-    print(">> downloading accession mapping file")
+    logging.info(">> downloading accession mapping file")
     download_file(f"{outPath}/prot2taxid.tsv.gz",
                   "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/prot.accession2taxid.FULL.gz")
 
@@ -80,10 +82,10 @@ def prepare_nr(outPath, db_name):
 
 
 def prepare_uniref(outPath, db_name):
-    print(f">> downloading {db_name}")
+    logging.info(f">> downloading {db_name}")
     download_file(f"{outPath}/{db_name}.gz",
                   f"https://ftp.uniprot.org/pub/databases/uniprot/uniref/{db_name}/{db_name}.fasta.gz")
-    print(">> downloading accession mapping file")
+    logging.info(">> downloading accession mapping file")
     download_file(f"{outPath}/idmapping_selected.tab.gz",
                   "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/idmapping_selected.tab.gz")
 
@@ -112,10 +114,10 @@ def prepare_uniref(outPath, db_name):
     # # 21.    Additional PubMed
 
     # read taxids that are in nodes files
-    nodes_taxids = []
+    nodes_taxids = set()
     with open(f"{outPath}/nodes.dmp", 'r') as nodes_file:
         for node in nodes_file:
-            nodes_taxids.append(node.split()[0])
+            nodes_taxids.add(node.split()[0])
     old2new = {}
     with open(f"{outPath}/merged.dmp", 'r') as nodes_file:
         for match in nodes_file:
@@ -130,7 +132,7 @@ def prepare_uniref(outPath, db_name):
         col_num = 9
 
     mapping_dict = {}
-
+    logging.info(">> creating protein to taxon mapping file")
     with gzip.open(f"{outPath}/idmapping_selected.tab.gz", 'rb') as in_mapping, \
         gzip.open(f"{outPath}/prot2taxid.tsv.gz", 'wb') as out_mapping:
         out_mapping.write(f"accession.version\ttaxid\n".encode('utf-8'))
@@ -144,10 +146,15 @@ def prepare_uniref(outPath, db_name):
                     else:
                         mapping_dict[spline[col_num]] = [spline[0]]
                 elif spline[col_num] in old2new.keys():
+                    new_taxid = old2new.get(spline[col_num])
                     out_mapping.write(
-                        f"{spline[0]}\t{old2new.get(spline[col_num])}\n".encode('utf-8'))
+                        f"{spline[0]}\t{new_taxid}\n".encode('utf-8'))
+                    if spline[col_num] in mapping_dict.keys():
+                        mapping_dict[spline[col_num]].append(spline[0])
+                    else:
+                        mapping_dict[spline[col_num]] = [spline[0]]
 
-
+    logging.info(">> renaming fasta headers in database file")
     with gzip.open(f"{outPath}/{db_name}.gz", 'rb') as in_db_file, \
         gzip.open(f"{outPath}/db.gz", 'wb') as out_db_file:
         for line in in_db_file:
@@ -168,11 +175,11 @@ def prepare_uniref(outPath, db_name):
 
 def setup_db(db_name, outPath, cmd_dict):
     pathlib.Path(outPath).mkdir(parents=True, exist_ok=True)
-    print("> downloading files")
-    print(">> downloading taxdmp")
+    logging.info("> downloading files")
+    logging.info(">> downloading taxdmp")
     download_file(f"{outPath}/taxdump.tar.gz",
                   "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz")
-    print("> unpacking taxdmp")
+    logging.info("> unpacking taxdmp")
     open_tarfile(f"{outPath}/taxdump.tar.gz", outPath, "gz",
                  ["names.dmp", "nodes.dmp", "merged.dmp"])
 
@@ -182,7 +189,7 @@ def setup_db(db_name, outPath, cmd_dict):
         db_path = prepare_uniref(outPath, db_name)
 
 
-    print("> preparing database")
+    logging.info("> preparing database")
     index_db = (f'{cmd_dict.get("diamond")} makedb -v --in "{db_path}" '
                 f'-d "{outPath}/db" '
                 f'--taxonmap "{outPath}/prot2taxid.tsv.gz" '
@@ -191,22 +198,22 @@ def setup_db(db_name, outPath, cmd_dict):
                 #f'&& rm -rf {outPath}/{db_name}.gz {outPath}/db.gz {outPath}/prot2taxid.tsv.gz {outPath}/taxdump.tar.gz')
     out_index_db = subprocess.run([index_db], shell=True, capture_output=True)
     if out_index_db.returncode != 0:
-        print(f"creation of diamond database failed:\n{out_index_db}")
-        print("Error message:\n" + out_index_db.stderr.decode())
+        logging.info(f"creation of diamond database failed:\n{out_index_db}")
+        logging.info("Error message:\n" + out_index_db.stderr.decode())
         sys.exit()
     else:
-        print(f">> creation of diamond database successful!")
-        print(
+        logging.info(f">> creation of diamond database successful!")
+        logging.info(
             f"Setup log:\n{out_index_db}")
-        print("Stdout:\n" + out_index_db.stderr.decode())
+        logging.info("Stdout:\n" + out_index_db.stderr.decode())
 
 
 def setup_krona_taxonomy(path):
-    print("setting up taxonomy db for krona tools")
+    logging.info("setting up taxonomy db for krona tools")
     setup_krona = subprocess.run([f"{path}"],
                                  shell=True, capture_output=True)
     if setup_krona.returncode != 0:
-        print("Setup of Krona database failed. Error message:"
+        logging.error("Setup of Krona database failed. Error message:"
               f"{setup_krona.stderr.decode()}")
 
 
@@ -214,26 +221,26 @@ def setup_conda():
     # check conda
     check_conda = subprocess.run(["conda --version"], shell=True, capture_output=True)
     if check_conda.returncode != 0:
-        print("Could not find anaconda installation.")
+        logging.error("Could not find anaconda installation.")
         sys.exit()
 
     cmd_dict = {}
 
     # install diamond
-    print("installing diamond")
+    logging.info("installing diamond")
     install_diamond = subprocess.run(['conda install -c bioconda -c conda-forge "diamond>=2.1.7" -y'],
                                      shell=True, capture_output=True)
     if install_diamond.returncode != 0:
-        print("Installation of diamond failed. Please try again "
+        logging.error("Installation of diamond failed. Please try again "
                         'by running\n\nconda install -c bioconda "diamond>=2.1.7"\n')
     cmd_dict["diamond"] = "diamond"
 
     # install Krona tools
-    print("installing krona tools")
+    logging.info("installing krona tools")
     install_krona = subprocess.run(["conda install -c bioconda krona -y"],
                                    shell=True, capture_output=True)
     if install_krona.returncode != 0:
-        print("Installation of Krona failed. Please try again "
+        logging.error("Installation of Krona failed. Please try again "
                         "by running\n\nconda install -c bioconda krona\n")
     cmd_dict["krona"] = "ktImportTaxonomy"
     ## initializing taxonomy for Krona
@@ -254,12 +261,10 @@ def setup_locally(tool_path):
     os.chdir(toolPath)
     toolPath = str(toolPath) + "/"
 
-    print(toolPath)
-
     cmd_dict = {}
 
     # install diamond
-    print("installing diamond")
+    logging.info("installing diamond")
     dmd_version = "2.0.15"
     download_file(f"diamond-linux64.tar.gz",
                   "https://github.com/bbuchfink/diamond/releases/download/"
@@ -268,7 +273,7 @@ def setup_locally(tool_path):
     cmd_dict["diamond"] = f"{toolPath}diamond"
 
     # install Krona tools
-    print("installing krona tools")
+    logging.info("installing krona tools")
     k_version = "2.8.1"
     download_file(f"KronaTools-{k_version}.tar",
                   "https://github.com/marbl/Krona/releases/download/"
@@ -279,7 +284,7 @@ def setup_locally(tool_path):
                                    shell=True, capture_output=True)
     os.chdir(toolPath)
     if install_krona.returncode != 0:
-        print("Installation of Krona failed:\n"
+        logging.error("Installation of Krona failed:\n"
                         f"{install_krona.stderr.decode()}")
     else:
         os.symlink(f"KronaTools-{k_version}/bin/ktImportTaxonomy",
@@ -297,6 +302,13 @@ def setup_locally(tool_path):
 
 def main():
     """  """
+
+    logging.basicConfig(level=logging.INFO,  # Set the logging level to INFO
+                        format='%(levelname)s: %(message)s')
+
+    # Create a logger object
+    logger = logging.getLogger(__name__)
+
     parser = argparse.ArgumentParser()
     required = parser.add_argument_group("required arguments")
     optional = parser.add_argument_group("optional arguments")
@@ -344,36 +356,41 @@ def main():
     # print requested paths
     if args.getDatapath:
         if not taxaminer_paths_save:
-            sys.exit("No config file found. Please run taxaminer.setup with option '-db'")
+            logger.error("No config file found. Please run taxaminer.setup with option '-db'")
+            sys.exit()
         else:
-            print(taxaminer_paths_save.get("data_path"))
+            logging.info(taxaminer_paths_save.get("data_path"))
             sys.exit()
     if args.getSourcepath:
-        print(taxaminer_path)
+        logging.info(taxaminer_path)
         sys.exit()
     if args.getToolpath:
         if not taxaminer_paths_save:
-            sys.exit("No config file found. Please run taxaminer.setup")
+            logger.error(
+                "No config file found. Please run taxaminer.setup")
+            sys.exit()
         else:
-            print(taxaminer_paths_save.get("tool_path"))
+            logging.info(taxaminer_paths_save.get("tool_path"))
             sys.exit()
 
     # sanity check of user input
     if (not args.conda and not args.toolPath) and (args.database and not args.dataPath):
-        sys.exit("Path for the installation not given!\nPlease use option "
-                "'-o' to specify the path where tools will be installed\n"
-                "and '-d' for path where database will be stored")
+        logger.error("Path for the installation not given!\nPlease use option "
+                    "'-o' to specify the path where tools will be installed\n"
+                    "and '-d' for path where database will be stored")
+        sys.exit()
 
     if args.conda:
-        print("setting up dependencies via conda")
+        logging.info("setting up dependencies via conda")
         cmd_dict = setup_conda()
         tool_path = "conda installation"
         check_executable(cmd_dict)
     elif args.toolPath:
-        print("setting up dependencies locally")
+        logging.info("setting up dependencies locally")
         if not args.toolPath and not taxaminer_paths_save:
-            sys.exit("No path for the installation given. Please use option"
+            logger.error("No path for the installation given. Please use option"
                      "'-o' to specify the path where tools will be installed")
+            sys.exit()
         if args.toolPath:
             tool_path = os.path.abspath(args.toolPath)
         else:
@@ -384,13 +401,15 @@ def main():
         check_executable(cmd_dict)
 
     if args.database:
-        print("setting up database")
+        logging.info("setting up database")
         if not tool_path:
-            sys.exit("Tools for database creation not installed. Please run "
+            logger.error("Tools for database creation not installed. Please run "
                      "taxaminer.setup with either option '-o' or '--conda'.")
+            sys.exit()
         if not args.dataPath and not taxaminer_paths_save:
-            sys.exit("No path for database given. Please use option"
+            logger.error("No path for database given. Please use option"
                      "'-d' to specify the database will be stored.")
+            sys.exit()
         if args.dataPath:
             data_path = os.path.abspath(args.dataPath)
         else:
