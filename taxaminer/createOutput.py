@@ -15,6 +15,7 @@ from jsmin import jsmin
 from . import checkInput
 from . import reduceDims
 from . import compFeatures
+from . import compTaxonomicAssignment
 
 import taxopy
 import sys
@@ -29,6 +30,7 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 import plotly.io as pio
+
 
 # mathjax is not required for saving of the plots;
 # it does though leave a message bar on the plots
@@ -66,18 +68,17 @@ def insert_string2string(string, insert_string, interval):
     return new_string
 
 
-def assess_superkingdom(plot_df):
-    # get unique plot labels
-    plot_labelIDs = plot_df['plot_labelID'].unique()
-    # identify their respective superkingdom
-    for id in plot_labelIDs:
-        if not pd.isna(id):
-            taxon = taxopy.Taxon(id, TAX_DB)
+def assess_superkingdom(id):
+
+    if not pd.isna(id):
+        taxon = compTaxonomicAssignment.init_taxopyon(id, set(), TAX_DB)
+        if taxon:
             superkingdom = taxon.rank_name_dictionary.get('superkingdom')
-            plot_df.loc[
-                plot_df['plot_labelID'] == id, 'superkingdom'] = superkingdom
+            return superkingdom
         else:
-            plot_df.loc[plot_df['plot_labelID'] == id, 'superkingdom'] = np.nan
+            return np.nan
+    else:
+        return np.nan
 
 
 def colourscale_to_lengths(lengths, colourscale):
@@ -95,61 +96,93 @@ def colourscale_to_lengths(lengths, colourscale):
     return colouring
 
 
-def default_colouring(plot_df, query_label, sk_sorted_labels, colourscale):
+def labels_sorted_sk(df):
+    label2sk = [(label[0], assess_superkingdom(label[1])) for label in df[['plot_label', 'plot_labelID']].drop_duplicates().values]
+    none_sk_labels = [tuple[0] for tuple in label2sk if pd.isna(tuple[1])]
+    label2sk = [tuple for tuple in label2sk if not pd.isna(tuple[1])]
+    label2sk.sort(key=lambda x: (x[1],x[0]))
+    label2sk = [tuple[0] for tuple in label2sk]
+
+    return label2sk + none_sk_labels
+
+
+def sort_traces(cfg, unlabelled_df):
+    # list of the plot labels, sorted by superkindgom
+    # and alphabetically within superkingdom
+    if cfg.legend_sort == 'superkingdom':
+        sorted_labels = labels_sorted_sk(unlabelled_df)
+    else:
+        sorted_labels = unlabelled_df[['plot_label', 'label_count']].drop_duplicates().sort_values(by=['label_count'], ascending=False)['plot_label'].to_list()
+
+    return sorted_labels
+
+def discrete_colour_dict(cfg, distinct_labels_count):
+    if not distinct_labels_count.empty:
+        palette = getattr(px.colors.qualitative, cfg.colour_palette)
+        if len(distinct_labels_count)//len(palette) > 1:
+            length_adjust_palette = palette * (len(distinct_labels_count)//len(palette)) + palette[:(len(distinct_labels_count)%len(palette))]
+        else:
+            length_adjust_palette = palette[:len(distinct_labels_count)]
+        colours = {tuple[1]: tuple[0] for tuple in zip(length_adjust_palette, distinct_labels_count.index)}
+        return colours
+    else:
+        return {}
+
+
+def continuous_colour_dict(cfg, distinct_labels_count):
+    if not distinct_labels_count.empty:
+        colours = {tuple[1]: tuple[0] for tuple in zip(px.colors.sample_colorscale(
+                cfg.colour_palette, np.arange(0, 1, 1 / len(distinct_labels_count))),
+            distinct_labels_count.index)}
+        return colours
+    else:
+        return {}
+
+def opacitiy_dict(cfg, distinct_labels_count):
+    if not distinct_labels_count.empty:
+        opacities = {tuple[1]: tuple[0] for tuple in zip([.95 for i in range(distinct_labels_count.shape[0])],
+                                                         distinct_labels_count.index)}
+        return opacities
+    else:
+        return {}
+
+
+def marker_styling(cfg, plot_df, query_label):
+
+    plot_df['plot_colour'] = None
+    if cfg.target_colouring:
+        colours = {query_label: 'rgb(159,161,179)'}
+        opacities = {query_label: 0.8}
+        sorted_traces = [query_label]
+        if "Unassigned" in plot_df.plot_label:
+            colours['Unassigned'] = 'rgb(211,213,220)'
+            opacities['Unassigned'] = '0.65'
+            sorted_traces.append('Unassigned')
+    else:
+        colours, opacities = {}, {}
+        sorted_traces = []
 
     # non-taxonomy informed colorscale
-    distinct_labels_count = plot_df['plot_label'].value_counts(
-        dropna=False).to_frame()
-    distinct_labels_count.drop(['Unassigned', query_label], inplace=True,
-                               errors='ignore')
-    # distinct_labels_count = pd.DataFrame(
-    #     {'plot_label_count': distinct_labels_count['plot_label']},
-    #     index=distinct_labels_count.index)
+    remaining_labels_df = plot_df.loc[~plot_df['plot_label'].isin(sorted_traces)]
+    distinct_labels_count = remaining_labels_df['plot_label'].value_counts(dropna=False).to_frame()
 
-    # sk_df = pd.DataFrame(
-    #     plot_df[["superkingdom", "plot_label"]]
-    # ).set_index("plot_label")
-    # sk_df = sk_df[~sk_df.index.duplicated(keep='first')]
-    # distinct_labels_count = distinct_labels_count.join(sk_df)
-    # distinct_labels_count = distinct_labels_count.sort_values(by='superkingdom')
+    sorted_traces += sort_traces(cfg, remaining_labels_df)
 
-    sort_index = dict(zip(sk_sorted_labels, range(len(sk_sorted_labels))))
-    distinct_labels_count['sk_sort'] = distinct_labels_count.index.map(sort_index)
-    distinct_labels_count.sort_values('sk_sort', inplace=True)
-    distinct_labels_count.drop('sk_sort', axis=1, inplace=True)
+    distinct_labels_count.sort_values(by="plot_label",
+                   key=lambda column: column.map(lambda e: sorted_traces.index(e)),
+                   inplace=True)
 
-    if not distinct_labels_count.empty:
-        marker_style = pd.DataFrame(
-            {"plot_colour": px.colors.sample_colorscale(
-                colourscale, np.arange(0, 1, 1 / len(distinct_labels_count))),
-             "plot_opacity": [1 for i in range(distinct_labels_count.shape[0])]},
-            index=distinct_labels_count.index)
-        plot_df = plot_df.join(marker_style, on='plot_label')
+    if cfg.palette_option == 'continuous':
+        colours = colours | continuous_colour_dict(cfg, distinct_labels_count)
+    else:
+        colours = colours | discrete_colour_dict(cfg, distinct_labels_count)
+    opacities = opacities | opacitiy_dict(cfg, distinct_labels_count)
+    opacities['Unassigned'] = 0.65
+    #opacities[query_label] = 0.8
+    plot_df['plot_colour'] = plot_df['plot_label'].map(colours)
+    plot_df['plot_opacity'] = plot_df['plot_label'].map(opacities)
 
-    plot_df.loc[plot_df[
-                    'plot_label'] == query_label, 'plot_colour'] = 'rgb(159,161,179)'
-    plot_df.loc[plot_df[
-                    'plot_label'] == "Unassigned", 'plot_colour'] = 'rgb(211,213,220)'
-
-    plot_df.loc[plot_df['plot_label'] == query_label, 'plot_opacity'] = 0.8
-    plot_df.loc[plot_df['plot_label'] == "Unassigned", 'plot_opacity'] = 0.65
-
-    return plot_df
-
-
-def labels_sorted_sk(plot_df):
-
-    assess_superkingdom(plot_df)
-
-    sk_df = pd.DataFrame(
-        plot_df[["superkingdom", "plot_label"]]
-    ).set_index("plot_label")
-    sk_df.index.name = 'plot_label'
-    sk_df = sk_df[~sk_df.index.duplicated(keep='first')]
-    sk_df = sk_df.sort_values(by=['superkingdom', 'plot_label'])
-
-    return list(sk_df.index)
-
+    return plot_df, sorted_traces
 
 
 def save_gif(cfg, fig):
@@ -175,10 +208,7 @@ def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_labe
 
     """
 
-
-
     # ________________ PLOT PREPARATION _______________ #
-
 
     # frequency information for labels in plots
     plot_df['label_count'] = plot_df['plot_label'].map(
@@ -187,9 +217,6 @@ def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_labe
     plot_df['plot_label_freq'] = plot_df['plot_label'] + ' (' + plot_df[
         'label_count'].astype(str) + ')'
 
-    # list of the plot labels, sorted by superkindgom
-    # and alphabetically within superkingdom
-    sk_sorted_labels = labels_sorted_sk(plot_df)
 
     ## add sequence information
     # read proteins fasta file
@@ -205,8 +232,9 @@ def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_labe
 
     ## prepare data for hover window display
     # replace bools to yes and no
-    plot_df.loc[plot_df['g_terminal'] == 0, 'g_terminal'] = 'no'
-    plot_df.loc[plot_df['g_terminal'] == 1, 'g_terminal'] = 'yes'
+    plot_df = plot_df.astype({'g_terminal': str})
+    plot_df.loc[plot_df['g_terminal'] == '0', 'g_terminal'] = 'no'
+    plot_df.loc[plot_df['g_terminal'] == '1', 'g_terminal'] = 'yes'
     # all gene coverage information in one column
     g_cov_cols = plot_df.filter(regex=("g_cov_[0-9]*"))
     plot_df['g_coverages'] = g_cov_cols.apply(
@@ -216,28 +244,8 @@ def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_labe
     plot_df['g_covdeviations'] = g_covdev_cols.apply(
         lambda x: '; '.join(x.dropna().astype(str)), axis=1)
 
-    traces = plot_df['plot_label'].unique()
-    traces_reordered = [plot_df.loc[plot_df['plot_label'] == query_label,
-                            'plot_label'][0]]
-    try:
-        traces_reordered.append(plot_df.loc[plot_df['plot_label'] == "Unassigned",
-                                    'plot_label'][0])
-    except:
-        pass
-
-    remaining_traces = np.setdiff1d(traces, traces_reordered)
-    sorted_remaining_traces = [trace for trace in sk_sorted_labels if
-                               trace in remaining_traces]
-    traces_reordered.extend(sorted_remaining_traces)
-
-    sort_index = dict(zip(traces_reordered, range(len(traces_reordered))))
-    plot_df['sk_sort'] = plot_df['plot_label'].map(sort_index)
-    plot_df.index.name = "g_name"
-    plot_df.sort_values(['sk_sort'], inplace=True)
-    plot_df.drop('sk_sort', axis=1, inplace=True)
-
     ## assign colours
-    plot_df = default_colouring(plot_df, query_label, sk_sorted_labels, 'Rainbow')
+    plot_df, traces_reordered = marker_styling(cfg, plot_df, query_label)
 
     ## create plot
     # subset data into three groups to load them in distinct traces
@@ -256,7 +264,7 @@ def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_labe
             name=plot_df.loc[plot_df['plot_label'] == label, 'plot_label_freq'].iloc[0],
             mode='markers',
             marker=dict(
-                size=2,
+                size=cfg.marker_size,
                 color=
                 plot_df.loc[plot_df['plot_label'] == label, 'plot_colour'].iloc[0],
                 opacity=plot_df.loc[
@@ -370,11 +378,11 @@ def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_labe
         'toImageButtonOptions': {
             'format': 'svg',  # one of png, svg, jpeg, webp
             'filename': 'custom_image',
-            'height': 500,
-            'width': 700,
-            'scale': 1  # Multiply title/legend/axis/canvas sizes by this factor
+            'height': None,
+            'width': None,
+            'scale': 10  # Multiply title/legend/axis/canvas sizes by this factor
         },
-        'doubleClickDelay': 5
+        'doubleClickDelay': 500
     }
 
     fig.write_html(cfg.output_path + "taxonomic_assignment/3D_plot.html",

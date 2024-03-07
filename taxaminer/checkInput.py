@@ -68,6 +68,11 @@ class Config:
         self.merging_labels = cfg_dict.get('merging_labels')
         self.output_pdf = cfg_dict.get('output_pdf')
         self.output_png = cfg_dict.get('output_png')
+        self.target_colouring = cfg_dict.get('target_colouring')
+        self.colour_palette = cfg_dict.get('colour_palette')
+        self.palette_option = cfg_dict.get('palette_option')
+        self.legend_sort = cfg_dict.get('legend_sort')
+        self.marker_size = cfg_dict.get('marker_size')
 
         self.include_pseudogenes = cfg_dict.get('include_pseudogenes')
         self.input_variables = cfg_dict.get('input_variables')
@@ -83,7 +88,6 @@ class Config:
         self.diamond = cfg_dict.get('diamond')
         self.samtools = cfg_dict.get('samtools')
         self.bedtools = cfg_dict.get('bedtools')
-        self.bowtie2 = cfg_dict.get('bowtie2')
         self.krona = cfg_dict.get('krona')
 
 
@@ -431,6 +435,31 @@ def set_config_defaults(config_obj, TAX_DB, db_dir):
                                                 '')
     config_vars['output_pdf'] = set_yesno_default(config_obj, 'output_pdf', True)
     config_vars['output_png'] = set_yesno_default(config_obj, 'output_png', False)
+
+
+    if 'target_colouring' in config_obj.keys():
+        config_vars['target_colouring'] = set_yesno_default(config_obj, 'target_colouring',
+                                                True)
+    elif 'target_coloring' in config_obj.keys():
+        config_vars['target_colouring'] = set_yesno_default(config_obj, 'target_coloring',
+                                                True)
+    else:
+        config_vars['target_colouring'] = True
+
+    if 'colour_palette' in config_obj.keys():
+        config_vars['colour_palette'] = set_default(config_obj, 'colour_palette',
+                                                'Rainbow')
+    elif 'color_palette' in config_obj.keys():
+        config_vars['colour_palette'] = set_default(config_obj, 'color_palette',
+                                                'Rainbow')
+    else:
+        config_vars['colour_palette'] = 'Rainbow'
+    config_vars['palette_option'] = set_default(config_obj, 'palette_option',
+                                             'continuous')
+    config_vars['legend_sort'] = set_default(config_obj, 'legend_sort',
+                                                'superkingdom')
+    config_vars['marker_size'] = set_default(config_obj, 'marker_size',
+                                             2)
 
     ## Gene info
     config_vars['include_pseudogenes'] = set_yesno_default(config_obj,
