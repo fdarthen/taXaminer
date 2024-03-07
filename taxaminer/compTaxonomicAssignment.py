@@ -156,6 +156,7 @@ def merge_assignments_at_id(assignments_df, ids, missing_taxids, TAX_DB):
             if id in lineage:
                 id_merger_taxon = init_taxopyon(id, missing_taxids, TAX_DB)
                 lineage = id_merger_taxon.taxid_lineage
+                break
         if id_merger_taxon:        
             genes_w_assignment = (assignments_df['taxon_assignmentID'] == assignmentID)
             assignments_df.loc[genes_w_assignment, 'plot_label'] = id_merger_taxon.name
@@ -320,9 +321,9 @@ def merge_labels(assignments_df, target_id, merging_labels, missing_taxids, TAX_
         merge_assignments_at_rank(assignments_df, all_merger_rank, missing_taxids, TAX_DB)
     else:
         if query_merger_id:
-            merge_assignments_at_id(assignments_df, query_merger_id,missing_taxids, TAX_DB)
+            merge_assignments_at_id(assignments_df, query_merger_id, missing_taxids, TAX_DB)
         if merger_ids:
-            merge_assignments_at_id(assignments_df, merger_ids,missing_taxids, TAX_DB)
+            merge_assignments_at_id(assignments_df, merger_ids, missing_taxids, TAX_DB)
 
     return assignments_df
 
