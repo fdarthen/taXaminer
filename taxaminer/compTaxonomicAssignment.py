@@ -16,6 +16,7 @@ import subprocess
 import logging
 import pandas as pd
 import multiprocessing as mp
+from tqdm import tqdm
 
 ###############################################################################
 ############################ HELPER FUNCTIONS #################################
@@ -390,6 +391,21 @@ def get_subset_id(target_id, subset_marker, missing_taxids, TAX_DB):
         return get_id_for_rank_of_species(target_id, subset_marker, missing_taxids, TAX_DB)
 
 
+def get_total_and_current(text):
+    """ Parse progress line of Diamond to get current status and total status
+
+     Example texts: 'Processing query block 1', 'reference block 1/128', 'shape 4/16'
+
+    :return:
+    """
+    both_values = text.split()[-1].split('/')
+    if len(both_values) == 2:
+        current_value, max_value = both_values
+    else:
+        current_value, max_value = both_values[0], both_values[0]
+    return int(current_value), int(max_value)
+
+
 def run_diamond(diamond_cmd):
     """
     perform DIAMOND run and catch errors
@@ -400,43 +416,68 @@ def run_diamond(diamond_cmd):
     Returns:
 
     """
+
     logging.info('>> running DIAMOND')
-    dmdnOut = subprocess.run([diamond_cmd], shell=True, capture_output=True)
-    if dmdnOut.returncode != 0:
+    dmndOut = subprocess.Popen(diamond_cmd,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    init_pbar = False
+    old_shapes = 0
+    pbar = None
+    full_log = []
+    while dmndOut.poll() is None:
+        log_line = dmndOut.stderr.readline().decode().strip()
+        full_log.append(log_line)
+        if 'reference block' in log_line:
+            if not init_pbar:
+                query_block, ref_block, shape = log_line[:-1].split(',')  # rm trailing .
+                current_query_block, max_query_blocks = get_total_and_current(
+                    query_block)
+                current_ref_block, max_ref_blocks = get_total_and_current(
+                    ref_block)
+                current_shape, max_shapes = get_total_and_current(shape)
+                total_shapes = max_query_blocks * max_ref_blocks * max_shapes
+                pbar = tqdm(total=total_shapes, bar_format='{l_bar}{bar}| [{elapsed}<{remaining}, ' '{rate_fmt}{postfix}]')
+                init_pbar = True
+            pbar.update(1)
+        if log_line.startswith('Scoring parameters:'):
+            logging.debug(log_line)
+        elif log_line.startswith('Temporary directory:'):
+            logging.debug(log_line)
+        elif log_line.startswith(
+                'Percentage range of top alignment score to report hits:'):
+            logging.debug(log_line)
+        elif log_line.startswith('Reference ='):
+            logging.debug(log_line)
+        elif log_line.startswith('Sequences ='):
+            logging.debug(log_line)
+        elif log_line.startswith('Letters ='):
+            logging.debug(log_line)
+        elif log_line.startswith('Block size ='):
+            logging.debug(log_line)
+        elif log_line.startswith('Total time ='):
+            pbar.update(1)
+            logging.info(f'DIAMOND runtime: {log_line.split(" = ")[1]}')
+        elif ' pairwise alignments, ' in log_line:
+            logging.info(log_line)
+        elif ' queries aligned.' in log_line:
+            logging.info(log_line)
+
+    if dmndOut.returncode != 0:
         logging.error(f'Error running DIAMOND '
-                      f'with following command:\n{diamond_cmd}')
-        if '\nOpening the database... No such file or directory\n' in dmdnOut.stderr.decode():
+                      f'with following command:\n{" ".join(diamond_cmd)}')
+        if any('Opening the database... No such file or directory' in line for line in full_log):
             logging.error('Database does not exists. Please check the taXaminer setup.')
         # TODO: check for output when putting empty protein file
-        elif 'chuighdseck' in dmdnOut.stderr.decode():
+        elif any('asnhdoiashd' in line for line in full_log):
             logging.error('Empty protein FASTA file. Please check your input.')
         else:
-            logging.error('DIAMOND Error message:\n' + dmdnOut.stderr.decode())
+            log_string = "\n".join(full_log)
+            logging.error(f'DIAMOND Error message:\n{log_string}')
         sys.exit()
-    else:
-        logging.info('DIAMOND ouput:\n')
-        for line in dmdnOut.stderr.decode().split('\n'):
-            if line.startswith('Scoring parameters:'):
-                logging.debug(line)
-            elif line.startswith('Temporary directory:'):
-                logging.debug(line)
-            elif line.startswith(
-                    'Percentage range of top alignment score to report hits:'):
-                logging.debug(line)
-            elif line.startswith('Reference ='):
-                logging.debug(line)
-            elif line.startswith('Sequences ='):
-                logging.debug(line)
-            elif line.startswith('Letters ='):
-                logging.debug(line)
-            elif line.startswith('Block size ='):
-                logging.debug(line)
-            elif line.startswith('Total time ='):
-                logging.info(f'DIAMOND runtime: {line.split(" = ")[1]}')
-            elif ' pairwise alignments, ' in line:
-                logging.info(line)
-            elif ' queries aligned.' in line:
-                logging.info(line)
+
+    if pbar:
+        pbar.close()
+
 
 
 def perform_quick_search_1(cfg, perform_diamond, diamond_cmd,
@@ -463,17 +504,11 @@ def perform_quick_search_1(cfg, perform_diamond, diamond_cmd,
                                              missing_taxids, TAX_DB)
 
         if target_exclude:
-            q1_exclude = target_exclude.rstrip('"') + ',' + ','.join(
-                diamond_inclusion_by_exclusion(quick_mode_search_id, missing_taxids, TAX_DB))
+            q1_exclude = target_exclude + diamond_inclusion_by_exclusion(quick_mode_search_id, missing_taxids, TAX_DB)
         else:
-            q1_exclude = f' --taxon-exclude ' \
-                         f'"{",".join(diamond_inclusion_by_exclusion(quick_mode_search_id,missing_taxids, TAX_DB))}"'
-        diamond_cmd_1 = f'{diamond_cmd} -o "{cfg.diamond_results_path}" {q1_exclude}'
-        ###taxonlist###
-        # diamond_cmd_1 = diamond_cmd + diamond_o1
-        # + ' --taxonlist "' + str(quick_mode_search_id)
-        # + '" --taxon-exclude "' + str(target_id) + '"'
+            q1_exclude = ['--taxon-exclude'] + diamond_inclusion_by_exclusion(quick_mode_search_id,missing_taxids, TAX_DB)
 
+        diamond_cmd_1 = diamond_cmd + ['-o', cfg.diamond_results_path] + q1_exclude
         logging.debug(f"Diamond command for "
                       f"quick search round 1:\n{diamond_cmd_1}")
         run_diamond(diamond_cmd_1)
@@ -506,7 +541,7 @@ def perform_quick_search_2(cfg, perform_diamond, diamond_cmd,
         filter_prots_quick_hits(assignment_df, quick_mode_match_id,
                                 tmp_prot_path, tmp_prot_path, missing_taxids, TAX_DB)
 
-        diamond_cmd_2 = f'{diamond_cmd} -o "{cfg.diamond_results_path}" {target_exclude}'
+        diamond_cmd_2 = diamond_cmd + ['-o', cfg.diamond_results_path] + target_exclude
         logging.debug(f"Diamond command for quick search round 2:\n{diamond_cmd_2}")
         run_diamond(diamond_cmd_2)
 
@@ -523,7 +558,7 @@ def perform_exhaustive_search(cfg, perform_diamond, diamond_cmd, target_exclude)
     """
     logging.info("Exhaustive mode for taxonomic assignment selected")
     if perform_diamond:
-        diamond_cmd = f'{diamond_cmd} -o "{cfg.diamond_results_path}" {target_exclude}'
+        diamond_cmd += ['-o', cfg.diamond_results_path] + target_exclude
         logging.debug(
             f"Diamond command for exhaustive search:\n{diamond_cmd}")
         run_diamond(diamond_cmd)
@@ -1013,7 +1048,7 @@ def diamond_inclusion_by_exclusion(include_id, missing_taxids, TAX_DB):
     include_lineage = include_taxon.taxid_lineage
     for parent in include_lineage[1:]:
         childs = get_children_ids(TAX_DB, parent)
-        exclude_list = exclude_list + [str(child) for child in childs if
+        exclude_list += [str(child) for child in childs if
                                        child not in include_lineage]
 
     return exclude_list
@@ -1150,31 +1185,31 @@ def run_assignment(cfg, gff_df, pca_coordinates, TAX_DB):
 
     tmp_prot_path = cfg.output_path + "tmp/tmp.subset.protein.fasta"
 
-    diamond_cmd = f'{cfg.diamond} blastp -p {cfg.threads} ' \
-                  f'-f 6 qseqid sseqid pident length mismatch gapopen qstart' \
-                  f' qend sstart send evalue bitscore staxids sscinames ' \
-                  f'-b2.0 --tmpdir /dev/shm --{cfg.diamond_sensitivity} -c1 ' \
-                  f'--top 10 -q "{tmp_prot_path}" -d "{cfg.database_path}"'
+
+    diamond_cmd = [cfg.diamond, 'blastp', '-p', str(cfg.threads), '-f', '6',
+                   'qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen', 'qstart',
+                   'qend', 'sstart', 'send', 'evalue', 'bitscore', 'staxids', 'sscinames',
+                  '-b', '2.0', '--tmpdir', '/dev/shm', f'--{cfg.diamond_sensitivity}', '-c', '1',
+                  '--top', '10', '-q', tmp_prot_path, '-d', cfg.database_path]
 
     target_taxon = init_taxopyon(cfg.taxon_id, missing_taxids, TAX_DB)
 
-    excluded_ids = ""
+    excluded_ids = []
     if cfg.target_exclude:
-        excluded_ids += f'{get_id_for_rank_of_species(target_taxon.taxid, cfg.exclusion_rank, missing_taxids, TAX_DB)},'
+        excluded_ids.append(str(get_id_for_rank_of_species(target_taxon.taxid, cfg.exclusion_rank, missing_taxids, TAX_DB)))
     if cfg.add_exclude:
         if type(cfg.add_exclude) == list:
             for id in cfg.add_exclude:
-                excluded_ids += f'{id},'
+                excluded_ids.append(str(id))
         elif ',' in cfg.add_exclude:
             for id in cfg.add_exclude.split(','):
-                excluded_ids += f'{id},'
+                excluded_ids.append(str(id))
         else:
-            excluded_ids += f'{cfg.add_exclude},'
+            excluded_ids.append(str(cfg.add_exclude))
     if cfg.target_exclude or cfg.add_exclude:
-        target_exclude = f' --taxon-exclude ' \
-                         f'"{excluded_ids[:-1]}"' # remove trailing comma
+        target_exclude = ['--taxon-exclude'] + excluded_ids
     else:
-        target_exclude = ''
+        target_exclude = []
 
 
     if type(cfg.num_groups_plot) == int:
