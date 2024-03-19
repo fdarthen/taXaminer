@@ -4,7 +4,7 @@ taXaminer - examine the taxonomic diversity in genome assemblies. Designed to de
 
 taXaminer combines a reference-free and an alignment-based approach to detect and differentiate contamination and horizontal gene transfer in genome assemblies. It uses a total of 16 intrinsic features to describe the gene set. Among these are the read coverage, sequence composition, gene length and the size of the scaffold it is annotated on (see details [here](https://github.com/BIONF/taXaminer/wiki/Additional-information#pca-variables)). To identify genes which discern from the average, a Principal Component Analysis is used to cluster genes with similar features. The taxonomic assignment targets at identifying the true taxon of origin for each gene. It is based on their protein sequence to reduce the need of having the exact reference in the database. 
 
-The results can be interactively explored in the accompanying [[dashboard|https://github.com/BIONF/taxaminer-dashboard]].
+The results can be interactively explored in the accompanying [dashboard](https://github.com/BIONF/taxaminer-dashboard).
 
 # Table of Contents
 * [Installation](#installation)
