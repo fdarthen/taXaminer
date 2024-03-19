@@ -54,8 +54,15 @@ def gene_data2panda(cfg, assignment_df, pca_coordinates):
                                 index_col=0)
 
     df = gene_features.merge(
-        pca_coordinates, left_index=True, right_index=True).merge(
-        assignment_df, left_index=True, right_index=True)
+        pca_coordinates, how='left', left_index=True, right_index=True).merge(
+        assignment_df, how='left', left_index=True, right_index=True)
+
+    df.loc[df['plot_label'].isna(), ['best_hit', 'best_hitID', 'bh_pident', 'bh_evalue', 'bh_bitscore',
+                                     'lca', 'lcaID', 'refined_lca', 'refined_lcaID', 'taxon_assignment', 'taxon_assignmentID']] = None
+
+
+    df.loc[df['plot_label'].isna(), 'is_target'] = 0
+    df.loc[df['plot_label'].isna(), 'plot_label'] = 'Unassigned'
 
     return df
 
@@ -403,8 +410,8 @@ def create_taxsun_input(cfg, data):
 
 def create_gene_table_taxon_assignment(cfg, gff_df, df):
 
-    out_df = df.merge(gff_df[['start', 'end', 'upstream_gene', 'downstream_gene']],
-                      left_index=True, right_index=True)
+    out_df = df.merge(gff_df[['start', 'end', 'upstream_gene', 'downstream_gene', 'gene_biotype']],
+                      left_index=True, right_index=True, how='left')
 
     columns_renamed = {}
     for col in out_df.columns:
