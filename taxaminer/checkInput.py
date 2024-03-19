@@ -88,7 +88,6 @@ class Config:
         self.diamond = cfg_dict.get('diamond')
         self.samtools = cfg_dict.get('samtools')
         self.bedtools = cfg_dict.get('bedtools')
-        self.krona = cfg_dict.get('krona')
 
 
 def check_assembly_ids(config_obj):

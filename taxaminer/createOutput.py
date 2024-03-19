@@ -3,7 +3,7 @@
 """Create and modifiy output
 
 Modifies the HTML 3D plot file to make is self-contained and
-the text in the hoverwindow selectable. Creates final 3D and Krona plot
+the text in the hoverwindow selectable. Creates final 3D plot
 
 Expects processed config file
 """
@@ -401,11 +401,6 @@ def create_taxsun_input(cfg, data):
     taxsun_df = data[['taxon_assignmentID', 'bh_evalue', 'fasta_header']]
     taxsun_df.to_csv(cfg.output_path + 'taxonomic_assignment/taxsun.tsv', sep='\t', index=True,
                      index_label='#gene_id', header=['taxID', 'e_value', 'fasta_id'])
-    cmd_krona = f'{cfg.krona} {cfg.output_path}taxonomic_assignment/taxsun.tsv -o {cfg.output_path}taxonomic_assignment/krona.html'
-    out_krona = subprocess.run([cmd_krona], shell=True, capture_output=True)
-    if out_krona.returncode != 0:
-        logging.error(f'creation of krona plot failed:\n{out_krona}')
-        logging.error('Error message:\n' + out_krona.stderr.decode())
 
 
 def create_gene_table_taxon_assignment(cfg, gff_df, df):
@@ -431,8 +426,6 @@ def create_plots(cfg, genes, pca_obj, variables, pca_coordinates,
     create_gene_table_taxon_assignment(cfg, gff_df, all_data_df)
     logging.debug('>>creating 3D plot')
     create_3D_plot(cfg, all_data_df, pca_obj, variables, pca_coordinates, query_label)
-    #TODO: krona optional
-    # if cfg.create_krona:
     logging.debug('>>creating taxSun')
     create_taxsun_input(cfg, all_data_df)
 

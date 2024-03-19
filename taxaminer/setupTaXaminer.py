@@ -60,14 +60,6 @@ def check_executable(cmd_dict):
         logging.error("Installation of diamond failed. Please try again "
                         "by running\n\nconda install -c bioconda diamond\n")
 
-    # check Krona tools
-    logging.info("checking krona tools")
-    check_krona = subprocess.run([f"{cmd_dict.get('krona')}"],
-                                   shell=True, capture_output=True)
-    if check_krona.returncode != 0:
-        logging.error("Installation of Krona failed. Please try again "
-                        "by running\n\nconda install -c bioconda krona\n")
-
 
 def prepare_nr(outPath, db_name):
     logging.info(f">> downloading {db_name}")
@@ -208,15 +200,6 @@ def setup_db(db_name, outPath, cmd_dict):
         logging.info("Stdout:\n" + out_index_db.stderr.decode())
 
 
-def setup_krona_taxonomy(path):
-    logging.info("setting up taxonomy db for krona tools")
-    setup_krona = subprocess.run([f"{path}"],
-                                 shell=True, capture_output=True)
-    if setup_krona.returncode != 0:
-        logging.error("Setup of Krona database failed. Error message:"
-              f"{setup_krona.stderr.decode()}")
-
-
 def setup_conda():
     # check conda
     check_conda = subprocess.run(["conda --version"], shell=True, capture_output=True)
@@ -234,21 +217,6 @@ def setup_conda():
         logging.error("Installation of diamond failed. Please try again "
                         'by running\n\nconda install -c bioconda "diamond>=2.1.7"\n')
     cmd_dict["diamond"] = "diamond"
-
-    # install Krona tools
-    logging.info("installing krona tools")
-    install_krona = subprocess.run(["conda install -c bioconda krona -y"],
-                                   shell=True, capture_output=True)
-    if install_krona.returncode != 0:
-        logging.error("Installation of Krona failed. Please try again "
-                        "by running\n\nconda install -c bioconda krona\n")
-    cmd_dict["krona"] = "ktImportTaxonomy"
-    ## initializing taxonomy for Krona
-    krona_run_path = subprocess.run(["which ktImportTaxonomy"], shell=True,
-                                capture_output=True).stdout.decode()
-    krona_update_path = krona_run_path.replace('bin/ktImportTaxonomy',
-                                               'opt/krona/updateTaxonomy.sh')
-    setup_krona_taxonomy(krona_update_path)
 
 
     return cmd_dict
@@ -272,31 +240,8 @@ def setup_locally(tool_path):
     open_tarfile(f"diamond-linux64.tar.gz", toolPath, "gz")
     cmd_dict["diamond"] = f"{toolPath}diamond"
 
-    # install Krona tools
-    logging.info("installing krona tools")
-    k_version = "2.8.1"
-    download_file(f"KronaTools-{k_version}.tar",
-                  "https://github.com/marbl/Krona/releases/download/"
-                  f"v{k_version}/KronaTools-{k_version}.tar")
-    open_tarfile(f"KronaTools-{k_version}.tar", toolPath, "")
-    os.chdir(pathlib.Path(f"KronaTools-{k_version}/"))
-    install_krona = subprocess.run([f"./install.pl --prefix .;"],
-                                   shell=True, capture_output=True)
-    os.chdir(toolPath)
-    if install_krona.returncode != 0:
-        logging.error("Installation of Krona failed:\n"
-                        f"{install_krona.stderr.decode()}")
-    else:
-        os.symlink(f"KronaTools-{k_version}/bin/ktImportTaxonomy",
-                   "ktImportTaxonomy")
-    cmd_dict["krona"] = f"{toolPath}ktImportTaxonomy"
-    ## initializing taxonomy for Krona
-    krona_update_path = f"{toolPath}KronaTools-{k_version}/updateTaxonomy.sh"
-    setup_krona_taxonomy(krona_update_path)
-
     # remove downloads
     os.remove("diamond-linux64.tar.gz")
-    os.remove(f"KronaTools-{k_version}.tar")
 
     return cmd_dict
 
