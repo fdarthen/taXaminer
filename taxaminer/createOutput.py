@@ -170,7 +170,7 @@ def marker_styling(cfg, plot_df, query_label):
         sorted_traces = []
 
     # non-taxonomy informed colorscale
-    remaining_labels_df = plot_df.loc[~plot_df['plot_label'].isin(sorted_traces)]
+    remaining_labels_df = plot_df.loc[(~plot_df['plot_label'].isin(sorted_traces)) & (plot_df['gene_biotype'] == 'mRNA')]
     distinct_labels_count = remaining_labels_df['plot_label'].value_counts(dropna=False).to_frame()
 
     sorted_traces += sort_traces(cfg, remaining_labels_df)
@@ -188,21 +188,23 @@ def marker_styling(cfg, plot_df, query_label):
     #opacities[query_label] = 0.8
     plot_df['plot_colour'] = plot_df['plot_label'].map(colours)
     plot_df['plot_opacity'] = plot_df['plot_label'].map(opacities)
+    plot_df['plot_shape'] = "circle"
 
     return plot_df, sorted_traces
 
 
-def save_gif(cfg, fig):
-    # save a gif of the 3D plot
-    new_fig = fig.update_layout(showlegend=False,
-                            font=dict(size=10, color="grey"))
-    gif = GIF()
-    three_d_scatter_rotate(gif, new_fig, 60,
-                            gif_kwargs={'length': 45000})
-    # custom path in gif_kwargs does not work due to bug
-    # 'gif_path': f'{cfg.output_path}taxonomic_assignment/3D_plot.gif'
+def update_nc_genes(cfg, plot_df):
+    print(plot_df.plot_label.unique())
+    print(bool('Unassigned' in plot_df.plot_label.to_list()))
+    print(bool('Unassigned' in plot_df.plot_label.unique()))
+    if "Unassigned" in plot_df.plot_label.to_list():
+        plot_df.loc[plot_df['gene_biotype'] != 'mRNA', 'plot_colour'] = plot_df.loc[plot_df['plot_label'] == 'Unassigned', 'plot_colour'].iloc[0]
+    else:
+        plot_df.loc[plot_df['gene_biotype'] != 'mRNA', 'plot_colour'] = 'rgb(211,213,220)'
 
-
+    plot_df.loc[plot_df['gene_biotype'] != 'mRNA', 'plot_opacity'] = 0.6
+    plot_df.loc[plot_df['gene_biotype'] != 'mRNA', 'plot_shape'] = 'square'
+    return plot_df
 
 def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_label):
     """
@@ -217,13 +219,14 @@ def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_labe
 
     # ________________ PLOT PREPARATION _______________ #
 
+    plot_df.loc[plot_df['gene_biotype'] != 'mRNA', 'plot_label'] = plot_df[
+        'gene_biotype']
     # frequency information for labels in plots
     plot_df['label_count'] = plot_df['plot_label'].map(
         plot_df['plot_label'].value_counts())
     # append frequency information to label
     plot_df['plot_label_freq'] = plot_df['plot_label'] + ' (' + plot_df[
         'label_count'].astype(str) + ')'
-
 
     ## add sequence information
     # read proteins fasta file
@@ -253,6 +256,8 @@ def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_labe
 
     ## assign colours
     plot_df, traces_reordered = marker_styling(cfg, plot_df, query_label)
+    plot_df = update_nc_genes(cfg, plot_df)
+
 
     ## create plot
     # subset data into three groups to load them in distinct traces
@@ -276,6 +281,8 @@ def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_labe
                 plot_df.loc[plot_df['plot_label'] == label, 'plot_colour'].iloc[0],
                 opacity=plot_df.loc[
                     plot_df['plot_label'] == label, 'plot_opacity'].iloc[0],
+                symbol=plot_df.loc[
+                    plot_df['plot_label'] == label, 'plot_shape'].iloc[0]
             ),
             text=[f"</br>ID: {index} | Scaffold: {row['c_name']} \
                             </br>Taxonomic assignment: {row['taxon_assignment']} | Label: {row['plot_label']} \
@@ -316,18 +323,35 @@ def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_labe
     )
 
 
-    # pio.kaleido.scope.default_width = 700
-    # pio.kaleido.scope.default_height = 500
-    # print("saving 3D plot to pdf")
-    # pre= time.time()
-    # fig.write_image(cfg.output_path + "taxonomic_assignment/3D_plot.pdf",
-    #                 engine='kaleido',
-    #                 width = 850,
-    #                 height = 650)
-    # print(f"pdf: {time.time() -pre}")
-
-
-    #save_gif(cfg,fig)
+    ### ADD NON-PROTEIN-CODING-GENES
+    for label in plot_df.loc[plot_df['gene_biotype'] != 'mRNA', 'gene_biotype'].unique() :
+        #logging.debug(f'>>>>loading trace {label}')
+        #labels = plot_df.loc[plot_df['plot_label'] == label, :]
+        fig.add_trace(go.Scatter3d(
+            x=plot_df.loc[plot_df['plot_label'] == label, 'PC 1'],
+            y=plot_df.loc[plot_df['plot_label'] == label, 'PC 2'],
+            z=plot_df.loc[plot_df['plot_label'] == label, 'PC 3'],
+            name=plot_df.loc[plot_df['plot_label'] == label, 'plot_label_freq'].iloc[0],
+            mode='markers',
+            marker=dict(
+                size=cfg.marker_size-1,
+                color=
+                plot_df.loc[plot_df['plot_label'] == label, 'plot_colour'].iloc[0],
+                opacity=plot_df.loc[
+                    plot_df['plot_label'] == label, 'plot_opacity'].iloc[0],
+                symbol=plot_df.loc[
+                    plot_df['plot_label'] == label, 'plot_shape'].iloc[0]
+            ),
+            text=[f"</br>ID: {index} | Scaffold: {row['c_name']}"
+                  f"</br>Biotype: {row['gene_biotype']}"
+                  f"</br>Coverage: {row['g_coverages']} (SD from contig mean: {row['g_covdeviations']})"
+                  f"</br>Terminal: {row['g_terminal']} (Genes on contig: {row['c_num_of_genes']})"
+                  for index, row in plot_df.loc[plot_df['plot_label'] == label].iterrows()],
+            hoverinfo='text',
+            visible="legendonly",
+            legendgroup="nc",
+            legendgrouptitle_text="Non-protein-coding"
+        ))
 
     ### ADD PCA CONTRIBUTION OF VARIABLES ###
     loadings = pca_obj.components_.T * np.sqrt(pca_obj.explained_variance_)
@@ -405,15 +429,17 @@ def create_taxsun_input(cfg, data):
 
 def create_gene_table_taxon_assignment(cfg, gff_df, df):
 
-    out_df = df.merge(gff_df[['start', 'end', 'upstream_gene', 'downstream_gene', 'gene_biotype']],
+    merged_df = df.merge(gff_df[['start', 'end', 'upstream_gene', 'downstream_gene', 'gene_biotype']],
                       left_index=True, right_index=True, how='left')
 
     columns_renamed = {}
-    for col in out_df.columns:
+    for col in merged_df.columns:
         if 'PC ' in col:
             columns_renamed[col] = f"PC_{col.split()[1]}"
-    out_df.rename(columns=columns_renamed, inplace=True)
+    out_df = merged_df.rename(columns=columns_renamed)
     out_df.to_csv(f"{cfg.output_path}taxonomic_assignment/gene_table_taxon_assignment.csv", index_label='g_name')
+
+    return merged_df
 
 
 def create_plots(cfg, genes, pca_obj, variables, pca_coordinates,
@@ -423,7 +449,7 @@ def create_plots(cfg, genes, pca_obj, variables, pca_coordinates,
 
 
     all_data_df = gene_data2panda(cfg, genes, pca_coordinates)
-    create_gene_table_taxon_assignment(cfg, gff_df, all_data_df)
+    all_data_df = create_gene_table_taxon_assignment(cfg, gff_df, all_data_df)
     logging.debug('>>creating 3D plot')
     create_3D_plot(cfg, all_data_df, pca_obj, variables, pca_coordinates, query_label)
     logging.debug('>>creating taxSun')
