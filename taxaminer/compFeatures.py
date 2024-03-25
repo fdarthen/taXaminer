@@ -1623,7 +1623,8 @@ def add_fasta_data2a(results, a, cfg, proteins_file,
         if cfg.extract_proteins:
             # write protein sequence
             for seq in seqs:
-                proteins_file.write(f">{seq[0]}\n{seq[1]}\n")
+                if seq[0]:
+                    proteins_file.write(f">{seq[0]}\n{seq[1]}\n")
     else:
         a.add_geneless_contig(contig.name, contig)
 

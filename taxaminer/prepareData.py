@@ -40,7 +40,7 @@ def set_seqs(cfg, gff_df, gene, contig_seq, proteins_file):
 
     if not gene.coding_features:
         # no transcript was found for gene
-        return
+        return (None, None)
 
     seq = ''
 
