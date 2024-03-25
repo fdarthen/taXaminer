@@ -394,29 +394,29 @@ def parse_genes(cfg):
 def set_gene_neighbours(gff_df):
 
 
-    # for scaffold_id in gff_df['scaffold'].unique():
-    #     genes = gff_df.loc[(gff_df['scaffold'] == scaffold_id) & (gff_df['type'] == 'gene')].sort_values(['start'])
-    #     gene_order = genes.index.to_list()
-    #     gff_df.loc[gene_order,'upstream_gene'] = ([None] + gene_order)[:-1]
-    #     gff_df.loc[gene_order,'downstream_gene'] = (gene_order + [None])[1:]
+    for scaffold_id in gff_df['scaffold'].unique():
+        genes = gff_df.loc[(gff_df['scaffold'] == scaffold_id) & (gff_df['type'] == 'gene')].sort_values(['start'])
+        gene_order = genes.index.to_list()
+        gff_df.loc[gene_order,'upstream_gene'] = ([None] + gene_order)[:-1]
+        gff_df.loc[gene_order,'downstream_gene'] = (gene_order + [None])[1:]
 
-    cur_gene, cur_contig = None, None
-    upstream_gene = None
-    for row in gff_df.loc[gff_df['type'] == 'gene'].itertuples():
-        #print(row)
-        if cur_contig == row.scaffold:
-            gff_df.at[cur_gene, 'upstream_gene'] = upstream_gene
-            gff_df.at[cur_gene, 'downstream_gene'] = row.Index
-            upstream_gene = cur_gene
-            cur_gene = row.Index
-        else:
-            if cur_gene:
-                gff_df.at[cur_gene, 'upstream_gene'] = upstream_gene
-                gff_df.at[cur_gene, 'downstream_gene'] = None
-
-            upstream_gene = None
-            cur_contig = row.scaffold
-            cur_gene = row.Index
+    # cur_gene, cur_contig = None, None
+    # upstream_gene = None
+    # for row in gff_df.loc[gff_df['type'] == 'gene'].itertuples():
+    #     #print(row)
+    #     if cur_contig == row.scaffold:
+    #         gff_df.at[cur_gene, 'upstream_gene'] = upstream_gene
+    #         gff_df.at[cur_gene, 'downstream_gene'] = row.Index
+    #         upstream_gene = cur_gene
+    #         cur_gene = row.Index
+    #     else:
+    #         if cur_gene:
+    #             gff_df.at[cur_gene, 'upstream_gene'] = upstream_gene
+    #             gff_df.at[cur_gene, 'downstream_gene'] = None
+    #
+    #         upstream_gene = None
+    #         cur_contig = row.scaffold
+    #         cur_gene = row.Index
 
     return gff_df
 
