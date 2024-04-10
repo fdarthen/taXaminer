@@ -8,12 +8,12 @@ Expects path to config file
 """
 __author__ = "Simonida Zehr, Freya Arthen"
 
-import psutil
 
 from . import classes
 from . import checkInput
 from . import prepareData
 
+import psutil
 import numpy as np
 import operator # for quick comparisons
 import scipy.stats as stats # for Pearson's R
