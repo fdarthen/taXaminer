@@ -314,6 +314,8 @@ def process_gene(gene, parent_ids, transcripts, gene_features, non_transcript_ty
     if len(set(cf_ids)) == 1:
         unique_coding_id = cf_ids[0]
         gene['unique_coding_id'] = unique_coding_id
+        for i, feat in enumerate(coding_features):
+            feat['id'] = f"{feat['id']}-{i}"
     else:
         # coding features all have same ID but are enumerated
         for sep in ['.', '-', '_']:
