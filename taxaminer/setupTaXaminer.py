@@ -363,6 +363,7 @@ def main():
         setup_db(args.database, args.dataPath, cmd_dict)
     elif args.dataPath:
         # database already precomputed -> adjust the path
+        logger.info(f"Setting database path to \n\t{os.path.abspath(args.dataPath)}")
         data_path = os.path.abspath(args.dataPath)
 
     taxaminer_paths = {"data_path": data_path,
@@ -372,6 +373,8 @@ def main():
     with open(taxaminer_path+"/pathconfig.txt", "w") as config:
             config.write(str(taxaminer_paths))
             config.close()
+
+    logging.info("Done!")
 
 
 if __name__ == "__main__":

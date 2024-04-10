@@ -132,7 +132,7 @@ def main():
 
 
     pre_time = time.time()
-    logging.info('> executing PCA and clustering')
+    logging.info('> executing PCA')
     pathlib.Path(output_path + 'PCA/').mkdir(parents=True, exist_ok=True)
     pca_obj, pca_coordinates, variables = reduceDims.compute_pca(cfg)
     logging.debug(f'finished [{int(time.time()-pre_time)}s]\n')
