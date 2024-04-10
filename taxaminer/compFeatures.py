@@ -23,6 +23,8 @@ import pysam
 import multiprocessing as mp
 from tqdm import tqdm
 import os
+import time
+from pathlib import Path
 
 # ====================== CONSTANTS ======================
 # define nucleotide alphabet
