@@ -8,6 +8,7 @@ Expects path to config file
 """
 __author__ = "Simonida Zehr, Freya Arthen"
 
+import psutil
 
 from . import classes
 from . import checkInput
