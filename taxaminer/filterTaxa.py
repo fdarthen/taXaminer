@@ -179,7 +179,7 @@ def ident_matched_genes(TAX_DB, gene_table_path, filter_taxon):
     selected_genes = gene_assignments[
         gene_assignments['taxon_assignmentID'].isin(selected_taxon_assignments)]
 
-    return selected_genes['g_name']
+    return set(selected_genes['g_name'])
 
 
 
@@ -194,9 +194,9 @@ def ident_matched_contigs(TAX_DB, contig_table_path, filter_taxon):
     selected_contigs = contig_assignments[
         contig_assignments['lcaID'].isin(selected_taxon_assignments)]
 
-    return selected_contigs['c_name']
+    return set(selected_contigs['c_name'])
 
-def taxon_based_filtering(args, TAX_DB, gene_table_path,contig_table_path,
+def taxon_based_filtering(args, TAX_DB, gene_table_path, contig_table_path,
                           id_mapper, fasta_path, gff_path):
     filter_taxon = taxopy.Taxon(args.taxon, TAX_DB)
 
@@ -214,18 +214,18 @@ def taxon_based_filtering(args, TAX_DB, gene_table_path,contig_table_path,
             filter_seq_ids = keep_seq_ids
         else:
             filter_seq_ids = \
-                id_mapper.loc[id_mapper['g_name'].isin(keep_seq_ids)][
-                    'c_name'].unique()
+                set(id_mapper.loc[id_mapper['g_name'].isin(keep_seq_ids)][
+                    'c_name'])
         print(f"Returning {len(filter_seq_ids)} contigs.")
         filter_fasta(fasta_path, args.output, filter_seq_ids)
     elif args.out_seq_type == "gene":
         if args.assignment_level == 'contig':
             # return all gene sequences of considered contigs
             filter_seq_ids = \
-                id_mapper.loc[id_mapper['c_name'].isin(keep_seq_ids)][
-                    'g_name'].unique()
+                set(id_mapper.loc[id_mapper['c_name'].isin(keep_seq_ids)][
+                    'g_name'])
         else:
-            filter_seq_ids = keep_seq_ids.values
+            filter_seq_ids = set(keep_seq_ids.values)
         print(f"Returning {len(filter_seq_ids)} genes.")
         gff_df = init_gff_df(gff_path, filter_seq_ids)
         gene_locs = df2gene_dict(gff_df)
@@ -234,10 +234,10 @@ def taxon_based_filtering(args, TAX_DB, gene_table_path,contig_table_path,
         if args.assignment_level == 'contig':
             # return all gene sequences of considered contigs
             filter_seq_ids = \
-                id_mapper.loc[id_mapper['c_name'].isin(keep_seq_ids)][
-                    'g_name'].unique()
+                set(id_mapper.loc[id_mapper['c_name'].isin(keep_seq_ids)][
+                    'g_name'])
         else:
-            filter_seq_ids = keep_seq_ids.values
+            filter_seq_ids = set(keep_seq_ids.values)
         print(f"Returning CDS sequences of {len(filter_seq_ids)} genes.")
         gff_df = init_gff_df(gff_path, filter_seq_ids)
         cds_locs = df2cds_dict(gff_df)
@@ -245,12 +245,12 @@ def taxon_based_filtering(args, TAX_DB, gene_table_path,contig_table_path,
     elif args.out_seq_type == "protein":
         if args.assignment_level == 'contig':
             filter_seq_ids = \
-                id_mapper.loc[id_mapper['c_name'].isin(keep_seq_ids)][
-                    'fasta_header'].unique()
+                set(id_mapper.loc[id_mapper['c_name'].isin(keep_seq_ids)][
+                    'fasta_header'])
         else:
             filter_seq_ids = \
-                id_mapper.loc[id_mapper['g_name'].isin(keep_seq_ids)][
-                    'fasta_header'].unique()
+                set(id_mapper.loc[id_mapper['g_name'].isin(keep_seq_ids)][
+                    'fasta_header'])
         print(f"Returning {len(filter_seq_ids)} proteins.")
         filter_fasta(fasta_path, args.output, filter_seq_ids)
     else:
@@ -333,7 +333,6 @@ def seqid_based_filtering(args, seq_ids, id_mapper, gene_table_path, fasta_path,
         else:
             sys.exit("Read filtering not supported yet.")
 
-
     else:
         # in type == out type
         filter_seq_ids = seq_ids
@@ -347,8 +346,6 @@ def seqid_based_filtering(args, seq_ids, id_mapper, gene_table_path, fasta_path,
             filter_genes(fasta_path, args.output, cds_locs)
         else: # contig and protein return whole sequence of fasta
             filter_fasta(fasta_path, args.output, filter_seq_ids)
-
-
 
 
 def main():

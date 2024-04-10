@@ -1561,41 +1561,37 @@ def set_seq_info(current_contig, raw_seq):
     return contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs #total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs
 
 
-def init_contig_and_genes(in_queue, results_queue):
+def init_contig_and_genes(input):
 
-    while True:
-        queue_item = in_queue.get()
-        # check for end of queue
-        if queue_item is None:
-            break
+    (contigs_gff, bam_indicies, cfg, seq_dict) = input
+    # initialize contig and its genes
+    return_dict = {}
 
-        (contig_gff, bam_indicies, cfg, contig_id, raw_seq) = queue_item
-        # initialize contig and its genes
+    for contig_id, raw_seq in seq_dict.items():
         current_contig = init_contig(bam_indicies, contig_id, len(raw_seq))
-
 
         seqs = {}
         ## init genes for current scaffold (which is already initialized)
-        contig_genes = (contig_gff['type'] == "gene")
-        genes = contig_gff[contig_genes]
-        #print(f"{contig_id}: {genes.shape}")
+        contig_genes = (contigs_gff['type'] == "gene") & (contigs_gff['scaffold'] == contig_id)
+        genes = contigs_gff[contig_genes]
         if not genes.empty:
             genes.apply(lambda row: init_gene(bam_indicies, current_contig, row), axis=1)
             if cfg.extract_proteins:
-                seqs = genes.apply(lambda row: prepareData.set_seqs(cfg, contig_gff, row, raw_seq, "#>#dummy"), axis=1)
+                seqs = genes.apply(lambda row: prepareData.set_seqs(cfg, contigs_gff, row, raw_seq, "#>#dummy"), axis=1)
 
         contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs = \
             set_seq_info(current_contig, raw_seq)
 
-        results_queue.put((current_contig, contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs, seqs))
+        return_dict[current_contig] = [contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs, seqs]
 
-    results_queue.put(None)
+    return return_dict
 
-def add_fasta_data2a(results, a, cfg, proteins_file,
+
+def add_fasta_data2a(contig, results, a, cfg, proteins_file,
                      total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs):
 
 
-    (contig, contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs,
+    (contig_tetranuc_freqs, contig_trinuc_freqs, contig_dinuc_freqs,
      seqs) = results
 
     # save results to a
@@ -1631,7 +1627,7 @@ def add_fasta_data2a(results, a, cfg, proteins_file,
     return total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs
 
 
-def read_fasta(cfg, a, gff_df, in_queue):
+def read_fasta(cfg, a, gff_df, chunk_size):
     """
 
     Args:
@@ -1643,23 +1639,25 @@ def read_fasta(cfg, a, gff_df, in_queue):
     """
 
     bam_indicies = list(a.get_bam_paths().keys())
-    num_lines = sum(1 for line in open(a.get_fasta_path(), 'r'))
-
+    count = 0
+    seq_dict = {}
     with open(a.get_fasta_path(), 'r') as fasta: # open FASTA file
         contig_id = next(fasta).split()[0][1:]
         raw_seq = ''
 
-        for line in tqdm(fasta, desc ="lines read", total=num_lines-1):
+        for line in fasta:
+            count += len(line)
             line = line.strip()
 
             # if line contains fasta header
             # store sequence of previous contig and save new name
             if line.startswith(">"):
-
-                #c_count += 1
-                # reduce amount of data to be pickeled for parallelization
-                contig_gff = gff_df.query(f'scaffold == "{contig_id}"')
-                in_queue.put((contig_gff, bam_indicies, cfg, contig_id, raw_seq))
+                seq_dict[contig_id] = raw_seq
+                if count >= chunk_size:
+                    contigs_gff = gff_df.loc[gff_df['scaffold'].isin(seq_dict.keys())]
+                    yield (contigs_gff, bam_indicies, cfg, seq_dict)
+                    seq_dict = {}
+                    count = 0
 
                 # refresh for new contig
                 raw_seq = ''
@@ -1667,46 +1665,38 @@ def read_fasta(cfg, a, gff_df, in_queue):
             else:
                 raw_seq = raw_seq + line.upper()
 
-        contig_gff = gff_df.query(f'scaffold == "{contig_id}"')
-        in_queue.put((contig_gff, bam_indicies, cfg, contig_id, raw_seq))
 
-    logging.info(">>> processing sequence information")
-
-    # add sentinels to track if queue really is empty
-    for p in range(cfg.threads):
-        in_queue.put(None)
+        seq_dict[contig_id] = raw_seq
+        contigs_gff = gff_df.loc[gff_df['scaffold'].isin(seq_dict.keys())]
+        yield (contigs_gff, bam_indicies, cfg, seq_dict)
 
 
 def process_fasta(cfg, a, gff_df):
 
     logging.info(f">> reading FASTA file")
-    in_queue = mp.Queue()
-    results_queue = mp.Queue()
     # start the processing
-    pool = mp.Pool(cfg.threads-1, init_contig_and_genes, (in_queue, results_queue,))
+    pool = mp.Pool(cfg.threads)
     # start the reading
-    read_process = mp.Process(target=read_fasta, args=(cfg, a, gff_df, in_queue,))
-    read_process.start()
-    # wait for all processes to finish
-    read_process.join()
-    read_process.close()
-    pool.close()
-
     total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs = init_tetranuc_freq()
     if cfg.extract_proteins:
         proteins_file = open(cfg.proteins_path, 'w')
     else:
         proteins_file = None
 
-    sentinel_countdown = cfg.threads - 1
-    while sentinel_countdown > 0:
-        results = results_queue.get()
-        if results is None:
-            sentinel_countdown -= 1
-            continue
-        total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs = add_fasta_data2a(
-            results, a, cfg, proteins_file, total_tetranuc_freqs,
-            total_trinuc_freqs, total_dinuc_freqs)
+    file_mem = Path(a.get_fasta_path()).stat().st_size
+    available_mem = psutil.virtual_memory().available * 0.9
+    chunk_size = (available_mem // cfg.threads) + 1
+    n_chunks = (file_mem // chunk_size) + 1
+    if (n_chunks < cfg.threads):
+        n_chunks = cfg.threads
+        chunk_size = (file_mem // n_chunks) + 1
+
+    for i in tqdm(pool.imap_unordered(init_contig_and_genes, read_fasta(cfg, a, gff_df, chunk_size)),
+                  desc ="chunks processed", total=n_chunks):
+        for contig_id, data in i.items():
+            total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs = add_fasta_data2a(
+                contig_id, data, a, cfg, proteins_file, total_tetranuc_freqs,
+                total_trinuc_freqs, total_dinuc_freqs)
 
     if proteins_file:
         proteins_file.close()
@@ -1716,10 +1706,7 @@ def process_fasta(cfg, a, gff_df):
                                  total_trinuc_freqs,
                                  total_dinuc_freqs))
 
-    in_queue.close()
-    in_queue.join_thread()
-    results_queue.close()
-    results_queue.join_thread()
+    pool.close()
     pool.join()
 
 

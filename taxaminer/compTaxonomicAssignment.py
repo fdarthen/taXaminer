@@ -974,7 +974,7 @@ def subset_prots_longest_cds(gff_df, proteins_path, path_out):
     """
 
     # when matching prot ID to gene ID it is already checked for the one with the longest CDS
-    longest_transcripts = gff_df.loc[gff_df['type'] == 'gene', 'diamond_header'].to_list()
+    longest_transcripts = set(gff_df.loc[gff_df['type'] == 'gene', 'diamond_header'])
 
     logging.info(
         f"{len(longest_transcripts)} proteins written to fasta file for "
@@ -1015,10 +1015,10 @@ def filter_prots_quick_hits(assignments_df, quick_mode_match_id, prot_path_in,
 
     """
 
-    no_match = assignments_df.apply(
+    no_match = set(assignments_df.apply(
         lambda row: detect_appropriate_assignment(row,
                                                   quick_mode_match_id, missing_taxids, TAX_DB),
-        axis=1).to_list()
+        axis=1))
 
     logging.info(f"{len(no_match)} proteins written to fasta file for 2nd DIAMOND run")
     subset_protein_fasta(prot_path_in, no_match, prot_path_out, "include")

@@ -333,7 +333,7 @@ def compute_pca(cfg):
             yaxis=dict(automargin=True, title_standoff=5)
         ))
 
-    create_2d_biplot(cfg, pca, components, data.columns[1:], plot_template)
+    #create_2d_biplot(cfg, pca, components, data.columns[1:], plot_template)
     create_heatmap(cfg, pca, data.columns[1:], plot_template)
     create_scree_plot(cfg, pca, plot_template)
     create_bar_plot(cfg, pca, plot_template)

@@ -233,7 +233,8 @@ def process_gene(gene, parent_ids, transcripts, gene_features, non_transcript_ty
     if transcripts:
         transcript_types = [transcript.get('type') for transcript in
                             transcripts]
-        if len(set(transcript_types)) == 1:
+        unique_transcript_types = set(transcript_types)
+        if len(unique_transcript_types) == 1:
             transcript_type = transcript_types[0]
 
             if transcript_type == 'mRNA':
@@ -268,21 +269,21 @@ def process_gene(gene, parent_ids, transcripts, gene_features, non_transcript_ty
                 gene['gene_biotype'] = gene_biotype
                 return [gene]
 
-        elif set(transcript_types) == {'exon', 'CDS'}:
+        elif unique_transcript_types == {'exon', 'CDS'}:
             # CDS is coding type
             unsorted_coding_features = [cds for cds in transcripts if
                                   cds.get('type') == 'CDS']
             coding_features = sorted(unsorted_coding_features,
                                      key=lambda dict: dict.get(
                                          'start'))
-        elif 'mRNA' in set(transcript_types):
+        elif 'mRNA' in unique_transcript_types:
             coding_transcripts = [feat for feat in transcripts if
                                   feat.get('type') == 'mRNA']
-            if 'exon' in set(transcript_types):
+            if 'exon' in unique_transcript_types:
                 non_transcript_types.append('exon')
                 gene_features += [feat for feat in transcripts
                                   if feat.get('type') == 'exon']
-            if 'CDS' in set(transcript_types):
+            if 'CDS' in unique_transcript_types:
                 non_transcript_types.append('CDS')
                 gene_features += [feat for feat in transcripts if
                                   feat.get('type') == 'CDS']
@@ -370,14 +371,14 @@ def parse_genes(cfg):
                 parent_ids = [gene.get('id')]
                 transcripts = [] # list of all features with gene=Parent
                 gene_features = [] # list of all other features connected to gene
-                non_transcript_types = []
+                non_transcript_types = set()
             elif gene and feature_dict.get('parent_id') == gene.get('id'):
                 transcripts.append(feature_dict)
                 parent_ids.append(feature_dict.get('id'))
             elif gene and feature_dict.get('parent_id') in parent_ids:
                 gene_features.append(feature_dict)
                 parent_ids.append(feature_dict.get('id'))
-                non_transcript_types.append(feature_dict.get('type'))
+                non_transcript_types.add(feature_dict.get('type'))
             else: # feature is not new gene but is also not connected to other gene features
                 if gene:
                     feature_dicts += process_gene(gene, parent_ids, transcripts, gene_features, non_transcript_types)
@@ -394,29 +395,32 @@ def parse_genes(cfg):
 def set_gene_neighbours(gff_df):
 
 
-    for scaffold_id in gff_df['scaffold'].unique():
-        genes = gff_df.loc[(gff_df['scaffold'] == scaffold_id) & (gff_df['type'] == 'gene')].sort_values(['start'])
-        gene_order = genes.index.to_list()
-        gff_df.loc[gene_order,'upstream_gene'] = ([None] + gene_order)[:-1]
-        gff_df.loc[gene_order,'downstream_gene'] = (gene_order + [None])[1:]
+    # for scaffold_id in gff_df['scaffold'].unique():
+    #     genes = gff_df.loc[(gff_df['scaffold'] == scaffold_id) & (gff_df['type'] == 'gene')].sort_values(['start'])
+    #     gene_order = genes.index.to_list()
+    #     gff_df.loc[gene_order,'upstream_gene'] = ([None] + gene_order)[:-1]
+    #     gff_df.loc[gene_order,'downstream_gene'] = (gene_order + [None])[1:]
 
-    # cur_gene, cur_contig = None, None
-    # upstream_gene = None
-    # for row in gff_df.loc[gff_df['type'] == 'gene'].itertuples():
-    #     #print(row)
-    #     if cur_contig == row.scaffold:
-    #         gff_df.at[cur_gene, 'upstream_gene'] = upstream_gene
-    #         gff_df.at[cur_gene, 'downstream_gene'] = row.Index
-    #         upstream_gene = cur_gene
-    #         cur_gene = row.Index
-    #     else:
-    #         if cur_gene:
-    #             gff_df.at[cur_gene, 'upstream_gene'] = upstream_gene
-    #             gff_df.at[cur_gene, 'downstream_gene'] = None
-    #
-    #         upstream_gene = None
-    #         cur_contig = row.scaffold
-    #         cur_gene = row.Index
+    cur_gene, cur_contig = None, None
+    upstream_gene = None
+    for row in gff_df.loc[gff_df['type'] == 'gene'].itertuples():
+        #print(row)
+        if cur_contig == row.scaffold:
+            gff_df.at[cur_gene, 'upstream_gene'] = upstream_gene
+            gff_df.at[cur_gene, 'downstream_gene'] = row.Index
+            upstream_gene = cur_gene
+            cur_gene = row.Index
+        else:
+            if cur_gene:
+                gff_df.at[cur_gene, 'upstream_gene'] = upstream_gene
+                gff_df.at[cur_gene, 'downstream_gene'] = None
+
+            upstream_gene = None
+            cur_contig = row.scaffold
+            cur_gene = row.Index
+
+    gff_df.at[cur_gene, 'upstream_gene'] = upstream_gene
+    gff_df.at[cur_gene, 'downstream_gene'] = None
 
     return gff_df
 
