@@ -360,7 +360,10 @@ def set_config_defaults(config_obj, TAX_DB, db_dir):
                                                           'proteins_path'),
                                                       'AND'))
     config_vars['use_phase'] = set_default(config_obj, 'use_phase', False)
-    config_vars['diamond_sensitivity'] = set_default(config_obj, 'diamond_sensitivity',
+    if config_obj.get('diamond_sensitivity') == '' or config_obj.get('diamond_sensitivity') == 'default':
+        config_vars['diamond_sensitivity'] = 'default'
+    else:
+        config_vars['diamond_sensitivity'] = set_default(config_obj, 'diamond_sensitivity',
                                                  'sensitive')
     config_vars['assignment_mode'] = set_default(config_obj, 'assignment_mode',
                                                  'exhaustive')

@@ -1189,8 +1189,10 @@ def run_assignment(cfg, gff_df, pca_coordinates, TAX_DB):
     diamond_cmd = [cfg.diamond, 'blastp', '-p', str(cfg.threads), '-f', '6',
                    'qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen', 'qstart',
                    'qend', 'sstart', 'send', 'evalue', 'bitscore', 'staxids', 'sscinames',
-                  '-b', '2.0', '--tmpdir', '/dev/shm', f'--{cfg.diamond_sensitivity}', '-c', '1',
+                  '-b', '2.0', '--tmpdir', '/dev/shm', '-c', '1',
                   '--top', '10', '-q', tmp_prot_path, '-d', cfg.database_path]
+    if cfg.diamond_sensitivity != 'default':
+        diamond_cmd.append(f'--{cfg.diamond_sensitivity}')
 
     target_taxon = init_taxopyon(cfg.taxon_id, missing_taxids, TAX_DB)
 
