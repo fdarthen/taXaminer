@@ -58,9 +58,17 @@ def strip_ID(id):
     if pd.isna(id):
         return None
 
-    for prefix in ['gene:', 'gene-', 'transcript:', 'transcript-',
-                   'rna:', 'rna-', 'cds:', 'cds-']:
-        id = remove_prefix(id, prefix)
+    prefix_types = ['gene', 'GENE', 'Gene',
+                    'transcript', 'TRANSCRIPT', 'Transcript',
+                    'rna', 'RNA', 'Rna',
+                    'cds', 'CDS', 'Cds']
+    prefix_connectors = [':', '-']
+    prefix_list = [f"{type}{con}" for con in prefix_connectors for type in prefix_types]
+
+    for prefix in prefix_list:
+        if id.startswith(prefix):
+            id = remove_prefix(id, prefix)
+            return id
     return id
 
 
@@ -351,7 +359,8 @@ def parse_genes(cfg):
     gene = None
 
     with open(cfg.gff_path, 'r') as gff_file:
-        for line in gff_file:
+        for line_num, line in enumerate(gff_file):
+            #print(line_num)
 
             # skip comments
             if line.startswith('#'):
@@ -363,7 +372,11 @@ def parse_genes(cfg):
 
 
             spline = line.strip().split('\t')
-            feature_dict = spline2dict(spline, cfg.include_pseudogenes)
+            if len(spline) == 9:
+                feature_dict = spline2dict(spline, cfg.include_pseudogenes)
+            else:
+                spline += [f"\tID={spline[2]}-{line_num}"]
+                feature_dict = spline2dict(spline, cfg.include_pseudogenes)
 
             if feature_dict.get('type') == 'gene':
                 if gene:
