@@ -126,7 +126,7 @@ def prepare_uniref(outPath, db_name):
     mapping_dict = {}
     logging.info(">> creating protein to taxon mapping file")
     with gzip.open(f"{outPath}/idmapping_selected.tab.gz", 'rb') as in_mapping, \
-        gzip.open(f"{outPath}/prot2taxid.tsv.gz", 'wb') as out_mapping:
+        gzip.open(f"{outPath}/prot2taxid.tsv.gz", 'wb', compresslevel=6) as out_mapping:
         out_mapping.write(f"accession.version\ttaxid\n".encode('utf-8'))
         for line in in_mapping:
             spline = line.decode('utf-8').strip().split('\t')
@@ -148,7 +148,7 @@ def prepare_uniref(outPath, db_name):
 
     logging.info(">> renaming fasta headers in database file")
     with gzip.open(f"{outPath}/{db_name}.gz", 'rb') as in_db_file, \
-        gzip.open(f"{outPath}/db.gz", 'wb') as out_db_file:
+        gzip.open(f"{outPath}/db.gz", 'wb', compresslevel=6) as out_db_file:
         for line in in_db_file:
             if line.decode('utf-8').startswith('>'):
                 uniref_id = line.decode('utf-8').split()[0][1:]
