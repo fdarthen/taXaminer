@@ -30,7 +30,8 @@ setup(
         'umap-learn',
         'kaleido',
         'pysam',
-        'tqdm'
+        'tqdm',
+        'psutil'
     ],
     entry_points={
         'console_scripts': ["taxaminer.run = taxaminer.runTaXaminer:main",

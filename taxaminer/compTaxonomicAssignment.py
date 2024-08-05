@@ -17,6 +17,7 @@ import logging
 import pandas as pd
 import multiprocessing as mp
 from tqdm import tqdm
+import psutil
 
 ###############################################################################
 ############################ HELPER FUNCTIONS #################################
@@ -436,7 +437,8 @@ def run_diamond(diamond_cmd):
                     ref_block)
                 current_shape, max_shapes = get_total_and_current(shape)
                 total_shapes = max_query_blocks * max_ref_blocks * max_shapes
-                pbar = tqdm(total=total_shapes, bar_format='{l_bar}{bar}| [{elapsed}<{remaining}, ' '{rate_fmt}{postfix}]')
+                pbar = tqdm(total=total_shapes,
+                            bar_format='{l_bar}{bar}| [{elapsed}<{remaining}, ' '{rate_fmt}{postfix}]')
                 init_pbar = True
             pbar.update(1)
         if log_line.startswith('Scoring parameters:'):
@@ -477,7 +479,6 @@ def run_diamond(diamond_cmd):
 
     if pbar:
         pbar.close()
-
 
 
 def perform_quick_search_1(cfg, perform_diamond, diamond_cmd,
@@ -689,7 +690,7 @@ def process_hit(hit, target_taxon, missing_taxids, TAX_DB):
         return hit
 
 
-def calc_assignment(in_queue, results_queue, target_taxon, missing_taxids, TAX_DB):
+def calc_assignment(params):
     """
     Calculate the LCA for each gene based on taxonomic hits.
 
@@ -702,28 +703,30 @@ def calc_assignment(in_queue, results_queue, target_taxon, missing_taxids, TAX_D
     :param target_taxon:
 
     """
+    hit_dict, assignments_df, target_taxon, missing_taxids, TAX_DB = params
+    return_dict = {}
+    unmapped_proteins = []
 
-    while True:
-        queue_item = in_queue.get()
-        # check for end of queue
-        if queue_item is None:
-            break
 
-        (gene_name, raw_hitlist) = queue_item
+    for protein_name, raw_hitlist in hit_dict.items():
 
-        hitlist = [process_hit(hit, target_taxon, missing_taxids, TAX_DB) for hit in raw_hitlist]
+        gene = assignments_df.loc[assignments_df.diamond_header == protein_name]
+        try:
+            gene_name = gene.index.item()
+        except:
+            unmapped_proteins.append(protein_name)
+            continue
+
+        hitlist = [process_hit(hit.strip().split('\t'), target_taxon, missing_taxids, TAX_DB) for hit in raw_hitlist]
         hit_ids = [id[-2].split(';')[0] for id in hitlist if id[-2] != '']
-
-        if hit_ids == []:
-            acc_nums = ','.join([elem[0] for elem in hitlist])
-            logging.info(f"Hits for protein(s) with following accession number(s) "
-                         f"couldn't be matched to corresponding taxon: \n {acc_nums}")
+        if not hit_ids:
+            unmapped_proteins.append(protein_name)
             continue
         else:
             lca = compute_lca(hit_ids, missing_taxids, TAX_DB)
             if lca:
                 if lca.taxid in target_taxon.taxid_lineage:
-                    closest_hit, closest_lca = assess_closest_of_hits(hit_ids,
+                    closest_hit, closest_lca =  assess_closest_of_hits(hit_ids,
                                                                       target_taxon, missing_taxids, TAX_DB)
                 else:
                     closest_lca = None
@@ -733,15 +736,14 @@ def calc_assignment(in_queue, results_queue, target_taxon, missing_taxids, TAX_D
         if not lca:
             lca = None
 
-        results_queue.put((gene_name, hitlist, lca, closest_lca))
+        return_dict[gene_name] = (hitlist, lca, closest_lca)
 
-    # put sentinel to indicate end of queue
-    results_queue.put(None)
+    return return_dict, unmapped_proteins
 
 
-def add_ta2gene(results, cfg, tax_assignment_path, assignments_df, target_taxon):
+def add_ta2gene(gene_id, results, cfg, tax_assignment_path, assignments_df, target_taxon):
 
-    (gene_id, hitlist, lca, closest_lca) = results
+    (hitlist, lca, closest_lca) = results
 
     #gene_id = assignments_df.query(f'diamond_header == "{diamond_header}"').index.item()
 
@@ -783,7 +785,7 @@ def add_ta2gene(results, cfg, tax_assignment_path, assignments_df, target_taxon)
     write_hits2file(cfg, tax_assignment_path, hitlist)
 
 
-def read_hit_file(cfg, assignments_df, in_queue):
+def read_hit_file(cfg, chunk_size):
     """
     Read DIAMOND output file and assign hits to genes.
 
@@ -795,82 +797,59 @@ def read_hit_file(cfg, assignments_df, in_queue):
     Returns:
 
     """
+
+    count = 0
+    return_dict = {}
     with open(cfg.diamond_results_path, 'r') as diamond_hits:
         # tax assignments list is sorted by query sequence
         # thus, all hits for one gene are following one another
 
-        first_spline = next(diamond_hits).strip().split('\t')
+        first_line = next(diamond_hits)
+        first_spline = first_line.strip().split('\t')
         if first_spline[0] == 'qseqid':
             #TODO: extend support to parsing already parsed diamond tables
             first_spline = next(diamond_hits).strip().split('\t')
 
-        gene = assignments_df.loc[assignments_df.diamond_header == first_spline[0]]
-        try:
-            gene.diamond_header.item()
-            current_diamond_header = gene.diamond_header.item()
-        except:
-            logging.error(f"Following protein sequence header could not be "
-                          f"conclusively matched to gene ID: {first_spline[0]}\n"
-                          f"Please check GFF for ambiguity. "
-                          f"Matched genes:\n {gene}")
-            current_diamond_header = None
-        #diamond_header = first_spline[0]
-        gene_assignments = [first_spline]
+        current_diamond_header = first_spline[0]
+        gene_hits = [first_line]
         for line in diamond_hits:
+            count += len(line)
             # first hit per gene is "best hit" in terms of alignment score
-            spline = line.strip().split('\t')
-            if spline[0] == current_diamond_header: #diamond_header: #
-                gene_assignments.append(spline)
+            if line.startswith(current_diamond_header): #diamond_header: #
+                gene_hits.append(line)
             else:
-                # compute the assignment with list of hits
-                if gene.shape[0] == 1:
-                    #in_queue.put((diamond_header, gene_assignments))
-                    in_queue.put((gene.index.item(), gene_assignments))
+                return_dict[current_diamond_header] = gene_hits
+                if count >= chunk_size:
+                    yield return_dict
+                    return_dict = {}
+                    count = 0
 
                 # new gene
-                # diamond_header = spline[0]
-                gene = assignments_df.loc[assignments_df.diamond_header == spline[0]]
-                try:
-                    gene.diamond_header.item()
-                    current_diamond_header = gene.diamond_header.item()
-                except:
-                    logging.error(
-                        f"Following diamond hit could not be "
-                        f"conclusively matched to gene ID: {spline[0]}\n"
-                        f"Please check GFF for ambiguity or other issues. "
-                        f"Will skip hits. Matched genes:\n {gene}.")
-                    current_diamond_header = None
-                    continue
-                gene_assignments = [spline]
+                current_diamond_header = line.split()[0]
+                gene_hits = [line]
 
-        if gene.shape[0] == 1:
-            in_queue.put((gene.index.item(), gene_assignments))
-
-    logging.info(f">>> processing DIAMOND hits")
-
-    # add sentinels to track if queue really is empty
-    for p in range(cfg.threads-1):
-        in_queue.put(None)
+        return_dict[current_diamond_header] = gene_hits
+        yield return_dict
 
 
 def process_hits(cfg, tax_assignment_path, assignments_df, target_taxon, missing_taxids, TAX_DB):
 
-    logging.info(f">> reading DIAMOND hits file")
-    in_queue = mp.Queue()
-    results_queue = mp.Queue()
+    logging.info(f">> processing DIAMOND hits file")
+    threads = max((cfg.threads // 4), 1)
     # start the processing
-    pool = mp.Pool(cfg.threads-1, calc_assignment, (in_queue, results_queue, target_taxon, missing_taxids, TAX_DB))
-    # start the reading
-    read_process = mp.Process(target=read_hit_file,
-                              args=(cfg, assignments_df, in_queue,))
-    read_process.start()
-    # wait for all processes to finish
-    read_process.join()
-    read_process.close()
-    pool.close()
+    pool = mp.Pool(threads)
+
+    file_mem = pathlib.Path(cfg.diamond_results_path).stat().st_size
+    available_mem = psutil.virtual_memory().available * 0.1
+    chunk_size = available_mem / threads
+    n_chunks = file_mem // chunk_size
+    if (n_chunks < threads):
+        n_chunks = threads
+        chunk_size = file_mem // n_chunks
 
     # empty file
     with open(tax_assignment_path, 'w') as file:
+        cfg.slim_diamond_results = True
         if cfg.slim_diamond_results:
             file.write('\t'.join(['qseqid', 'sseqid', 'pident', 'evalue',
                                   'bitscore', 'taxid', 'taxname']) + '\n')
@@ -880,20 +859,35 @@ def process_hits(cfg, tax_assignment_path, assignments_df, target_taxon, missing
                                   'sstart', 'send', 'evalue', 'bitscore',
                                   'taxid', 'taxname']) + '\n')
 
-        sentinel_countdown = cfg.threads - 1
-        while sentinel_countdown > 0:
-            results = results_queue.get()
-            if results is None:
-                sentinel_countdown -= 1
-                continue
-            add_ta2gene(results, cfg, tax_assignment_path, assignments_df,
-                        target_taxon)
+        chunks = read_hit_file(cfg, chunk_size)
+        unmapped_proteins = []
+        pbar = tqdm(total=n_chunks,
+                    bar_format='{l_bar}{bar}| [{elapsed}<{remaining}, ' '{rate_fmt}{postfix}]')
 
-        in_queue.close()
-        in_queue.join_thread()
-        results_queue.close()
-        results_queue.join_thread()
-        pool.join()
+        for i in pool.imap_unordered(
+                calc_assignment, [(chunk, assignments_df, target_taxon, missing_taxids, TAX_DB) for chunk in chunks]):
+            pbar.update(1)
+            for gene_name, results in i[0].items():
+                add_ta2gene(gene_name, results, cfg, tax_assignment_path, assignments_df,
+                            target_taxon)
+            unmapped_proteins += i[1]
+
+
+    if pbar.n != n_chunks:
+        pbar.update(n_chunks-pbar.n)
+
+    pbar.close()
+
+    pool.close()
+    pool.join()
+    pbar.close()
+
+    if unmapped_proteins:
+        logging.info(f"Unable to process hits for protein(s) with following "
+                     f"accession(s): \n {unmapped_proteins}\n"
+                     f"Either the mapping to gene ID or the mapping of "
+                     f"hit accession to respective taxon failed.")
+
 
 def taxonomic_assignment(cfg, gff_df, assignments_df, tax_assignment_path, target_taxon, missing_taxids, TAX_DB):
     """
