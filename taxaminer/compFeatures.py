@@ -1694,12 +1694,19 @@ def process_fasta(cfg, a, gff_df):
         n_chunks = cfg.threads
         chunk_size = (file_mem // n_chunks) + 1
 
-    for i in tqdm(pool.imap_unordered(init_contig_and_genes, read_fasta(cfg, a, gff_df, chunk_size)),
-                  desc ="chunks processed", total=n_chunks):
+    pbar = tqdm(total=n_chunks,
+                bar_format='{l_bar}{bar}| [{elapsed}<{remaining}, ' '{rate_fmt}{postfix}]')
+    for i in pool.imap_unordered(init_contig_and_genes, read_fasta(cfg, a, gff_df, chunk_size)):
+        pbar.update(1)
         for contig_id, data in i.items():
             total_tetranuc_freqs, total_trinuc_freqs, total_dinuc_freqs = add_fasta_data2a(
                 contig_id, data, a, cfg, proteins_file, total_tetranuc_freqs,
                 total_trinuc_freqs, total_dinuc_freqs)
+
+    if pbar.n != n_chunks:
+        pbar.update(n_chunks-pbar.n)
+
+    pbar.close()
 
     if proteins_file:
         proteins_file.close()
@@ -1783,7 +1790,6 @@ def read_bam(cfg, a):
                     contig.add_base_coverage(bam_index, coverage_wo_ns)
                 pool.close()
                 pool.join()
-
 
 # # !!!!!!!!!!!!!!!!!!!!!!!!!!! GENERATE OUTPUT PART !!!!!!!!!!!!!!!!!!!!!!!!!!!
 

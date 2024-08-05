@@ -1100,7 +1100,7 @@ def taxonomy_summary(cfg, assignments_df, target_taxon, query_label, missing_tax
             f'({round((outside_query_lineage/total_assignments)*100, 2)}%)\n\n')
         for rank, taxa in tax_sum_dict.items():
             summary_file.write(f'Following taxa for rank "{rank}" '
-                               f'are present in the assembly:\n')
+                               f'are present in the assembly ("taxon"\t"gene count"):\n')
             for taxon, count in taxa.items():
                 if taxon != 'None' and taxon:
                     summary_file.write(f'{taxon}:\t{count}\n')

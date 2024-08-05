@@ -375,7 +375,7 @@ def parse_genes(cfg):
             if len(spline) == 9:
                 feature_dict = spline2dict(spline, cfg.include_pseudogenes)
             else:
-                spline += [f"\tID={spline[2]}-{line_num}"]
+                spline.append(f"\tID={spline[2]}-{line_num}")
                 feature_dict = spline2dict(spline, cfg.include_pseudogenes)
 
             if feature_dict.get('type') == 'gene':

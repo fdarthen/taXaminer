@@ -128,7 +128,7 @@ def main():
     else:
         logging.info(f"> Reusing gene features in"
                      f" {cfg.output_path}gene_info/imputed_gene_table.csv\n"
-                     f"Use option 'force' to overwrite.")
+                     f"Use option 'force: True' to overwrite.")
 
 
     pre_time = time.time()
@@ -150,8 +150,9 @@ def main():
         taxonomic_assignment, query_label = compTaxonomicAssignment.run_assignment(cfg, gff_df, pca_coordinates, TAX_DB)
         logging.debug(f'finished [{int(time.time()-pre_time)}s]\n')
     else:
-        logging.info(f"> Reusing taxonomic assignment in in"
-                     f" {cfg.output_path}taxonomic_assignment/gene_table_taxon_assignment.csv")
+        logging.info(f"> Reusing taxonomic assignment in"
+                     f" {cfg.output_path}taxonomic_assignment/gene_table_taxon_assignment.csv\n"
+                     f"Use option 'force: True' to overwrite.")
         taxonomic_assignment = pd.read_csv(f"{cfg.output_path}taxonomic_assignment/gene_table_taxon_assignment.csv",
             sep=',', index_col='g_name',
             usecols = ['g_name','fasta_header', 'best_hit', 'best_hitID',

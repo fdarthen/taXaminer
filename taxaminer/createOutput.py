@@ -194,9 +194,6 @@ def marker_styling(cfg, plot_df, query_label):
 
 
 def update_nc_genes(cfg, plot_df):
-    print(plot_df.plot_label.unique())
-    print(bool('Unassigned' in plot_df.plot_label.to_list()))
-    print(bool('Unassigned' in plot_df.plot_label.unique()))
     if "Unassigned" in plot_df.plot_label.to_list():
         plot_df.loc[plot_df['gene_biotype'] != 'mRNA', 'plot_colour'] = plot_df.loc[plot_df['plot_label'] == 'Unassigned', 'plot_colour'].iloc[0]
     else:
