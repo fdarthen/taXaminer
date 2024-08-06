@@ -6,11 +6,22 @@ Expects processed config file
 """
 __author__ = "Freya Arthen"
 
+import time
+
+from tqdm import tqdm
+
 from . import checkInput
 from . import compTaxonomicAssignment
 
 import sys
 import pandas as pd
+import multiprocessing as mp
+
+def chunks(lst, n):
+    """Yield n successive chunks from lst."""
+    size = (len(lst) // n) + 1
+    for i in range(0, len(lst), size):
+        yield lst[i:i + size]
 
 def percentage_target(contig_genes):
 
@@ -76,6 +87,61 @@ def monitor_coverage(contig_genes):
     cont_std = covs.loc[covs['is_target'] == 0].drop(columns='is_target').std()
 
 
+def compute_contig_stats(params):
+
+    (chunk, all_data_df, missing_taxids, TAX_DB) = params
+
+    df_list = []
+
+    contigs_df_header = ['c_name', 'num_of_genes', 'percentage_target', 'lca',
+        'most_abundant_taxon', 'target_bitscore_mean', 'target_bitscore_sd',
+        'target_evalue_mean', 'target_evalue_sd', 'other_bitscore_mean',
+        'other_bitscore_sd', 'other_evalue_mean',  'other_evalue_sd']
+
+    for contig_id in chunk:
+
+        contig_genes = all_data_df.loc[all_data_df['c_name'] == contig_id, :]
+        contig_row = [contig_id, contig_genes.iloc[0].c_num_of_genes]
+
+        if contig_genes.empty:
+            df_list.append(contig_row)
+            continue
+        contig_lca = comp_contig_lca(contig_genes, missing_taxids, TAX_DB)
+        if not contig_lca or contig_lca == "Unassigned":
+            contig_row.append("Unassigned")
+            contig_row.append(None)
+
+        else:
+            contig_row.append(contig_lca.name)
+            contig_row.append(contig_lca.taxid)
+
+        contig_row.append(percentage_target(contig_genes))
+        contig_row.append(comp_most_abundant_taxon(contig_genes))
+
+        target_genes = contig_genes.loc[contig_genes['is_target'] == 1]
+        non_target_genes = contig_genes.loc[contig_genes['is_target'] == 0]
+        # target_bitscore_mean
+        contig_row.append(round(target_genes.bh_bitscore.astype(float).mean(), 2))
+        # target_bitscore_sd
+        contig_row.append(round(target_genes.bh_bitscore.astype(float).std(), 2))
+        # target_evalue_mean
+        contig_row.append(target_genes.bh_evalue.astype(float).mean())
+        # target_evalue_sd
+        contig_row.append(target_genes.bh_evalue.astype(float).std())
+        # other_bitscore_mean
+        contig_row.append(round(non_target_genes.bh_bitscore.astype(float).mean(), 2))
+        # other_bitscore_sd
+        contig_row.append(round(non_target_genes.bh_bitscore.astype(float).std(), 2))
+        # other_evalue_mean
+        contig_row.append(non_target_genes.bh_evalue.astype(float).mean())
+        # other_evalue_sd
+        contig_row.append(non_target_genes.bh_evalue.astype(float).std())
+
+        df_list.append(contig_row)
+
+
+    return df_list, missing_taxids
+
 ###############################################################################
 ###############################################################################
 
@@ -90,54 +156,30 @@ def process_assignments(cfg, gff_df, all_data_df, TAX_DB):
 
     """
 
+    pool = mp.Pool(cfg.threads)
+
     missing_taxids = set()
 
+    contigs_df_header = ['c_name', 'num_of_genes', 'percentage_target', 'lca',
+        'most_abundant_taxon', 'target_bitscore_mean', 'target_bitscore_sd',
+        'target_evalue_mean', 'target_evalue_sd', 'other_bitscore_mean',
+        'other_bitscore_sd', 'other_evalue_mean',  'other_evalue_sd']
+
     contig_ids = all_data_df.c_name.unique()
-    contig_dict = {
-        'num_of_genes': [None for i in range(contig_ids.size)],
-        'percentage_target': [None for i in range(contig_ids.size)],
-        'lca': [None for i in range(contig_ids.size)],
-        'most_abundant_taxon': [None for i in range(contig_ids.size)],
-        'target_bitscore_mean': [None for i in range(contig_ids.size)],
-        'target_bitscore_sd': [None for i in range(contig_ids.size)],
-        'target_evalue_mean': [None for i in range(contig_ids.size)],
-        'target_evalue_sd': [None for i in range(contig_ids.size)],
-        'other_bitscore_mean': [None for i in range(contig_ids.size)],
-        'other_bitscore_sd': [None for i in range(contig_ids.size)],
-        'other_evalue_mean': [None for i in range(contig_ids.size)],
-        'other_evalue_sd': [None for i in range(contig_ids.size)]
-    }
-    contigs = pd.DataFrame(contig_dict, index=contig_ids)
-    contigs['num_of_genes'] = contigs.index.map(
-        all_data_df[['c_name', 'c_num_of_genes']].set_index('c_name').to_dict().get('c_num_of_genes'))
 
-    for contig in contigs.itertuples():
-        contig_genes = all_data_df.loc[all_data_df['c_name'] == contig.Index, :]
+    chunked_contig_ids = list(chunks(contig_ids, cfg.threads))
 
-        if contig_genes.empty:
-            continue
-        contig_lca = comp_contig_lca(contig_genes, missing_taxids, TAX_DB)
-        if not contig_lca or contig_lca == "Unassigned":
-            contigs.at[contig.Index, 'lca'] = "Unassigned"
-            contigs.at[contig.Index, 'lcaID'] = None
-        else:
-            contigs.at[contig.Index, 'lca'] = contig_lca.name
-            contigs.at[contig.Index, 'lcaID'] = contig_lca.taxid
-        contigs.at[contig.Index, 'percentage_target'] = percentage_target(
-            contig_genes)
-        contigs.at[
-            contig.Index, 'most_abundant_taxon'] = comp_most_abundant_taxon(contig_genes)
-        # contigs.at[contig.Index, 'all_assignments'] = ';'.join(contig_genes['taxon_assignment'].dropna().unique().tolist())
+    df_row_list = [contigs_df_header]
+    for i in tqdm(pool.imap_unordered(compute_contig_stats,
+            [(chunk, all_data_df, missing_taxids, TAX_DB) for
+             chunk in chunked_contig_ids]),
+            total=len(chunked_contig_ids),
+            bar_format='{l_bar}{bar}| [{elapsed}<{remaining}, ' '{rate_fmt}{postfix}]'):
+        # add data to df list
+        df_row_list += i[0]
+        missing_taxids = missing_taxids | i[1]
 
-        contigs.at[contig.Index, 'target_bitscore_mean'] = round(contig_genes.loc[contig_genes['is_target'] == 1, 'bh_bitscore'].astype(float).mean(),2)
-        contigs.at[contig.Index, 'target_bitscore_sd'] = round(contig_genes.loc[contig_genes['is_target'] == 1, 'bh_bitscore'].astype(float).std(),2)
-        contigs.at[contig.Index, 'target_evalue_mean'] = contig_genes.loc[contig_genes['is_target'] == 1, 'bh_evalue'].astype(float).mean()
-        contigs.at[contig.Index, 'target_evalue_sd'] = contig_genes.loc[contig_genes['is_target'] == 1, 'bh_evalue'].astype(float).std()
-        contigs.at[contig.Index, 'other_bitscore_mean'] = round(contig_genes.loc[contig_genes['is_target'] == 0, 'bh_bitscore'].astype(float).mean(),2)
-        contigs.at[contig.Index, 'other_bitscore_sd'] = round(contig_genes.loc[contig_genes['is_target'] == 0, 'bh_bitscore'].astype(float).std(),2)
-        contigs.at[contig.Index, 'other_evalue_mean'] = contig_genes.loc[contig_genes['is_target'] == 0, 'bh_evalue'].astype(float).mean()
-        contigs.at[contig.Index, 'other_evalue_sd'] = contig_genes.loc[contig_genes['is_target'] == 0, 'bh_evalue'].astype(float).std()
-
+    contigs = pd.DataFrame(df_row_list)
     contigs.to_csv(f"{cfg.output_path}taxonomic_assignment/contig_assignments.csv", index_label='c_name')
 
 
