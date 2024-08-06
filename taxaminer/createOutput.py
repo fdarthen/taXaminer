@@ -315,7 +315,6 @@ def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_labe
             t=40
         ),
         legend={'itemsizing': 'constant',
-                'groupclick': "toggleitem",
                 'tracegroupgap': 2}
     )
 
@@ -350,54 +349,55 @@ def create_3D_plot(cfg, plot_df, pca_obj, variables, pca_coordinates, query_labe
             legendgrouptitle_text="Non-protein-coding"
         ))
 
-    ### ADD PCA CONTRIBUTION OF VARIABLES ###
-    loadings = pca_obj.components_.T * np.sqrt(pca_obj.explained_variance_)
-    # scaling of the loading to the data
-    coordinates_as_tuples = [(row[1]['PC 1'], row[1]['PC 2'], row[1]['PC 3'])
-                             for row in pca_coordinates.iterrows()]
-    farthest_point = reduceDims.farthest((0, 0, 0), coordinates_as_tuples)
-    factor = max(
-        [np.abs(farthest_point[i]) / max(np.abs(loadings[:, i])) for i in
-         range(len(farthest_point))]) * 0.5
+    if cfg.reduction_method == 'pca':
+        ### ADD PCA CONTRIBUTION OF VARIABLES ###
+        loadings = pca_obj.components_.T * np.sqrt(pca_obj.explained_variance_)
+        # scaling of the loading to the data
+        coordinates_as_tuples = [(row[1]['PC 1'], row[1]['PC 2'], row[1]['PC 3'])
+                                 for row in pca_coordinates.iterrows()]
+        farthest_point = reduceDims.farthest((0, 0, 0), coordinates_as_tuples)
+        factor = max(
+            [np.abs(farthest_point[i]) / max(np.abs(loadings[:, i])) for i in
+             range(len(farthest_point))]) * 0.5
 
-    coordinates_contribution = pd.DataFrame({
-        'center': [(0, 0, 0) for i in range(loadings.shape[0])],
-        'loading': [(row[0], row[1], row[2]) for row in loadings]},
-        index=variables)
+        coordinates_contribution = pd.DataFrame({
+            'center': [(0, 0, 0) for i in range(loadings.shape[0])],
+            'loading': [(row[0], row[1], row[2]) for row in loadings]},
+            index=variables)
 
-    lengths = pd.DataFrame(
-        [reduceDims.distance(row[1]['center'], row[1]['loading']) for row in
-         coordinates_contribution.iterrows()],
-        index=variables)
-    colour_lengths = colourscale_to_lengths(lengths, 'Greys')
+        lengths = pd.DataFrame(
+            [reduceDims.distance(row[1]['center'], row[1]['loading']) for row in
+             coordinates_contribution.iterrows()],
+            index=variables)
+        colour_lengths = colourscale_to_lengths(lengths, 'Greys')
 
-    coordinates_contribution = coordinates_contribution.join(colour_lengths)
+        coordinates_contribution = coordinates_contribution.join(colour_lengths)
 
-    logging.debug('>>>loading contribution of variables')
-    for variable in coordinates_contribution.iterrows():
-        x = [variable[1]['center'][0], variable[1]['loading'][0] * factor]
-        y = [variable[1]['center'][1], variable[1]['loading'][1] * factor]
-        z = [variable[1]['center'][2], variable[1]['loading'][2] * factor]
-        fig.add_trace(go.Scatter3d(
-            x=x,
-            y=y,
-            z=z,
-            visible="legendonly",
-            legendgroup="variables",
-            legendgrouptitle_text="Contribution<br>of variables",
-            line=dict(
-                color=variable[1][0],
-                width=2
-            ),
-            marker=dict(
-                size=[0, 5],
-                color=variable[1][0]
-            ),
-            name=variable[0],
-            hovertext=variable[0],
-            hoverinfo='text'
-        ))
-        
+        logging.debug('>>>loading contribution of variables')
+        for variable in coordinates_contribution.iterrows():
+            x = [variable[1]['center'][0], variable[1]['loading'][0] * factor]
+            y = [variable[1]['center'][1], variable[1]['loading'][1] * factor]
+            z = [variable[1]['center'][2], variable[1]['loading'][2] * factor]
+            fig.add_trace(go.Scatter3d(
+                x=x,
+                y=y,
+                z=z,
+                visible="legendonly",
+                legendgroup="variables",
+                legendgrouptitle_text="Contribution<br>of variables",
+                line=dict(
+                    color=variable[1][0],
+                    width=2
+                ),
+                marker=dict(
+                    size=[0, 5],
+                    color=variable[1][0]
+                ),
+                name=variable[0],
+                hovertext=variable[0],
+                hoverinfo='text'
+            ))
+
     fig.update_layout(legend=dict(groupclick="togglegroup"),
                       modebar_add=["v1hovermode"])
 

@@ -18,7 +18,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 import plotly.graph_objects as go
 import math
-import umap
+import umap.umap_ as umap
 
 # prevents message "Loading [MathJax]/extensions/MathMenu.js" showing in plots
 import plotly
@@ -239,9 +239,11 @@ def write_pca_summary(cfg, pca, variables):
 
 
 def compute_umap(data):
-    reducer = umap.UMAP(n_components=3)
+    prev_level = logging.getLogger().level
+    logging.getLogger().setLevel(logging.INFO)
+    reducer = umap.UMAP(n_components=3, verbose=False)
     embedding = reducer.fit_transform(data)
-
+    logging.getLogger().setLevel(prev_level)
     return embedding
 
 
@@ -311,18 +313,6 @@ def compute_pca(cfg):
 
     # :::::::::::::::::::: PCA ::::::::::::::::::::::::::::::
 
-    scaled_data = StandardScaler().fit_transform(data.iloc[:, 1:])
-    pca = PCA()
-    components = pca.fit_transform(scaled_data)
-
-    pca_coordinates = pd.DataFrame(data=components[:, :3],
-                                   columns=['PC 1', 'PC 2', 'PC 3'],
-                                   index=data.index)
-
-    # umap_embedding = compute_umap(scaled_data)
-    # umap_df = pd.DataFrame(data=umap_embedding
-    #                     , columns=['PC 1', 'PC 2', 'PC 3'],index=data.index)
-
     plot_template = dict(
         layout=go.Layout(
             template="plotly_white",
@@ -333,17 +323,33 @@ def compute_pca(cfg):
             yaxis=dict(automargin=True, title_standoff=5)
         ))
 
-    #create_2d_biplot(cfg, pca, components, data.columns[1:], plot_template)
-    create_heatmap(cfg, pca, data.columns[1:], plot_template)
-    create_scree_plot(cfg, pca, plot_template)
-    create_bar_plot(cfg, pca, plot_template)
-    create_3d_biplot(cfg, pca, components, data.columns[1:], plot_template)
-    write_contrib_report(cfg, pca, data.columns[1:])
-    write_pca_summary(cfg, pca, data.columns[1:])
+    scaled_data = StandardScaler().fit_transform(data.iloc[:, 1:])
+    if cfg.reduction_method == 'pca':
+        pca = PCA()
+        components = pca.fit_transform(scaled_data)
 
-    return pca, pca_coordinates, data.columns[1:]
+        coordinates = pd.DataFrame(data=components[:, :3],
+                                   columns=['PC 1', 'PC 2', 'PC 3'],
+                                   index=data.index)
 
-    # TODO: horns parallel analysis
+        create_heatmap(cfg, pca, data.columns[1:], plot_template)
+        create_scree_plot(cfg, pca, plot_template)
+        create_bar_plot(cfg, pca, plot_template)
+        create_3d_biplot(cfg, pca, components, data.columns[1:], plot_template)
+        write_contrib_report(cfg, pca, data.columns[1:])
+        write_pca_summary(cfg, pca, data.columns[1:])
+
+    elif cfg.reduction_method.lower() == 'umap':
+        umap_embedding = compute_umap(scaled_data)
+        coordinates = pd.DataFrame(data=umap_embedding,
+                               columns=['PC 1', 'PC 2', 'PC 3'],index=data.index)
+        pca = None
+
+    else:
+        logging.error(f"Invalid dimension reduction method: {cfg.reduction_method}\n"
+                      f"Choose from 'umap' or 'pca'")
+
+    return pca, coordinates, data.columns[1:]
 
 
 def main():

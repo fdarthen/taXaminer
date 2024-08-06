@@ -75,6 +75,7 @@ class Config:
         self.marker_size = cfg_dict.get('marker_size')
 
         self.include_pseudogenes = cfg_dict.get('include_pseudogenes')
+        self.reduction_method = cfg_dict.get('reduction_method')
         self.input_variables = cfg_dict.get('input_variables')
         self.num_pcs = cfg_dict.get('num_pcs')
 
@@ -473,6 +474,8 @@ def set_config_defaults(config_obj, TAX_DB, db_dir):
                                                        config_vars.get('include_coverage'),
                                                        config_vars.get('bam_paths').keys())
     config_vars['num_pcs'] = set_default(config_obj, 'num_pcs', '3')
+    config_vars['reduction_method'] = set_default(config_obj, 'reduction_method', 'pca')
+
 
 
     return config_vars
