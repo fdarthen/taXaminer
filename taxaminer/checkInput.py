@@ -76,9 +76,7 @@ class Config:
 
         self.include_pseudogenes = cfg_dict.get('include_pseudogenes')
         self.input_variables = cfg_dict.get('input_variables')
-        self.perform_parallel_analysis = cfg_dict.get('perform_parallel_analysis')
         self.num_pcs = cfg_dict.get('num_pcs')
-        self.coverage_cutoff_mode = cfg_dict.get('coverage_cutoff_mode')
 
         self.script_dir = cfg_dict.get('script_dir')
         self.usr_cfg_path = cfg_dict.get('usr_cfg_path')
@@ -474,13 +472,8 @@ def set_config_defaults(config_obj, TAX_DB, db_dir):
                                                                    default_pca_vars),
                                                        config_vars.get('include_coverage'),
                                                        config_vars.get('bam_paths').keys())
-    config_vars['perform_parallel_analysis'] = set_yesno_default(config_obj,
-                                                           'perform_parallel_analysis',
-                                                           False)
     config_vars['num_pcs'] = set_default(config_obj, 'num_pcs', '3')
-    config_vars['coverage_cutoff_mode'] = set_default(config_obj,
-                                                      'coverage_cutoff_mode',
-                                                      'default')
+
 
     return config_vars
 
@@ -565,10 +558,6 @@ def write_run_overview(config_path, config_vars):
     logging.info('\n')
 
     logging.info(f"PCA variables:\t{config_vars.get('input_variables')}")
-    logging.info(f"Parallel analysis performed:\t"
-                 f"{config_vars.get('perform_parallel_analysis')}")
-    if config_vars.get('coverage_cutoff_mode') != 'default':
-        logging.info(f"Coverage cutoff:\t{config_vars.get('coverage_cutoff_mode')}")
 
     logging.info('')
 
