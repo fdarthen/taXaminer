@@ -26,6 +26,8 @@ from tqdm import tqdm
 import os
 import time
 from pathlib import Path
+import re
+
 
 # ====================== CONSTANTS ======================
 # define nucleotide alphabet
@@ -42,6 +44,31 @@ DINUCLEOTIDES = [''.join(i) for i in itertools_product(NUC_ALPHABET, repeat = 2)
 # ==============================================================
 # ========================= FUNCTIONS ==========================
 # ==============================================================
+
+def chunks(lst, n):
+    """Yield n successive chunks from lst."""
+    size = (len(lst) // n) + 1
+    for i in range(0, len(lst), size):
+        yield lst[i:i + size]
+
+def size_sorted_contigs(contig_ids):
+
+
+    natsort = lambda s: [int(t) if t.isdigit() else t.lower() for t in
+                         re.split('([0-9]+)', s)]
+    name_sorted_ids = sorted(contig_ids, key=natsort)
+    evenly_size_sorted_ids = []
+    for i in range((len(name_sorted_ids)//2)):
+        evenly_size_sorted_ids.append(name_sorted_ids[i])
+        evenly_size_sorted_ids.append(name_sorted_ids[-(i+1)])
+    if len(name_sorted_ids) % 2 == 1:
+        missing_index = (len(name_sorted_ids)//2)
+        evenly_size_sorted_ids.append(name_sorted_ids[missing_index])
+
+    return evenly_size_sorted_ids
+
+
+
 def compare(given, relation, crit):
     """
     Returns True, if the given value relates to the critical value
@@ -1726,25 +1753,28 @@ def process_fasta(cfg, a, gff_df):
 
 
 def compute_coverage(args):
-    (contig_name, bam_path, index_path) = args
+    (contig_names, bam_path, index_path) = args
 
     bamfile = pysam.AlignmentFile(bam_path, "rb",
                                   index_filename=index_path)
 
-    cov_array = bamfile.count_coverage(contig_name,
-                                       quality_threshold=0,
-                                       read_callback='nofilter')
+    cov_dict = {}
+    for contig_name in contig_names:
+
+        cov_array = bamfile.count_coverage(contig_name,
+                                           quality_threshold=0,
+                                           read_callback='nofilter')
 
 
-    # cov_array is a tuple of 4 arrays: one for each nucleotide, each position representing the
-    # number of reads with the respective nucleotide at respective position
-    # position wit Ns will be included with a coverage of 0
-    contig_coverage = [sum([cov_array[base][pos] for base in range(4)]) for pos
-                       in range(len(cov_array[0]))]
-
+        # cov_array is a tuple of 4 arrays: one for each nucleotide, each position representing the
+        # number of reads with the respective nucleotide at respective position
+        # position wit Ns will be included with a coverage of 0
+        contig_coverage = [sum([cov_array[base][pos] for base in range(4)]) for pos
+                           in range(len(cov_array[0]))]
+        cov_dict[contig_name] = contig_coverage
     bamfile.close()
 
-    return contig_name, contig_coverage
+    return cov_dict
 
 
 def read_bam(cfg, a):
@@ -1759,6 +1789,11 @@ def read_bam(cfg, a):
     """
 
     if cfg.include_coverage:
+
+        contig_ids = list(a.get_contigs().keys())
+        evenly_sorted_ids = size_sorted_contigs(contig_ids)
+        chunked_contig_ids = list(chunks(evenly_sorted_ids, (cfg.threads * 2)))
+
         for bam_index, bam_path in a.get_bam_paths().items():
             logging.info(f">> reading BAM file {bam_index}")
             bamfile = pysam.AlignmentFile(bam_path, "rb")
@@ -1773,21 +1808,15 @@ def read_bam(cfg, a):
                     logging.info('>>> creating BAM file index')
                     pysam.index(bam_path, index_path)
 
-            calls = []
-
-            for contig_name, contig in a.get_contigs().items():
-                if not contig_name in a.get_contigs().keys(): # if contig has no genes
-                    continue
-                calls.append((contig_name, bam_path, index_path))
-
+            calls = [(chunk, bam_path, index_path) for chunk in chunked_contig_ids]
 
             if calls:
                 pool = mp.Pool(cfg.threads)
-                for i in tqdm(pool.imap_unordered(compute_coverage, calls),
-                              desc ="contigs processed", total=len(calls)):
-                    contig = a.get_contig(i[0])
-                    coverage_wo_ns = [np.nan if pos in contig.positions_of_Ns else cov for pos, cov in enumerate(i[1])]
-                    contig.add_base_coverage(bam_index, coverage_wo_ns)
+                for i in tqdm(pool.imap_unordered(compute_coverage, calls), total=len(calls)):
+                    for contig_name, coverage in i.items():
+                        contig = a.get_contig(contig_name)
+                        coverage_wo_ns = [np.nan if pos in contig.positions_of_Ns else cov for pos, cov in enumerate(coverage)]
+                        contig.add_base_coverage(bam_index, coverage_wo_ns)
                 pool.close()
                 pool.join()
 
