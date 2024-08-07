@@ -1,8 +1,10 @@
 # taXaminer
 
-taXaminer enables the interactive exploration of taxonomic footprints in gene sets. The specific goal is to detect and differentiate contamination and horizontal gene transfer.
+taXaminer - examine the taxonomic diversity in genome assemblies. Designed to detect and differentiate contamination and horizontal gene transfer. 
 
-Besides the taxonomic assignment of genes, taXaminer uses a total of 16 further indicators to faciliate this. Among these indicators are read coverage, sequence composition, gene length and position of genes within their scaffold. To identify genes which deviate from the mean set of genes, a principal component analysis (PCA) is used as it condenses data to fewer dimensions. Genes with similar values for certain variables are thereby clustered together, so that deviations are made visible. The results can be interactively examined in a 3D scatterplot, where the dot position respresents a combination of coverage, sequence composition and spatial information provided by the PCA and the color the taxonomic assignment.
+taXaminer combines a reference-free and an alignment-based approach to detect and differentiate contamination and horizontal gene transfer in genome assemblies. It uses a total of 16 intrinsic features to describe the gene set. Among these are the read coverage, sequence composition, gene length and the size of the scaffold it is annotated on (see details [here](https://github.com/BIONF/taXaminer/wiki/Additional-information#pca-variables)). To identify genes which discern from the average, a Principal Component Analysis is used to cluster genes with similar features. The taxonomic assignment targets at identifying the true taxon of origin for each gene. It is based on their protein sequence to reduce the need of having the exact reference in the database. 
+
+The results can be interactively explored in the accompanying [dashboard](https://github.com/BIONF/taxaminer-dashboard).
 
 # Table of Contents
 * [Installation](#installation)
@@ -14,59 +16,63 @@ Besides the taxonomic assignment of genes, taXaminer uses a total of 16 further 
 
 # Installation
 
-## Using Conda
-Dependencies for *taXaminer* can be installed within a [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/) environment. For this, run:
+To install taXaminer, use the python package installer pip. 
+Note: taXaminer is as of yet not published at pypi, thus you need to download this repository and provide pip with the link to the directory for installation.
 ```
-./setup_conda.sh
+git clone https://github.com/BIONF/taXaminer.git
+pip install ./taXaminer
 ```
-The script will create the new environment 'taxaminer' and download and install all required dependencies - this step will take a while. *(Note: Depending on your system this sometimes fails, please check the console log for error messages concerning the dependency installation)*
 
-## Preparation of reference database
-To prepare the reference database for taxonomic assignment of the gene set, run:
+To install the additional dependencies, use the setup function included in taXaminer. You can install the tools either via conda or locally in a specified directory.
+
+Using conda (installs into the currently active environment):
 ```
-./setup_db.sh
+taxaminer.setup --conda
 ```
-This downloads the most recent NCBI non-redundant protein database and all additional files into the working directory to create a DIAMOND formatted version of it. 
+In a local directory:
+```
+taxaminer.setup -o </path/to/tool/directory/>
+```
+To download and build the database, use:
+```
+taxaminer.setup --db -d </path/to/database/directory/>
+```
+Use the following command to use an existing database.
+```
+taxaminer.setup -d </path/to/existing_database/directory/>
+```
 
 # Usage
-1. Make a copy of the default config file 'config.yml' from the taXaminer directory
-2. Adjust the following parameters to fit your data:
+1. Create a configuration file using the following template and adapt it to fit your data.
 ```
 fasta_path: "path/to/assembly.fasta" # path to assembly FASTA
 gff_path: "path/to/assembly.gff" # path to annotation in GFF3 format
 output_path: "path/to/output_directory/" # directory to save results in
 taxon_id: "<NCBI taxon ID>" # NCBI Taxon ID of query species
-database_path: "path/to/database.dmnd" # path to database for taxonomic assignment
 ```
-3. To include coverage information, adapt one of the following parameters (this is optional):
+2. To include coverage information, add the path to a sorted bam file (this is optional). Otherwise, omit this parameter from the configuration file.
 ```
-pbc_path_1: "path/to/pbc.txt" # path to PBC file; omit to use default location in output directory
-bam_path_1: "path/to/mapping.bam" # path to BAM file; omit to use default location in output directory
-read_paths_1: ["path/to/read_file_1.fa","path/to/read_file_2.fa"] # path to read file(s)
+bam_path_1: "path/to/mapping.bam" # path to BAM file
 ```
-* Note: When using multiple coverage sets, duplicate the parameter you need and increase the number in the suffix
+* Note: When using multiple coverage sets, duplicate the parameter and increase the number in the suffix
 
 
-Make sure to activate the conda environment before running *taXaminer*. To run *taXaminer* on a SLURM cluster environment (recommended), enter:
+To run taXaminer, call it with the path to the config file, like so:
 ```
-sbatch taxaminer.slurm <config.yml>
-```
-To run it locally, use:
-```
-python taxaminer.py <config.yml>
+taxaminer.run <config.yml>
 ```
 
-For details on additional options see [Configuration parameters](https://github.com/fdhubert/taXaminer/wiki/Configuration-parameters). 
+For details on additional options see [Configuration parameters](https://github.com/BIONF/taXaminer/wiki/Configuration-parameters). 
 
 # Bugs
-Any bug reports, comments or suggestions are highly appreciated. Please [open an issue on GitHub](https://github.com/BIONF/taXaminer/issues/new) or reach out via [email](mailto:freya.hubert@gmail.com).
+Any bug reports, comments or suggestions are highly appreciated. Please [open an issue on GitHub](https://github.com/BIONF/taXaminer/issues/new) or reach out via [email](mailto:f.arthen@bio.uni-frankfurt.de).
 
 # Contributors
-* [Freya Arthen](https://github.com/fdhubert)
+* [Freya Arthen](https://github.com/fdarthen)
 * Simonida Zehr
 
 # License
 *taXaminer* is released under [MIT license](https://github.com/BIONF/taXaminer/blob/master/LICENSE).
 
 # Contact
-Please contact us via [email](mailto:freya.hubert@gmail.com).
+Please contact us via [email](mailto:f.arthen@bio.uni-frankfurt.de).
